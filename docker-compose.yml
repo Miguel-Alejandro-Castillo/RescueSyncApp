@@ -1,0 +1,89 @@
+services:
+
+  bonita-db:
+    container_name: bonita-db
+    image: bonitasoft/bonita-postgres:15.4
+    ports:
+      - "5432:5432"
+    volumes:
+      - bonita_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bonita -d bonita"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  bonita-engine:
+    container_name: bonita-engine
+    image: bonita:2024.3
+    ports:
+      - "8080:8080"
+    environment:
+      DB_VENDOR: postgres
+      DB_HOST: bonita-db
+      DB_PORT: 5432
+      DB_NAME: bonita
+      DB_USER: bonita
+      DB_PASS: bpm
+
+      BIZ_DB_NAME: business_data
+      BIZ_DB_USER: business_data
+      BIZ_DB_PASS: bpm
+
+      BONITA_RUNTIME_ADMIN_USERNAME: tech_user
+      BONITA_RUNTIME_ADMIN_PASSWORD: secret
+
+      PLATFORM_LOGIN: pfadmin
+      PLATFORM_PASSWORD: pfsecret
+    depends_on:
+      bonita-db:
+        condition: service_healthy
+    restart: on-failure
+
+  backend:
+    container_name: rescuesync-backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      PORT: 3000
+      # PostgreSQL
+      DB_HOST: bonita-db
+      DB_PORT: 5432
+      DB_NAME: rescuesync
+      DB_USER: rescuesync
+      DB_PASSWORD: rescuesync
+
+      # Bonita
+      BONITA_URL: http://bonita-engine:8080/bonita
+      BONITA_USER: tech_user
+      BONITA_PASSWORD: secret
+    depends_on:
+      - bonita-engine
+    restart: unless-stopped
+
+  frontend:
+    container_name: rescuesync-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      VITE_API_URL: http://localhost:3000
+      CHOKIDAR_USEPOLLING: "true" # Asegura que watchers subyacentes como Chokidar detecten cambios
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  bonita_pgdata:

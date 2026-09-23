@@ -1,1 +1,110 @@
 # RescueSyncApp
+
+Guia rapida para ejecutar la infraestructura con Docker Compose.
+
+## Requisitos
+
+- Docker Desktop en ejecucion
+- `docker compose` disponible en la terminal
+
+## Levantar toda la infraestructura
+
+El comando principal para levantar toda la infraestructura es:
+
+```bash
+docker compose up -d
+```
+
+Usa ese comando al inicio cuando los servicios ya fueron construidos y solo necesitas poner en marcha todo el stack.
+
+Si ademas quieres reconstruir las imagenes mientras levantas todo, ejecuta:
+
+```bash
+docker compose up -d --build
+```
+
+Esto levanta y construye estos servicios:
+
+- `bonita-db`
+- `bonita-engine`
+- `backend`
+- `frontend`
+
+## Actualizar solo el backend
+
+Si hiciste cambios en `backend/` y quieres reconstruir solo ese servicio:
+
+```bash
+docker compose up -d --build backend
+```
+
+Si no necesitas reconstruir la imagen y solo quieres reiniciarlo:
+
+```bash
+docker compose restart backend
+```
+
+## Actualizar solo el frontend
+
+Si hiciste cambios en `frontend/` y quieres reconstruir solo ese servicio:
+
+```bash
+docker compose up -d --build frontend
+```
+
+Si no necesitas reconstruir la imagen y solo quieres reiniciarlo:
+
+```bash
+docker compose restart frontend
+```
+
+## Ver estado de los contenedores
+
+```bash
+docker compose ps
+```
+
+## Ver logs
+
+Logs de todos los servicios:
+
+```bash
+docker compose logs -f
+```
+
+Logs solo del backend:
+
+```bash
+docker compose logs -f backend
+```
+
+Logs solo del frontend:
+
+```bash
+docker compose logs -f frontend
+```
+
+## Detener sin eliminar
+
+Si solo quieres detener los contenedores, sin eliminar la infraestructura creada por Compose:
+
+```bash
+docker compose stop
+```
+
+## Eliminar toda la infraestructura
+
+`docker compose down` no solo detiene los contenedores: tambien elimina la infraestructura creada por Compose, como la red y los contenedores del proyecto.
+
+```bash
+docker compose down
+```
+
+Si tambien quieres eliminar los volumenes creados:
+
+```bash
+docker compose down -v
+```
+
+
+
