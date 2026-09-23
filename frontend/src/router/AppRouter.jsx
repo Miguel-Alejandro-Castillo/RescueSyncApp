@@ -6,6 +6,7 @@ import {
 
 import Home from "../pages/Home";
 import AltaEmergencia from "../pages/AltaEmergencia";
+import AltaLotes from "../pages/AltaLotes";
 
 function AppRouter() {
 
@@ -24,6 +25,10 @@ function AppRouter() {
                     element={<AltaEmergencia />}
                 />
 
+                <Route
+                    path="lotes/nuevo"
+                    element={<AltaLotes />}
+                />
             </Routes>
 
         </BrowserRouter>
