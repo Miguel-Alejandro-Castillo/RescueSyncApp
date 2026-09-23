@@ -7,6 +7,7 @@ services:
       - "5432:5432"
     volumes:
       - bonita_pgdata:/var/lib/postgresql/data
+      - ./database/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U bonita -d bonita"]
@@ -41,6 +42,33 @@ services:
         condition: service_healthy
     restart: on-failure
 
+  nacional:
+    container_name: rescuesync-nacional
+    build:
+      context: ./nacional
+      dockerfile: Dockerfile
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./nacional:/app
+      - /app/node_modules
+    environment:
+      PORT: 4000
+      # PostgreSQL
+      #DB_HOST: bonita-db
+      #DB_PORT: 5432
+      #DB_NAME: rescuesync
+      #DB_USER: rescuesync
+      #DB_PASSWORD: rescuesync
+
+      # Bonita
+      #BONITA_URL: http://bonita-engine:8080/bonita
+      #BONITA_USER: tech_user
+      #BONITA_PASSWORD: secret
+    depends_on:
+      - bonita-engine
+    restart: unless-stopped
+
   backend:
     container_name: rescuesync-backend
     build:
@@ -50,22 +78,12 @@ services:
       - "3000:3000"
     volumes:
       - ./backend:/app
-      - /app/node_modules
     environment:
       PORT: 3000
-      # PostgreSQL
-      DB_HOST: bonita-db
-      DB_PORT: 5432
-      DB_NAME: rescuesync
-      DB_USER: rescuesync
-      DB_PASSWORD: rescuesync
-
-      # Bonita
-      BONITA_URL: http://bonita-engine:8080/bonita
-      BONITA_USER: tech_user
-      BONITA_PASSWORD: secret
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://bonita:bpm@bonita-db:5432/rescuesync
     depends_on:
-      - bonita-engine
+      - bonita-db
     restart: unless-stopped
 
   frontend:

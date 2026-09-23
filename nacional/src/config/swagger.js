@@ -4,9 +4,9 @@ const options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "RescueSync Backend API",
+      title: "Sistema Nacional de Gestión de Recursos y Riesgos",
       version: "1.0.0",
-      description: "API Backend de RescueSync"
+      description: "API del Sistema Nacional de Gestión de Recursos y Riesgos"
     },
     servers: [
       {

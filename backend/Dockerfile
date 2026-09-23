@@ -1,14 +1,21 @@
-FROM node:22
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY package*.json ./
+COPY requirements.txt .
 
-RUN npm install
+RUN pip install \
+    --no-cache-dir \
+    -r requirements.txt
 
 COPY . .
 
+RUN sed -i 's/\r$//' start.sh \
+    && chmod +x start.sh
+
 EXPOSE 3000
 
-# CMD ["npm", "start"]
-CMD ["npm", "run", "dev"]
+CMD ["./start.sh"]
