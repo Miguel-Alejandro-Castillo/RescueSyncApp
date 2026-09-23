@@ -1,33 +1,34 @@
 import React, { useState } from 'react';
 import { crearLotes } from '../services/lotesService';
 
-// Simulación de emergencias registradas pendientes de desglose y publicación
+// Datos simulados de emergencias pendientes
 const MOCK_EMERGENCIAS_PENDIENTES = [
     {
         id: "EMG-101",
         zonaAfectada: "Municipio de Quilmes - Sector Este",
         nivelGravedad: "critico",
         descripcionInicial: "Inundación por desborde de arroyo. Se requieren refugios y atención médica urgente.",
-        tiempoVentana: "2 horas"
+        tiempoVentanaSugerido: 2 // horas
     },
     {
         id: "EMG-102",
         zonaAfectada: "Zona Norte - Tigre",
         nivelGravedad: "alto",
         descripcionInicial: "Temporal de viento y lluvia con caída de postes de luz y anegamientos.",
-        tiempoVentana: "6 horas"
+        tiempoVentanaSugerido: 6 // horas
     },
     {
         id: "EMG-103",
         zonaAfectada: "La Plata - Casco Urbano",
         nivelGravedad: "medio",
         descripcionInicial: "Anegamiento puntual de avenidas principales sin evacuados de gravedad.",
-        tiempoVentana: "12 horas"
+        tiempoVentanaSugerido: 12 // horas
     }
 ];
 
 const AltaLotes = () => {
     const [emergenciaSeleccionada, setEmergenciaSeleccionada] = useState(null);
+    const [horasVentana, setHorasVentana] = useState(2); // Estado editable de la ventana de tiempo
     const [lotes, setLotes] = useState([
         { tipoRecurso: 'Insumos', descripcion: '', cantidad: 1 }
     ]);
@@ -36,6 +37,9 @@ const AltaLotes = () => {
         const id = e.target.value;
         const encontrada = MOCK_EMERGENCIAS_PENDIENTES.find(item => item.id === id);
         setEmergenciaSeleccionada(encontrada || null);
+        if (encontrada) {
+            setHorasVentana(encontrada.tiempoVentanaSugerido); // Precarga el valor sugerido
+        }
     };
 
     const handleLoteChange = (index, e) => {
@@ -73,7 +77,7 @@ const AltaLotes = () => {
 
         const payload = {
             emergenciaId: emergenciaSeleccionada.id,
-            duracionConvocatoria: emergenciaSeleccionada.tiempoVentana,
+            duracionConvocatoriaHoras: Number(horasVentana),
             lotes
         };
 
@@ -87,10 +91,7 @@ const AltaLotes = () => {
                 <div className="col-12 col-lg-10">
                     <div className="card shadow-sm border-0 rounded-4">
                         <div className="card-body p-4">
-                            <h1 className="h3 mb-2 text-center">Desglose de Lotes y Apertura de Convocatoria</h1>
-                            <p className="text-muted text-center mb-4 small">
-                                Centro Coordinador de Emergencias - Publicación de necesidades para la red de ONGs
-                            </p>
+                            <h1 className="h3 mb-4 text-center">Desglose de Lotes y Apertura de Convocatoria</h1>
 
                             <form onSubmit={handleSubmit}>
                                 {/* SELECCIÓN DE EMERGENCIA */}
@@ -111,25 +112,40 @@ const AltaLotes = () => {
                                     </select>
                                 </div>
 
-                                {/* TARJETA DE RESUMEN Y VENTANA DE TIEMPO DE LA EMERGENCIA */}
+                                {/* RESUMEN DE LA EMERGENCIA Y CAMPO EDITABLE DE DURACIÓN */}
                                 {emergenciaSeleccionada && (
                                     <div className="card border-primary bg-light mb-4 p-3 rounded-3">
                                         <div className="d-flex justify-content-between align-items-center mb-2">
                                             <h6 className="mb-0 fw-bold text-primary">
-                                                📍 {emergenciaSeleccionada.zonaAfectada}
+                                                Zona: {emergenciaSeleccionada.zonaAfectada}
                                             </h6>
                                             {getBadgeGravedad(emergenciaSeleccionada.nivelGravedad)}
                                         </div>
 
-                                        <p className="small text-muted mb-2">
+                                        <p className="small text-muted mb-3">
                                             {emergenciaSeleccionada.descripcionInicial}
                                         </p>
 
-                                        <div className="alert alert-warning py-2 mb-0 d-flex align-items-center gap-2 small">
-                                            <span>⏳</span>
-                                            <div>
-                                                <strong>Ventana de Convocatoria:</strong> Según el nivel de gravedad, las ONGs tendrán 
-                                                <strong className="text-dark"> {emergenciaSeleccionada.tiempoVentana}</strong> para enviar sus ofertas de ayuda una vez publicada.
+                                        {/* Campo para editar la ventana de tiempo */}
+                                        <div className="row align-items-center g-2 pt-2 border-top">
+                                            <div className="col-md-7">
+                                                <label className="form-label mb-0 fw-bold small">
+                                                    Duración de la Convocatoria para ONGs (Horas):
+                                                </label>
+                                                <div className="text-muted small">
+                                                    Sugerido por gravedad ({emergenciaSeleccionada.nivelGravedad}): {emergenciaSeleccionada.tiempoVentanaSugerido} hs.
+                                                </div>
+                                            </div>
+                                            <div className="col-md-5">
+                                                <input
+                                                    type="number"
+                                                    className="form-control"
+                                                    min="1"
+                                                    max="72"
+                                                    value={horasVentana}
+                                                    onChange={(e) => setHorasVentana(e.target.value)}
+                                                    required
+                                                />
                                             </div>
                                         </div>
                                     </div>
@@ -146,7 +162,7 @@ const AltaLotes = () => {
                                         onClick={handleAddLote}
                                         disabled={!emergenciaSeleccionada}
                                     >
-                                        ＋ Agregar otro lote
+                                        + Agregar otro lote
                                     </button>
                                 </div>
 
@@ -160,7 +176,7 @@ const AltaLotes = () => {
                                                     className="btn btn-outline-danger btn-sm border-0"
                                                     onClick={() => handleRemoveLote(index)}
                                                 >
-                                                    🗑️ Eliminar
+                                                    Eliminar
                                                 </button>
                                             )}
                                         </div>
@@ -211,14 +227,14 @@ const AltaLotes = () => {
                                     </div>
                                 ))}
 
-                                {/* BOTÓN DE ACCIÓN CLEAR */}
+                                {/* BOTÓN DE ACCIÓN */}
                                 <div className="d-grid mt-4">
                                     <button
                                         type="submit"
                                         className="btn btn-primary btn-lg"
                                         disabled={!emergenciaSeleccionada}
                                     >
-                                        🚀 Publicar Lotes y Abrir Convocatoria
+                                        Publicar Lotes y Abrir Convocatoria
                                     </button>
                                 </div>
                             </form>
