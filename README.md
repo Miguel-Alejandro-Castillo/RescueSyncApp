@@ -30,6 +30,14 @@ Esto levanta y construye estos servicios:
 - `backend`
 - `frontend`
 
+## URLs publicadas
+
+Una vez levantada toda la infraestructura, podras acceder a:
+
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:3000`
+- Swagger del backend: `http://localhost:3000/api-docs`
+
 ## Actualizar solo el backend
 
 Si hiciste cambios en `backend/` y quieres reconstruir solo ese servicio:
