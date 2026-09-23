@@ -1,5 +1,12 @@
 import React from "react";
+import AppRouter from "./router/AppRouter";
 
+
+function App() {
+  return <AppRouter />;
+}
+
+/*
 function App() {
   return (
     <div>
@@ -7,5 +14,6 @@ function App() {
     </div>
   );
 }
+*/
 
 export default App;
