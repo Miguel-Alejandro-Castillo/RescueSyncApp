@@ -20,7 +20,7 @@ app.use(
 
 app.get("/", (req, res) => {
   console.log("Received request for /");
-  res.send("RescueSync Backend Server is running. Hot reload enabled 1.0.");
+  res.send("RescueSync API Nacional is running. Hot reload enabled 1.0.");
 });
 
 app.listen(port, () => {

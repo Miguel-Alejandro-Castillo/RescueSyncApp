@@ -23,6 +23,20 @@ Si ademas quieres reconstruir las imagenes mientras levantas todo, ejecuta:
 docker compose up -d --build
 ```
 
+Si necesitas forzar una reconstruccion completa sin usar la cache de Docker y volver a ejecutar todo el `Dockerfile`, ejecuta:
+
+```bash
+docker compose build --no-cache
+docker compose up -d
+```
+
+Si quieres hacerlo solo para un servicio en particular, por ejemplo `backend`:
+
+```bash
+docker compose build --no-cache backend
+docker compose up -d backend
+```
+
 Esto levanta y construye estos servicios:
 
 - `bonita-db`
@@ -36,7 +50,9 @@ Una vez levantada toda la infraestructura, podras acceder a:
 
 - Frontend: `http://localhost:5173`
 - Backend: `http://localhost:3000`
-- Swagger del backend: `http://localhost:3000/api-docs`
+- Swagger del backend: `http://localhost:3000/docs`
+- Nacional: `http://localhost:4000`
+- Swagger de la api Nacional: `http://localhost:4000/api-docs/`
 
 ## Actualizar solo el backend
 
@@ -114,5 +130,11 @@ Si tambien quieres eliminar los volumenes creados:
 docker compose down -v
 ```
 
-
-
+## Para correr los tests de integracion
+```bash
+docker compose exec backend python -m pytest tests/ -v
+```
+## Para correr un test de integracion en particular
+```bash
+docker compose exec backend python -m pytest tests/tu-test.py
+```
