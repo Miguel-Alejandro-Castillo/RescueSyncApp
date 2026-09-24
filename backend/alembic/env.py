@@ -62,6 +62,8 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             compare_type=True,
             compare_server_default=True,
+            # línea agregada para que Alembic reconozca los tipos de SQLModel correctamente
+            user_module_prefix="sqlmodel.sql.sqltypes.",
         )
 
         with context.begin_transaction():
