@@ -1,4 +1,4 @@
-SELECT 'CREATE DATABASE rescuesync OWNER TO bonita'
+SELECT 'CREATE DATABASE rescuesync OWNER bonita'
 WHERE NOT EXISTS (
     SELECT
         FROM pg_database
