@@ -3,3 +3,5 @@ uvicorn[standard]
 sqlmodel
 alembic
 psycopg2-binary
+pytest
+httpx
