@@ -129,3 +129,12 @@ Si tambien quieres eliminar los volumenes creados:
 ```bash
 docker compose down -v
 ```
+
+## Para correr los tests de integracion
+```bash
+docker compose exec backend python -m pytest tests/ -v
+```
+## Para correr un test de integracion en particular
+```bash
+docker compose exec backend python -m pytest tests/tu-test.py
+```
