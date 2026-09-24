@@ -134,3 +134,7 @@ docker compose down -v
 ```bash
 docker compose exec backend python -m pytest tests/ -v
 ```
+## Para correr un test de integracion en particular
+```bash
+docker compose exec backend python -m pytest tests/tu-test.py
+```
