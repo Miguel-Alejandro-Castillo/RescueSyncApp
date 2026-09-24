@@ -82,7 +82,8 @@ services:
       HOST: 0.0.0.0
       DATABASE_URL: postgresql://bonita:bpm@bonita-db:5432/rescuesync
     depends_on:
-      - bonita-db
+      bonita-db:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
