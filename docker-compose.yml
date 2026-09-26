@@ -82,9 +82,11 @@ services:
       HOST: 0.0.0.0
       DATABASE_URL: postgresql://bonita:bpm@bonita-db:5432/rescuesync
       #BONITA_ENGINE_URL: http://localhost:44704/bonita
-      BONITA_ENGINE_URL: http://host.docker.internal:44704/bonita
+      BONITA_ENGINE_URL: http://host.docker.internal:8080/bonita
       BONITA_ENGINE_API_PATH: /API/bpm
       BONITA_PROCESS: Plataforma RescueSync
+      BONITA_USER: walter.bates
+      BONITA_PASSWORD: bpm
     depends_on:
       bonita-db:
         condition: service_healthy

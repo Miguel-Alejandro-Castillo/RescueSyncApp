@@ -6,6 +6,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from database import get_session
 from main import app
+from services.bonita_service import BonitaService
 
 TEST_DATABASE_URL = os.getenv(
     "TEST_DATABASE_URL",
@@ -24,6 +25,22 @@ def crear_tablas():
     SQLModel.metadata.drop_all(engine)
 
 
+@pytest.fixture(autouse=True)
+def bonita_falso(monkeypatch):
+    async def login(self, username, password):
+        return {"success": True}
+
+    async def obtener_procesos_por_nombre(self, process_name):
+        return [{"id": "1"}]
+
+    async def iniciar_proceso(self, process_id, contract={}):
+        return {}
+
+    monkeypatch.setattr(BonitaService, "login", login)
+    monkeypatch.setattr(BonitaService, "obtener_procesos_por_nombre", obtener_procesos_por_nombre)
+    monkeypatch.setattr(BonitaService, "iniciar_proceso", iniciar_proceso)
+
+
 @pytest.fixture(name="client")
 def client_fixture():
     def get_session_override():
@@ -36,8 +53,6 @@ def client_fixture():
 
     app.dependency_overrides.clear()
 
-
-# Sesión independiente de la del endpoint: solo ve datos ya commiteados.
 @pytest.fixture(name="session")
 def session_fixture():
     with Session(engine) as session:
