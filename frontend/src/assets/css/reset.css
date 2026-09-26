@@ -1,0 +1,6 @@
+/* poner aqui estilos de reseteo para estilos del navegador */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}

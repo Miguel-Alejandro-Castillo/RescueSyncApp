@@ -4,9 +4,10 @@ import {
     Route
 } from "react-router-dom";
 
-import Home from "../pages/Home";
-import AltaEmergencia from "../pages/AltaEmergencia";
-import AltaLotes from "../pages/AltaLotes";
+import Dashboard from "../pages/dashboard/Dashboard";
+import AltaEmergencia from "../pages/emergencias/AltaEmergencia";
+import AltaLotes from "../pages/lotes/AltaLotes";
+import Login from "../pages/auth/Login";
 
 function AppRouter() {
 
@@ -17,7 +18,17 @@ function AppRouter() {
 
                 <Route
                     path="/"
-                    element={<Home />}
+                    element={<Dashboard />}
+                />
+
+                <Route
+                    path="/login"
+                    element={<Login />}
+                />
+
+                <Route
+                    path="/dashboard"
+                    element={<Dashboard />}
                 />
 
                 <Route
@@ -26,7 +37,7 @@ function AppRouter() {
                 />
 
                 <Route
-                    path="lotes/nuevo"
+                    path="/lotes/nuevo"
                     element={<AltaLotes />}
                 />
             </Routes>
