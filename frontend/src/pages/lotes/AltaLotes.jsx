@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { crearLotes } from '../services/lotesService';
+import { crearLotes } from '../../services/lotesService';
 
 // Datos simulados de emergencias pendientes
 const MOCK_EMERGENCIAS_PENDIENTES = [
