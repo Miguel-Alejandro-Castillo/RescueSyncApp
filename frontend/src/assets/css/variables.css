@@ -1,1 +1,35 @@
-/* declarar variables CSS para colores, tipografías y otros valores reutilizables */
+:root {
+  color-scheme: dark;
+
+  /* Fondos */
+  --background: #0e131b;
+  --surface: #18212d;
+  --surface-raised: #202d3c;
+  --input: #101923;
+
+  /* Acento y texto sobre botones principales */
+  --primary: #70e0be;
+  --primary-hover: #9cebd2;
+  --on-primary: #09281f;
+
+  /* Texto y bordes */
+  --ink: #f1f5fa;
+  --muted: #b0bfd0;
+  --border: #3c4e63;
+  --field-border: #657c94;
+
+  /* Estados y superficies destacadas */
+  --soft: #193a35;
+  --danger: #ffb2b2;
+  --radius: 12px;
+
+  /* Conecta la paleta con los componentes de Bootstrap. */
+  --bs-body-color: var(--ink);
+  --bs-body-color-rgb: 241, 245, 250;
+  --bs-body-bg: var(--background);
+  --bs-border-color: var(--border);
+  --bs-secondary-color: var(--muted);
+  --bs-secondary-bg: var(--surface-raised);
+  --bs-tertiary-bg: var(--surface);
+  --bs-emphasis-color: var(--ink);
+}

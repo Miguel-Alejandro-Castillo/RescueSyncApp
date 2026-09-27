@@ -1,105 +1,127 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { crearEmergencia } from '../../services/emergenciaService';
-
-// Importación de estilos específicos para el componente AltaEmergencia
-import styles from './AltaEmergencia.module.css';
-
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { crearEmergencia } from "../../services/emergenciaService";
+import styles from "./AltaEmergencia.module.css";
 const initialFormData = {
-    zonaAfectada: "",
-    nivelGravedad: "medio",
-    descripcionInicial: ""
+  zonaAfectada: "",
+  nivelGravedad: "medio",
+  descripcionInicial: "",
 };
-const AltaEmergencia = () => {
-    const [formData, setFormData] = useState(initialFormData);
+export default function AltaEmergencia() {
+  const [formData, setFormData] = useState(initialFormData);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  function handleChange(event) {
+    const { name, value } = event.target;
+    setFormData((current) => ({ ...current, [name]: value }));
+    setFeedback(null);
+  }
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (saving) return;
+    if (!formData.zonaAfectada.trim() || !formData.descripcionInicial.trim()) {
+      setFeedback({
+        error: true,
+        text: "Completá la zona y la descripción con información válida.",
+      });
+      return;
+    }
+    setSaving(true);
+    setFeedback(null);
+    try {
+      await crearEmergencia({
+        ...formData,
+        zonaAfectada: formData.zonaAfectada.trim(),
+        descripcionInicial: formData.descripcionInicial.trim(),
+      });
+      setFormData(initialFormData);
+      setFeedback({ text: "Emergencia registrada correctamente." });
+    } catch {
+      setFeedback({
+        error: true,
+        text: "No pudimos registrar la emergencia. Revisá la conexión e intentá nuevamente.",
+      });
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <div className={styles.page}>
+      <div className="page-heading">
+        <h1>Registrar una emergencia</h1>
+        <p>
+          Completá la información inicial para comenzar a coordinar la
+          respuesta.
+        </p>
+      </div>
+      <div className="panel">
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData({
-            ...formData,
-            [name]: value
-        });
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        const response = await crearEmergencia(formData)
-        if (response) {
-            //  enviar a la página de dashboard o limpiar el formulario
-            setFormData(initialFormData);
-            // Aquí se podría mostrar un mensaje de éxito al usuario antes de redirigir
-            alert("Emergencia creada con éxito");
-            // Redirigir a la página de dashboard mediante react-router-dom
-            // Aquí se podría usar el hook useNavigate de react-router-dom para redirigir
-            const navigate = useNavigate();
-            navigate("/dashboard");
-        } else {
-            // Manejar el caso en que la creación de la emergencia falle
-            console.error("Error al crear la emergencia");
-            alert("Error al crear la emergencia");
-        }
-
-
-
-    };
-
-    return (
-        <div className={styles.page}>
-            <div className="container">
-                <div className="row justify-content-center">
-                    <div className="col-12 col-md-8 col-lg-6">
-                        <div className={`card ${styles.card}`}>
-                            <div className={`card-body ${styles.cardBody}`}>
-                                <h1 className={`h3 text-center ${styles.title}`}>Alta Emergencia</h1>
-                                <form className={styles.form} onSubmit={handleSubmit}>
-                                    <div className={styles.field}>
-                                        <label className={styles.label}>Zona Afectada:</label>
-                                        <input
-                                            type="text"
-                                            className={styles.input}
-                                            name="zonaAfectada"
-                                            value={formData.zonaAfectada}
-                                            onChange={handleChange}
-                                            required
-                                        />
-                                    </div>
-                                    <div className={styles.field}>
-                                        <label className={styles.label}>Nivel de gravedad:</label>
-                                        <select
-                                            className={styles.select}
-                                            name="nivelGravedad"
-                                            value={formData.nivelGravedad}
-                                            onChange={handleChange}
-                                            required
-                                        >
-                                            <option value="bajo">Bajo</option>
-                                            <option value="medio">Medio</option>
-                                            <option value="alto">Alto</option>
-                                            <option value="critico">Crítico</option>
-                                        </select>
-                                    </div>
-                                    <div className={styles.field}>
-                                        <label className={styles.label}>Descripcion Inicial:</label>
-                                        <textarea
-                                            className={styles.textarea}
-                                            name="descripcionInicial"
-                                            value={formData.descripcionInicial}
-                                            onChange={handleChange}
-                                            rows="4"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="d-grid">
-                                        <button type="submit" className={styles.submit}>Guardar</button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <form className="form-stack" onSubmit={handleSubmit} aria-busy={saving}>
+          <fieldset disabled={saving} className="form-stack">
+            <div>
+              <label className="form-label" htmlFor="zona">
+                Zona afectada
+              </label>
+              <input
+                className="form-control"
+                id="zona"
+                name="zonaAfectada"
+                value={formData.zonaAfectada}
+                onChange={handleChange}
+                required
+              />
             </div>
-        </div>
-    );
-};
-
-export default AltaEmergencia;
+            <div>
+              <label className="form-label" htmlFor="gravedad">
+                Nivel de gravedad
+              </label>
+              <select
+                className="form-select"
+                id="gravedad"
+                name="nivelGravedad"
+                value={formData.nivelGravedad}
+                onChange={handleChange}
+                required
+              >
+                <option value="bajo">Bajo</option>
+                <option value="medio">Medio</option>
+                <option value="alto">Alto</option>
+                <option value="critico">Crítico</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label" htmlFor="descripcion">
+                Descripción inicial
+              </label>
+              <textarea
+                className="form-control"
+                id="descripcion"
+                name="descripcionInicial"
+                rows="5"
+                value={formData.descripcionInicial}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </fieldset>
+          {feedback && (
+            <div
+              className={"notice" + (feedback.error ? " notice-error" : "")}
+              role={feedback.error ? "alert" : "status"}
+            >
+              {feedback.text}
+            </div>
+          )}
+          <div className="form-actions">
+            <Link className="btn btn-outline-secondary" to="/dashboard">
+              Volver al inicio
+            </Link>
+            <button className="btn btn-primary" disabled={saving} type="submit">
+              {saving ? "Guardando…" : "Registrar emergencia"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

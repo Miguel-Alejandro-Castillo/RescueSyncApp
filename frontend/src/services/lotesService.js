@@ -1,11 +1,5 @@
-export const crearLotes = async (data) => {
-    console.log("Simulando envío de lotes de necesidades al backend:", data);
-    
-    // Simula una respuesta exitosa de red para probar la interfaz
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            alert("¡Lotes de necesidades publicados exitosamente! (Simulado)");
-            resolve({ success: true, message: "Lotes creados exitosamente" });
-        }, 500);
-    });
-};
+// Servicio temporal: reemplazar por la llamada HTTP cuando esté disponible.
+export const crearLotes = async () =>
+  new Promise((resolve) => {
+    setTimeout(() => resolve({ success: true }), 500);
+  });
