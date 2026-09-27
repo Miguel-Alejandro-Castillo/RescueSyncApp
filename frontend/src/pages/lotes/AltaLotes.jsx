@@ -129,7 +129,7 @@ const AltaLotes = () => {
       <div className="page-heading">
         <h1>Lotes y convocatorias</h1>
         <p>
-          Organizá la ayuda necesaria para cada emergencia y definí el plazo de
+          Declará la ayuda necesaria para cada emergencia y definí el plazo de
           participación.
         </p>
       </div>
