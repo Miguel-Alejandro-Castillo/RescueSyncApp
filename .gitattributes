@@ -1,0 +1,2 @@
+# Los scripts ejecutados por contenedores Linux deben conservar finales LF.
+*.sh text eol=lf

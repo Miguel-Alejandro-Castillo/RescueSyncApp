@@ -152,3 +152,24 @@ __pycache__/
 instance/
 celerybeat-schedule
 *.log
+
+# Python tooling caches and coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+venv/
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor backups and temporary files
+*.bak
+*.BAK
+*.swp
+*.swo
+*~

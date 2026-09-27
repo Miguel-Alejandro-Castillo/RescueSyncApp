@@ -1,17 +1,14 @@
-import { ENDPOINTS } from '../config/api';
+import { ENDPOINTS } from "../config/api";
 
 export async function crearEmergencia(emergencia) {
-    console.log("Creating emergencia:", emergencia);
-    const response = await fetch(
-        ENDPOINTS.EMERGENCIAS,
-        {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(emergencia)
-        }
-    );
+  const response = await fetch(ENDPOINTS.EMERGENCIAS, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(emergencia),
+  });
 
-    return await response.json();
+  if (!response.ok) throw new Error("No se pudo registrar la emergencia");
+  return response.status === 204 ? null : response.json();
 }

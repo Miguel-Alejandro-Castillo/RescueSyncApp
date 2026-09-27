@@ -1,6 +1,6 @@
-/* poner aqui estilos de reseteo para estilos del navegador */
+/* Quita el espaciado por defecto y hace que el tamaño incluya borde y padding. */
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }

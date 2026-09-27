@@ -1,0 +1,20 @@
+.page {
+  max-width: 1000px;
+  margin: auto;
+}
+
+.lote {
+  padding: 20px;
+  margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--input);
+}
+
+.summary {
+  padding: 16px;
+  margin-bottom: 24px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--input);
+}
