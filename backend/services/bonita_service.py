@@ -3,8 +3,9 @@ from clients.http_client import HttpClient
 
 class BonitaService:
 
-    # definir constante X-Bonita-API-Token para los encabezados de autenticación
+    # definir constantes para la autenticación de la api de bonita
     API_TOKEN_HEADER = "X-Bonita-API-Token"
+    COOKIE_JSESSIONID = "JSESSIONID"
 
     def __init__(self):
         base_url = os.getenv(
@@ -19,11 +20,25 @@ class BonitaService:
     @property
     def api_token(self):
         return self.http_client.client.cookies.get(self.API_TOKEN_HEADER)
+    
+    # setter de api_token (actualiza la cookie correspondiente en el cliente HTTP)
+    @api_token.setter
+    def api_token(self, value):
+        self.http_client.client.cookies.set(self.API_TOKEN_HEADER, value)
+
+    @property
+    def j_session(self):
+        return self.http_client.client.cookies.get(self.COOKIE_JSESSIONID)
+
+    # setter de j_session (actualiza la cookie correspondiente en el cliente HTTP)
+    @j_session.setter
+    def j_session(self, value):
+        self.http_client.client.cookies.set(self.COOKIE_JSESSIONID, value)
 
     def _auth_headers(self):
         token = self.api_token
         if not token:
-            # si no hay token, no se incluyen los encabezados de autenticación
+            # si no hay token, no se incluyen los encabezados de autenticación en la solicitud HTTP
             return {}
         return {
             self.API_TOKEN_HEADER: token
@@ -44,11 +59,53 @@ class BonitaService:
                 "redirectURL": ""
             }
         )
-        # no tiene respuesta, devuelve un 204 No Content
-        # por seguridad no deberia devolver la API Key directamente
-        # en su lugar, se puede devolver un indicador de éxito
-        return {"success": bool(self.api_token)}
 
+        jsessionid = self.j_session
+        api_token = self.api_token
+
+        return {
+            "success": bool(jsessionid and api_token),
+            "sessionId": jsessionid,
+            "token": api_token
+        }
+
+    async def get_user_info(self, username: str):
+        response = await self.http_client.get(
+            "/API/identity/user",
+            headers=self._auth_headers(),
+            params = {
+                "p": 0, # (Required) index of the page to display
+                "f": f"userName={username}"
+            }
+        )
+        return response.json()[0]
+    
+    # Devuelve los memberships(grupo + rol) de un usuario específico por su ID
+    async def get_memberships_by_user_id(self, user_id: str):
+        response = await self.http_client.get(
+            "/API/identity/membership",
+            headers=self._auth_headers(),
+            params = {
+                "p": 0, # (Required) index of the page to display
+                "f": f"user_id={user_id}"
+            }
+        )
+        return response.json()
+    
+    async def get_group_by_id(self, group_id: str):
+        response = await self.http_client.get(
+            f"/API/identity/group/{group_id}",
+            headers=self._auth_headers()
+        )
+        return response.json()
+
+    async def get_role_by_id(self, role_id: str):
+        response = await self.http_client.get(
+            f"/API/identity/role/{role_id}",
+            headers=self._auth_headers()
+        )
+        return response.json()
+    
     # Logout de Bonita y limpieza de cookies del cliente HTTP
     async def logout(self):
         await self.http_client.post(
@@ -75,6 +132,8 @@ class BonitaService:
     
     # Devuelve un listado de procesos que coinciden con el nombre proporcionado
     async def obtener_procesos_por_nombre(self, process_name: str):
+        print("cookies", self.http_client.client.cookies)
+        print("Auth headers:", self._auth_headers())
         response = await self.http_client.get(
             f"{self.api_path}/process",
             headers=self._auth_headers(),
@@ -127,6 +186,17 @@ class BonitaService:
             } 
         )
         return response.json()
+    
+    # Devuelve un listado de todas las tareas humanas disponibles
+    async def obtener_tareas_humanas(self):
+        response = await self.http_client.get(
+            f"{self.api_path}/humanTask",
+            headers=self._auth_headers(),
+            params = {
+                "p": 0 # (Required) index of the page to display
+            } 
+        )
+        return response.json()
 
     # Completa una tarea específica por su ID
     async def completar_tarea(self, task_id: str):
@@ -147,3 +217,9 @@ class BonitaService:
             } 
         )
         return response.json()
+    
+    
+    async def close(self):
+        """Cierra las conexiones del cliente HTTP subyacente."""
+        await self.http_client.close() 
+        
