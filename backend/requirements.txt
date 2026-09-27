@@ -5,3 +5,5 @@ alembic
 psycopg2-binary
 pytest
 httpx
+python-jose[cryptography]
+cryptography
