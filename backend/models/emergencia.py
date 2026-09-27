@@ -40,3 +40,8 @@ class Emergencia(SQLModel, table=True):
         default_factory=lambda: datetime.now(timezone.utc),
         description="Fecha de creación de la emergencia"
     )
+    
+    bonitaCaseid: str | None = Field(
+        default=None,
+        description="ID del caso en Bonita asociado a la emergencia"
+    )
