@@ -1,31 +1,44 @@
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { login } from "../../services/authService";
+import { useSession } from "../../auth/AuthContext";
 import Brand from "../../components/layout/Brand";
 import styles from "./Login.module.css";
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const session = useSession();
+  const from = location.state?.from;
+  const destination = typeof from === "string" && from.startsWith("/") && !from.startsWith("//") && from !== "/login" ? from : "/dashboard";
+  const [pending, setPending] = useState(false);
   const [visible, setVisible] = useState(false);
   const [errors, setErrors] = useState({});
-  const emailRef = useRef(null);
+  const usernameRef = useRef(null);
   const passwordRef = useRef(null);
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
-    const email = emailRef.current.value.trim();
+    if (pending) return;
+    const username = usernameRef.current.value.trim();
     const nextErrors = {};
-    if (!email) nextErrors.email = "Ingresá tu correo electrónico.";
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      nextErrors.email = "Ingresá un correo electrónico válido.";
+    if (!username) nextErrors.username = "Ingresá tu usuario.";
     if (!passwordRef.current.value.trim())
       nextErrors.password = "Ingresá tu contraseña.";
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
-      (nextErrors.email ? emailRef : passwordRef).current.focus();
+      (nextErrors.username ? usernameRef : passwordRef).current.focus();
       return;
     }
-    // Integrar aquí el servicio de autenticación. Solo navegación de demostración:
-    // no se guardan credenciales ni se crea una sesión autenticada.
-    navigate("/dashboard", { state: { loginPreview: true } });
+    setPending(true);
+    try {
+      await login(username, passwordRef.current.value);
+      navigate(destination, { replace: true });
+    } catch (error) {
+      setErrors({ submit: error.message });
+    } finally {
+      setPending(false);
+    }
   }
+  if (session) return <Navigate to={destination} replace />;
   return (
     <main className={styles.page}>
       <header className={styles.header}>
@@ -43,27 +56,27 @@ export default function Login() {
             noValidate
           >
             <div>
-              <label className="form-label" htmlFor="email">
-                Correo electrónico
+              <label className="form-label" htmlFor="username">
+                Usuario
               </label>
               <input
-                ref={emailRef}
+                ref={usernameRef}
                 className="form-control"
-                id="email"
-                name="email"
-                type="email"
+                id="username"
+                name="username"
+                type="text"
                 autoComplete="username"
-                placeholder="nombre@organizacion.org"
+                placeholder="Tu usuario"
                 required
-                aria-invalid={Boolean(errors.email)}
-                aria-describedby={errors.email ? "email-error" : undefined}
+                aria-invalid={Boolean(errors.username)}
+                aria-describedby={errors.username ? "username-error" : undefined}
                 onChange={() =>
-                  setErrors((current) => ({ ...current, email: undefined }))
+                  setErrors((current) => ({ ...current, username: undefined }))
                 }
               />
-              {errors.email && (
-                <p className="field-error" id="email-error" role="alert">
-                  {errors.email}
+              {errors.username && (
+                <p className="field-error" id="username-error" role="alert">
+                  {errors.username}
                 </p>
               )}
             </div>
@@ -109,8 +122,9 @@ export default function Login() {
                 </p>
               )}
             </div>
-            <button className="btn btn-primary w-100" type="submit">
-              Acceder
+            {errors.submit && <p className="field-error" role="alert">{errors.submit}</p>}
+            <button className="btn btn-primary w-100" type="submit" disabled={pending}>
+              {pending ? "Ingresando…" : "Acceder"}
             </button>
           </form>
 

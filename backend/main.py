@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers.emergencia import router as emergencia_router
+from routers.auth import router as auth_router
 
 API_PREFIX = "/api/rescue"
 
@@ -37,3 +38,4 @@ app.include_router(
     emergencia_router,
     prefix=API_PREFIX
 )
+app.include_router(auth_router, prefix=API_PREFIX)

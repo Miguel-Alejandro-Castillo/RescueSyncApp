@@ -67,8 +67,6 @@ async def login(user: UserLogin):
             "exp": expire_time
         }
 
-        print("Token data to be encoded:", token_data)
-
         fastapi_jwt = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
         return {

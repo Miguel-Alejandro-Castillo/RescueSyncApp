@@ -70,15 +70,20 @@ class BonitaService:
         }
 
     async def get_user_info(self, username: str):
-        response = await self.http_client.get(
-            "/API/identity/user",
+        # A regular user can read their own identity, but cannot search all users.
+        session = await self.http_client.get(
+            "/API/system/session/unusedId",
             headers=self._auth_headers(),
-            params = {
-                "p": 0, # (Required) index of the page to display
-                "f": f"userName={username}"
-            }
         )
-        return response.json()[0]
+        user_id = session.json()["user_id"]
+        response = await self.http_client.get(
+            f"/API/identity/user/{user_id}",
+            headers=self._auth_headers(),
+        )
+        user_info = response.json()
+        if user_info["userName"] != username:
+            raise ValueError("La sesión de Bonita no corresponde al usuario solicitado")
+        return user_info
     
     # Devuelve los memberships(grupo + rol) de un usuario específico por su ID
     async def get_memberships_by_user_id(self, user_id: str):
@@ -221,5 +226,4 @@ class BonitaService:
     
     async def close(self):
         """Cierra las conexiones del cliente HTTP subyacente."""
-        await self.http_client.close() 
-        
+        await self.http_client.close()
