@@ -1,8 +1,16 @@
+import styles from './AltaLotes.module.css';
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import SeleccionarEmergencia from './SeleccionarEmergencia';
 import {  obtenerEmergenciaPorId,crearLotes } from '../../services/lotesService';
 
-const AltaLotes = () => {
+export default function AltaLotes() {
+    const [params] = useSearchParams();
+    const id = params.get('emergenciaId');
+    return id ? <FormularioLotes key={id} /> : <SeleccionarEmergencia />;
+}
+
+const FormularioLotes = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const emergenciaId = searchParams.get('emergenciaId');
@@ -10,6 +18,8 @@ const AltaLotes = () => {
     const [emergenciaSeleccionada, setEmergenciaSeleccionada] = useState(null);
     const [loadingEmergencia, setLoadingEmergencia] = useState(false);
     const [error, setError] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [submitError, setSubmitError] = useState('');
 
     const [lotes, setLotes] = useState([
         { tipoRecurso: 'Insumos', descripcion: '', cantidad: 1 }
@@ -74,24 +84,32 @@ const AltaLotes = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!emergenciaSeleccionada) return;
+        if (!emergenciaSeleccionada || saving) return;
+        setSubmitError('');
+        if (lotes.some(lote => !lote.descripcion.trim() || !Number.isSafeInteger(Number(lote.cantidad)) || Number(lote.cantidad) < 1)) {
+            setSubmitError('Completá la descripción y una cantidad entera mayor a cero en cada lote.');
+            return;
+        }
 
         const payload = {
             emergenciaId: emergenciaSeleccionada.id,
-            lotes
+            lotes: lotes.map(lote => ({ ...lote, descripcion: lote.descripcion.trim(), cantidad: Number(lote.cantidad) }))
         };
 
         try {
+            setSaving(true);
             await crearLotes(payload);
             alert('Lotes publicados y convocatoria abierta con éxito.');
             navigate('/dashboard');
         } catch (err) {
-            alert(`Error al publicar lotes: ${err.message}`);
+            setSubmitError(err.message);
+        } finally {
+            setSaving(false);
         }
     };
 
     if (error) {
-        return <div className="alert alert-danger m-4 text-center">{error}</div>;
+        return <div className="panel"><p className="notice notice-error" role="alert">{error}</p><Link className="btn btn-outline-secondary" to="/lotes/nuevo">Elegir otra emergencia</Link></div>;
     }
 
     if (loadingEmergencia || !emergenciaSeleccionada) {
@@ -99,26 +117,27 @@ const AltaLotes = () => {
     }
 
     return (
-        <div className="container mt-4 mb-5">
+        <div className={styles.page}>
             <div className="row justify-content-center">
-                <div className="col-12 col-lg-10">
-                    <div className="card shadow-sm border-0 rounded-4">
-                        <div className="card-body p-4">
-                            <h1 className="h3 mb-4 text-center text-primary fw-bold">
+                <div className="col-12">
+                    <div className="panel">
+                        <div className={styles.content}>
+                            <h1 className={styles.title}>
                                 Desglose de Lotes y Apertura de Convocatoria
                             </h1>
 
-                            <form onSubmit={handleSubmit}>
+                            <form onSubmit={handleSubmit} aria-busy={saving}>
+                                <fieldset disabled={saving}>
                                 {/* RESUMEN DE LA EMERGENCIA */}
-                                <div className="card border-primary-subtle bg-light mb-4 p-3 rounded-3 shadow-sm">
-                                    <div className="d-flex justify-content-between align-items-center mb-2">
-                                        <h5 className="mb-0 fw-bold text-dark">
+                                <div className={styles.summary}>
+                                    <div className={styles.row}>
+                                        <h5 className="mb-0 fw-bold">
                                             Zona Afectada: {emergenciaSeleccionada.zonaAfectada}
                                         </h5>
                                         {getBadgeGravedad(emergenciaSeleccionada.nivelGravedad)}
                                     </div>
 
-                                    <p className="text-secondary mb-0">
+                                    <p className="text-muted mb-0">
                                         {emergenciaSeleccionada.descripcionInicial}
                                     </p>
                                 </div>
@@ -126,11 +145,11 @@ const AltaLotes = () => {
                                 <hr className="my-4" />
 
                                 {/* DESGLOSE DE LOTES */}
-                                <div className="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 className="mb-0 fw-bold text-dark">Lotes de Recursos Requeridos</h5>
+                                <div className={styles.row}>
+                                    <h5 className="mb-0 fw-bold">Lotes de Recursos Requeridos</h5>
                                     <button
                                         type="button"
-                                        className="btn btn-success btn-sm font-weight-bold"
+                                        className="btn btn-outline-secondary"
                                         onClick={handleAddLote}
                                     >
                                         + Agregar otro lote
@@ -138,8 +157,8 @@ const AltaLotes = () => {
                                 </div>
 
                                 {lotes.map((lote, index) => (
-                                    <div key={index} className="card bg-white border mb-3 p-3 rounded-3 shadow-sm">
-                                        <div className="d-flex justify-content-between align-items-center mb-2">
+                                    <div key={index} className={styles.lote}>
+                                        <div className={styles.row}>
                                             <span className="badge bg-secondary">Lote #{index + 1}</span>
                                             {lotes.length > 1 && (
                                                 <button
@@ -198,14 +217,17 @@ const AltaLotes = () => {
                                     </div>
                                 ))}
 
-                                <div className="d-grid mt-4">
+                                <div className="form-actions">
+                                    <Link className="btn btn-outline-secondary" to="/lotes/nuevo">Elegir otra emergencia</Link>
                                     <button
                                         type="submit"
-                                        className="btn btn-primary btn-lg font-weight-bold"
+                                        className="btn btn-primary"
                                     >
-                                        Publicar Lotes y Abrir Convocatoria
+                                        {saving ? 'Publicando…' : 'Publicar lotes y abrir convocatoria'}
                                     </button>
                                 </div>
+                                </fieldset>
+                                {submitError && <p className="notice notice-error mt-3" role="alert">{submitError}</p>}
                             </form>
                         </div>
                     </div>
@@ -214,5 +236,3 @@ const AltaLotes = () => {
         </div>
     );
 };
-
-export default AltaLotes;

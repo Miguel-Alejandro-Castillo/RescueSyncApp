@@ -8,7 +8,7 @@ export default function DetalleLotes() {
 
   const [lotes, setLotes] = useState([]);
   const [loading, setLoading] = useState(true);
-  
+
 
   const [loteSeleccionadoId, setLoteSeleccionadoId] = useState(null);
 
@@ -46,7 +46,7 @@ export default function DetalleLotes() {
     e.preventDefault();
 
     const faltante = lote.cantidad - (lote.cant_cubierta || 0);
-    
+
 
     if (!cantRecurso || Number(cantRecurso) <= 0) {
       alert('Ingresa una cantidad válida a ofertar.');
@@ -61,7 +61,7 @@ export default function DetalleLotes() {
     try {
       setSubmitting(true);
 
-    
+
       const payload = {
         id_lote: Number(lote.id),
         id_ong: 1,
@@ -84,7 +84,7 @@ export default function DetalleLotes() {
       setLoteSeleccionadoId(null);
       setCantRecurso('');
 
-      
+
       const updated = await fetch(`http://127.0.0.1:3000/api/rescue/emergencias/${id}/lotes`);
       const updatedData = await updated.json();
       setLotes(Array.isArray(updatedData) ? updatedData : []);
@@ -98,7 +98,7 @@ export default function DetalleLotes() {
 
   return (
     <div className={styles.page} style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-      <button onClick={() => navigate(-1)} style={{ marginBottom: '1rem', cursor: 'pointer' }}>
+      <button onClick={() => navigate('/ofertas')} style={{ marginBottom: '1rem', cursor: 'pointer' }}>
         ← Volver al portal
       </button>
 
@@ -116,33 +116,33 @@ export default function DetalleLotes() {
             const faltante = lote.cantidad - cantCubierta;
 
             return (
-              <div 
-                key={lote.id} 
-                style={{ 
-                  border: '1px solid #ccc', 
-                  padding: '1.2rem', 
+              <div
+                key={lote.id}
+                style={{
+                  border: '1px solid var(--border)',
+                  padding: '1.2rem',
                   borderRadius: '8px',
-                  backgroundColor: '#fff'
+                  backgroundColor: 'var(--surface)'
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
                     <h3 style={{ margin: '0 0 0.5rem 0' }}>{lote.tipo_recurso}</h3>
-                    <p style={{ margin: 0, color: '#555' }}>
-                      Cubierto: <strong>{cantCubierta}</strong> de {lote.cantidad} (Faltan: <strong style={{ color: '#e53e3e' }}>{faltante}</strong>)
+                    <p style={{ margin: 0, color: 'var(--muted)' }}>
+                      Cubierto: <strong>{cantCubierta}</strong> de {lote.cantidad} (Faltan: <strong style={{ color: 'var(--danger)' }}>{faltante}</strong>)
                     </p>
                   </div>
 
                   {lote.estado !== 'cubierto' && (
-                    <button 
+                    <button
                       onClick={() => toggleFormulario(lote.id)}
                       style={{
                         padding: '0.5rem 1rem',
                         cursor: 'pointer',
                         borderRadius: '6px',
                         border: 'none',
-                        backgroundColor: estaDesplegado ? '#e2e8f0' : '#2b6cb0',
-                        color: estaDesplegado ? '#2d3748' : '#fff',
+                        backgroundColor: estaDesplegado ? 'var(--surface-raised)' : 'var(--primary)',
+                        color: estaDesplegado ? 'var(--ink)' : 'var(--on-primary)',
                         fontWeight: 'bold'
                       }}
                     >
@@ -153,46 +153,46 @@ export default function DetalleLotes() {
 
                 {}
                 {estaDesplegado && (
-                  <form 
+                  <form
                     onSubmit={(e) => handleSubmitOferta(e, lote)}
-                    style={{ 
-                      marginTop: '1rem', 
-                      paddingTop: '1rem', 
-                      borderTop: '1px dashed #cbd5e0',
+                    style={{
+                      marginTop: '1rem',
+                      paddingTop: '1rem',
+                      borderTop: '1px solid var(--border)',
                       display: 'flex',
                       flexDirection: 'column',
                       gap: '0.8rem'
                     }}
                   >
                     <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
-                      
-                        
+
+
 
                       <div style={{ flex: '1 1 200px' }}>
                         <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '0.2rem' }}>
                           Cantidad a ofertar (Máx: {faltante}):
                         </label>
-                        <input 
-                          type="number" 
+                        <input className="form-control"
+                          type="number"
                           min="1"
                           max={faltante}
                           placeholder={`Máximo ${faltante}`}
                           value={cantRecurso}
                           onChange={(e) => setCantRecurso(e.target.value)}
-                          style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)' }}
                           required
                         />
                       </div>
                     </div>
 
-                    <button 
-                      type="submit" 
+                    <button
+                      type="submit"
                       disabled={submitting}
                       style={{
                         alignSelf: 'flex-start',
                         padding: '0.6rem 1.2rem',
-                        backgroundColor: '#38a169',
-                        color: '#fff',
+                        backgroundColor: 'var(--primary)',
+                        color: 'var(--on-primary)',
                         border: 'none',
                         borderRadius: '4px',
                         fontWeight: 'bold',

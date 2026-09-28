@@ -17,10 +17,11 @@ import Footer from "../components/layout/Footer/Footer";
 import CargarOfertas from "../pages/ofertas/CargarOfertas";
 import DetalleLotes from "../pages/ofertas/DetalleLotes";
 import { useSession } from "../auth/AuthContext";
+import RequirePermission from "../auth/RequirePermission";
 function RequireSession() {
   const session = useSession();
   const location = useLocation();
-  return session ? <Outlet /> : <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  return session ? <Outlet /> : <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
 }
 function Layout() {
   const { pathname } = useLocation();
@@ -49,10 +50,10 @@ export default function AppRouter() {
           <Route element={<Layout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/emergencias/nueva" element={<AltaEmergencia />} />
-            <Route path="/lotes/nuevo" element={<AltaLotes />} />
-             <Route path="/ofertas" element={<CargarOfertas />} />
-             <Route path="/emergencias/:id/lotes" element={<DetalleLotes />} />
+            <Route path="/emergencias/nueva" element={<RequirePermission permission="emergencias.crear"><AltaEmergencia /></RequirePermission>} />
+            <Route path="/lotes/nuevo" element={<RequirePermission permission="lotes.crear"><AltaLotes /></RequirePermission>} />
+            <Route path="/ofertas" element={<RequirePermission permission="ofertas.crear"><CargarOfertas /></RequirePermission>} />
+            <Route path="/emergencias/:id/lotes" element={<RequirePermission permission="ofertas.crear"><DetalleLotes /></RequirePermission>} />
             <Route
               path="*"
               element={

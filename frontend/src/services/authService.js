@@ -3,6 +3,25 @@ import { ENDPOINTS } from "../config/api";
 const SESSION_KEY = "rescuesync.session";
 const SESSION_EVENT = "rescuesync-session";
 
+// Display information only. Authorization must be enforced by the server.
+export function getSessionMemberships(session) {
+  try {
+    const payload = session.access_token.split(".")[1];
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
+    const claims = JSON.parse(new TextDecoder().decode(bytes));
+    return Array.isArray(claims.memberships) ? claims.memberships : [];
+  } catch {
+    return [];
+  }
+}
+
+export function getSessionRoles(session) {
+  return [...new Set(getSessionMemberships(session).map(membership =>
+    membership?.role?.displayName || membership?.role?.name
+  ).filter(role => typeof role === 'string' && role.trim()))];
+}
+
 export function clearSession() {
   sessionStorage.removeItem(SESSION_KEY);
   window.dispatchEvent(new Event(SESSION_EVENT));

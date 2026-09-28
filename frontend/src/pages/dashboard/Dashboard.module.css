@@ -21,7 +21,7 @@
   background: var(--surface-raised);
   border-color: var(--primary);
 }
-.action h3 {
+.action h2 {
   font-size: 1.3rem;
   line-height: 1.4;
   margin: 0 0 14px;

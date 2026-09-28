@@ -37,9 +37,9 @@ export default function CargarOfertas() {
         {}
         <div className={styles.card}>
           <div className={styles.cardBody}>
-            <h1 className={styles.title}> Ofertas Emergencias</h1>
-            <p style={{ color: '#5b6e8a' }}>
-              S
+            <h1 className={styles.title}>Ofertas para emergencias</h1>
+            <p style={{ color: 'var(--muted)' }}>
+              Seleccioná una emergencia para consultar sus lotes y ofrecer recursos.
             </p>
           </div>
         </div>
@@ -65,7 +65,7 @@ export default function CargarOfertas() {
                       <h2 className={styles.title} style={{ marginBottom: '0.4rem' }}>
                          {emergencia.zonaAfectada}
                       </h2>
-                      <p style={{ color: '#4a5568', margin: 0 }}>{emergencia.descripcionInicial}</p>
+                      <p style={{ color: 'var(--muted)', margin: 0 }}>{emergencia.descripcionInicial}</p>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>

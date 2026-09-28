@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { login } from "../../services/authService";
 import { useSession } from "../../auth/AuthContext";
 import Brand from "../../components/layout/Brand";
@@ -43,9 +43,6 @@ export default function Login() {
     <main className={styles.page}>
       <header className={styles.header}>
         <Brand light showIcon={false} />
-        <Link className={styles.back} to="/dashboard">
-          ← Volver al inicio
-        </Link>
       </header>
       <section className={styles.access} aria-labelledby="login-title">
         <div className={styles.formWrap}>

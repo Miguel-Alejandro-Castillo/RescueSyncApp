@@ -3,6 +3,27 @@
   margin: auto;
 }
 
+.content { min-width: 0; }
+
+.title {
+  margin-bottom: 28px;
+  font-size: clamp(1.6rem, 4vw, 2.2rem);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 600px) {
+  .row > button { width: 100%; }
+  .lote { padding: 16px; }
+}
+
 .lote {
   padding: 20px;
   margin-bottom: 16px;

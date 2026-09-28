@@ -2,6 +2,20 @@
   background: #111a25;
   border-bottom: 1px solid var(--border);
 }
+.account {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.identity {
+  display: grid;
+  gap: 2px;
+  overflow-wrap: anywhere;
+}
+.identity strong { font-size: 0.9rem; }
+.identity span { font-size: 0.8rem; color: var(--muted); }
 .inner {
   max-width: 1120px;
   margin: auto;
