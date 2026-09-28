@@ -41,7 +41,7 @@ class Emergencia(SQLModel, table=True):
         description="Fecha de creación de la emergencia"
     )
     
-    bonitaCaseid: str | None = Field(
+    bonitaCaseId: str | None = Field(
         default=None,
         description="ID del caso en Bonita asociado a la emergencia"
     )

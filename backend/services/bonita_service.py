@@ -1,5 +1,9 @@
+import asyncio
+from datetime import time
 import os
 from clients.http_client import HttpClient
+import asyncio
+import time
 
 class BonitaService:
 
@@ -176,36 +180,48 @@ class BonitaService:
         )
         return response.json()
 
-    # Devuelve un listado de todas las tareas disponibles
-    async def obtener_tareas(self):
+    # Devuelve un listado de todas las tareas activas por caso
+    async def obtener_tareas_por_caso(self, caseId: str):
+        params = [
+            ("p", 0),
+            ("f", f"caseId={caseId}"),
+            ("f", "state=ready")
+        ]
         response = await self.http_client.get(
             f"{self.api_path}/task",
             headers=self._auth_headers(),
-            params = {
-                "p": 0 # (Required) index of the page to display
-            } 
+            params = params
         )
         return response.json()
     
-    # Devuelve un listado de todas las tareas humanas disponibles
-    async def obtener_tareas_humanas(self):
+    # Devuelve un listado de todas las tareas humanas activas por caso
+    async def obtener_tareas_humanas_por_caso(self, caseId: str):
+        print(f"Obteniendo tareas humanas para el caseId {caseId}")
+
+        params = [
+            ("p", 0),
+            ("f", f"caseId={caseId}"),
+            ("f", "state=ready")
+        ]
         response = await self.http_client.get(
             f"{self.api_path}/humanTask",
             headers=self._auth_headers(),
-            params = {
-                "p": 0 # (Required) index of the page to display
-            } 
+            params = params
         )
+      
         return response.json()
 
-    # Completa una tarea específica por su ID
-    async def completar_tarea(self, task_id: str):
-        response = await self.http_client.post(
-            f"{self.api_path}/task/{task_id}/execution",
+    # Completa una tarea humana específica por su ID
+    async def completar_tarea_humana(self, task_id: str):
+        await self.http_client.post(
+            f"{self.api_path}/userTask/{task_id}/execution",
             headers=self._auth_headers(),
-            json = {} # A JSON object matching task contract.
+            json = {}, # A JSON object matching task contract.
+            params = {
+                "assign": True
+            }
         )
-        return response.json()
+        # retorna un HTTP 204, no devuelve nada, solo completa la tarea humana
 
     # Devuelve un listado de todos los usuarios disponibles
     async def obtener_usuarios(self):
@@ -218,7 +234,34 @@ class BonitaService:
         )
         return response.json()
     
-    
+    # Espera hasta que aparezcan tareas humanas en estado 'ready' para un caso específico o hasta que se agote el tiempo de espera.
+    async def esperar_tareas_humanas_por_caso(
+        self,
+        caseId: str,
+        timeout_segundos: int = 20,
+        intervalo_ms: int = 200
+    ):
+        inicio = time.monotonic()
+
+        while True:
+
+            tareas = await self.obtener_tareas_humanas_por_caso(caseId)
+
+            if tareas:
+                return tareas
+
+            transcurrido = time.monotonic() - inicio
+
+            if transcurrido >= timeout_segundos:
+                raise TimeoutError(
+                    f"No aparecieron tareas para el caso {caseId} "
+                    f"en {timeout_segundos} segundos"
+                )
+
+            await asyncio.sleep(
+                intervalo_ms / 1000
+            )
+
     async def close(self):
         """Cierra las conexiones del cliente HTTP subyacente."""
         await self.http_client.close() 
