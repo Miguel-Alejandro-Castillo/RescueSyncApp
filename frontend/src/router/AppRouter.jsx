@@ -14,6 +14,8 @@ import AltaLotes from "../pages/lotes/AltaLotes";
 import Login from "../pages/auth/Login";
 import Header from "../components/layout/Header/Header";
 import Footer from "../components/layout/Footer/Footer";
+import CargarOfertas from "../pages/ofertas/CargarOfertas";
+import DetalleLotes from "../pages/ofertas/DetalleLotes";
 import { useSession } from "../auth/AuthContext";
 function RequireSession() {
   const session = useSession();
@@ -49,6 +51,8 @@ export default function AppRouter() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/emergencias/nueva" element={<AltaEmergencia />} />
             <Route path="/lotes/nuevo" element={<AltaLotes />} />
+             <Route path="/ofertas" element={<CargarOfertas />} />
+             <Route path="/emergencias/:id/lotes" element={<DetalleLotes />} />
             <Route
               path="*"
               element={
