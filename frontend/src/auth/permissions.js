@@ -1,7 +1,7 @@
 
 export const ROLE_NAMES = {
   municipal: ['operador_municipal'],
-  coordinador: ['centro_coordinador_regional'],
+  coordinador: ['centro_coordinador'],
   ong: ['representante_ong'],
   auditor: ['auditor', 'directivo'],
 };

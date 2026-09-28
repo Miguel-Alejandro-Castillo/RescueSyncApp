@@ -16,10 +16,18 @@ from models import Emergencia, Lote, Oferta
 PASSWORD = '1234'
 USERS = (
     ('municipal', 'operador_municipal', 'Operador Municipal'),
-    ('coordinador', 'centro_coordinador_regional', 'Centro Coordinador Regional'),
+    ('coordinador', 'centro_coordinador', 'Centro Coordinador Regional'),
     ('ong', 'representante_ong', 'Representante de ONG'),
-    ('auditor', 'auditor', 'Auditor / Directivo'),
+    ('auditor', 'auditor', 'Auditor'),
 )
+
+# Nombres y jerarquía de app/organizations/RESCUE.xml del proyecto Bonita.
+ROLE_GROUPS = {
+    'operador_municipal': ('municipios', 'Municipios'),
+    'centro_coordinador': ('coordinadores', 'Coordinadores'),
+    'representante_ong': ('ongs', 'Ongs'),
+    'auditor': ('auditores', 'Auditores'),
+}
 
 
 def all_items(client, path, filters=None):
@@ -44,17 +52,20 @@ def ensure(client, path, matches, payload, filters=None):
 
 
 def seed_users(client, password):
-    group, _ = ensure(client, '/API/identity/group',
-        lambda item: item['name'] == 'rescuesync-demo' and not item.get('parent_path'),
-        {'name': 'rescuesync-demo', 'displayName': 'RescueSync DEMO',
-         'description': 'Organización provisional de desarrollo', 'parent_path': ''})
+    ensure(client, '/API/identity/group',
+        lambda item: item['name'] == 'rescue' and not item.get('parent_path'),
+        {'name': 'rescue', 'displayName': 'Rescue', 'parent_path': ''})
     profiles = all_items(client, '/API/portal/profile')
     profile = next((item for item in profiles if item['name'] == 'User'), None)
     if not profile:
         raise RuntimeError('No existe el perfil estándar User de Bonita.')
     for username, role_name, label in USERS:
+        group_name, group_label = ROLE_GROUPS[role_name]
+        group, _ = ensure(client, '/API/identity/group',
+            lambda item: item['name'] == group_name and item.get('parent_path') == '/rescue',
+            {'name': group_name, 'displayName': group_label, 'parent_path': '/rescue'})
         role, _ = ensure(client, '/API/identity/role', lambda item: item['name'] == role_name,
-            {'name': role_name, 'displayName': label, 'description': 'Rol provisional RescueSync'})
+            {'name': role_name, 'displayName': label, 'description': 'Rol de RESCUE.xml'})
         user, created = ensure(client, '/API/identity/user', lambda item: item['userName'] == username,
             {'userName': username, 'password': password, 'password_confirm': password,
              'firstName': label, 'lastName': 'DEMO', 'enabled': 'true'})
