@@ -6,7 +6,8 @@ from sqlmodel import Session, select
 from database import get_session
 from models.emergencia import Emergencia
 from services.bonita_service import BonitaService
-
+from typing import List
+from models.lote import Lote
 PROCESS_NAME = os.getenv("BONITA_PROCESS")
 
 router = APIRouter(
@@ -99,3 +100,21 @@ def delete_emergencia(
     session.delete(emergencia)
     session.commit()
     return {"ok": True}
+
+
+@router.get("/{emergencia_id}/lotes", response_model=List[Lote])
+def get_lotes_by_emergencia(
+    emergencia_id: int,
+    session: Session = Depends(get_session)
+):
+
+    emergencia = session.get(Emergencia, emergencia_id)
+    if not emergencia:
+        raise HTTPException(status_code=404, detail="Emergencia no encontrada")
+    
+    abiertos= select(Lote).where(
+        Lote.id_emergencia == emergencia_id,
+        Lote.estado == "abierto"
+    )
+    lotes = session.exec(abiertos).all()
+    return lotes
