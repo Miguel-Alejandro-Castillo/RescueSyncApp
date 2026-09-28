@@ -34,8 +34,8 @@ async def get_memberships_by_user(user_info, bonita: BonitaService):
         role = await bonita.get_role_by_id(role_id=membership["role_id"])
 
         _memberships.append({
-            "group":group["name"],
-            "role": role["name"]
+            "group": { "name": group["name"], "displayName": group["displayName"] },
+            "role": { "name": role["name"], "displayName": role["displayName"] }
         })
     return _memberships
 
