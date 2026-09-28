@@ -1,6 +1,7 @@
 import os
 from datetime import datetime, timezone
-from auth.jwt_auth import get_current_user
+from dependencies.jwt_auth import get_current_user
+from dependencies.bonita import get_bonita_service
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database import get_session
@@ -54,37 +55,39 @@ def read_emergencia(
 @router.post("")
 async def create_emergencia(
     emergencia: Emergencia,
-    current_user= Depends(get_current_user),
+    bonita: BonitaService = Depends(get_bonita_service),
     session: Session = Depends(get_session)
 ):
-    # deberia extraer el token del usuario actual y usarlo en Bonita
-    bonita = BonitaService()
-    bonita.j_session = current_user["bonita_auth"]
-    bonita.api_token = current_user["bonita_token"]
-    
-    session.add(emergencia)
     try:
-        procesos = await bonita.obtener_procesos_por_nombre(PROCESS_NAME)
-        processId = procesos[0]["id"]
-        iniciar_proceso_response = await bonita.iniciar_proceso(processId) # devuelve un case id, setear a la emergencia
+        proceso = await bonita.obtener_proceso_por_nombre(PROCESS_NAME)
+
+        iniciar_proceso_response = await bonita.iniciar_proceso(proceso["id"]) # devuelve un case id, setear a la emergencia
 
         emergencia.bonitaCaseId = iniciar_proceso_response["caseId"] # Asigna el case ID de Bonita a la emergencia
         
+        session.add(emergencia) # Agrega la emergencia a la sesión de la base de datos
+        
         # Espera hasta que aparezcan tareas humanas en estado 'ready' para el caso específico
-        tareas_humanas = await bonita.esperar_tareas_humanas_por_caso(emergencia.bonitaCaseId)
-        tarea_registrar_emergencia = tareas_humanas[0]
+        tarea_registrar_emergencia = await bonita.esperar_tarea_humana_por_caso(emergencia.bonitaCaseId)
 
         # Si es exitoso devuelve un HTTP 204, no devuelve nada, solo completa la tarea humana
         await bonita.completar_tarea_humana(tarea_registrar_emergencia["id"])
 
         session.commit()
-        session.refresh(emergencia)
+        session.refresh(emergencia) # Refresca la instancia de la emergencia desde la base de datos para obtener los valores actualizados
         
-    except Exception:
-        session.rollback() # Revertir los cambios en la sesión de la base de datos en caso de error
-        raise HTTPException(status_code=500, detail="No se pudo iniciar el proceso en Bonita")
-    finally:
-        await bonita.http_client.close()
+    except Exception as e:
+        # Revertir los cambios en la sesión de la base de datos en caso de error
+        session.rollback()
+        
+        # Borra el caso en Bonita si existe
+        if emergencia.bonitaCaseId:
+            await bonita.borrar_caso_por_id(emergencia.bonitaCaseId)
+
+        raise HTTPException( 
+            status_code=500,
+            detail=str(e)
+        )
 
     return emergencia
 

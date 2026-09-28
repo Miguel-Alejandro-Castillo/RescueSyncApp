@@ -1,3 +1,4 @@
+from dependencies.bonita import get_bonita_service
 from fastapi import APIRouter, HTTPException, Depends
 import os
 from fastapi import Response
@@ -5,7 +6,8 @@ from datetime import datetime, timedelta, timezone
 from jose import jwt
 from pydantic import BaseModel
 from services.bonita_service import BonitaService
-from auth.jwt_auth import get_current_user
+from dependencies.jwt_auth import get_current_user
+import traceback
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "tu_clave_secreta_jwt")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
@@ -37,12 +39,12 @@ async def get_memberships_by_user(user_info, bonita: BonitaService):
         })
     return _memberships
 
+# No conviene incluir la dependencia de Bonita(get_bonita_service) directamente en el login, se instancia manualmente dentro de la función
 @router.post("/login", response_model=LoginResponse, status_code=200)
-async def login(user: UserLogin):
+async def login(user: UserLogin ):
     bonita = BonitaService()
     try:
-        print("Attempting login for user:", user.username)
-    
+
         # 1.Autenticar contra Bonita
         login_response = await bonita.login(user.username, user.password)
   
@@ -74,24 +76,22 @@ async def login(user: UserLogin):
             "token_type": "bearer",
             "expires_in": int(expire_delta.total_seconds())
         }
-    
+
     except HTTPException:
         # Re-lanzar excepciones HTTP explícitas (ej. 401)
+
+        traceback.print_exc()
         raise
     except Exception as e:
+        traceback.print_exc()
         raise HTTPException(status_code=401, detail="No se pudo autenticar el usuario")
     finally:
         await bonita.close()
    
 @router.post("/logout", status_code=204)
-async def logout(current_user= Depends(get_current_user)):
-    bonita = BonitaService()
+async def logout(bonita: BonitaService = Depends(get_bonita_service)):
     try:
-        bonita.api_token = current_user["bonita_token"]
-        bonita.j_session = current_user["bonita_auth"]
         await bonita.logout()
     except Exception as e:
             raise HTTPException(status_code=401, detail="No se pudo cerrar sesión del usuario")
-    finally:
-        await bonita.http_client.close()
     return Response(status_code=204)

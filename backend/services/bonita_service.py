@@ -153,6 +153,10 @@ class BonitaService:
         )
         return response.json()
 
+    async def obtener_proceso_por_nombre(self, process_name: str):
+        procesos = await self.obtener_procesos_por_nombre(process_name)
+        return procesos[0] if procesos else None
+    
     # Devuelve un proceso específico por su ID
     async def obtener_proceso_por_id(self, process_id: str):
         response = await self.http_client.get(
@@ -185,6 +189,13 @@ class BonitaService:
         )
         return response.json()
 
+    # elimina un caso específico por su ID, si es exitoso devuelve un HTTP 200 con body vacío
+    async def borrar_caso_por_id(self, case_id: str):
+        await self.http_client.delete(
+            f"{self.api_path}/case/{case_id}",
+            headers=self._auth_headers()
+        )
+    
     # Devuelve un listado de todas las tareas activas por caso
     async def obtener_tareas_por_caso(self, caseId: str):
         params = [
@@ -217,11 +228,11 @@ class BonitaService:
         return response.json()
 
     # Completa una tarea humana específica por su ID
-    async def completar_tarea_humana(self, task_id: str):
+    async def completar_tarea_humana(self, task_id: str, contract: dict = {}):
         await self.http_client.post(
             f"{self.api_path}/userTask/{task_id}/execution",
             headers=self._auth_headers(),
-            json = {}, # A JSON object matching task contract.
+            json = contract, # A JSON object matching task contract.
             params = {
                 "assign": True
             }
@@ -267,6 +278,15 @@ class BonitaService:
                 intervalo_ms / 1000
             )
 
+    async def esperar_tarea_humana_por_caso(
+        self,
+        caseId: str,
+        timeout_segundos: int = 20,
+        intervalo_ms: int = 200
+    ):
+        tareas = await self.esperar_tareas_humanas_por_caso(caseId, timeout_segundos, intervalo_ms)
+        return tareas[0] if tareas else None
+    
     async def close(self):
         """Cierra las conexiones del cliente HTTP subyacente."""
         await self.http_client.close()
