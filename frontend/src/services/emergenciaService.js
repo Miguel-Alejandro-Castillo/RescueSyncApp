@@ -1,7 +1,8 @@
 import { ENDPOINTS } from "../config/api";
+import { authenticatedFetch } from "./authService";
 
 export async function crearEmergencia(emergencia) {
-  const response = await fetch(ENDPOINTS.EMERGENCIAS, {
+  const response = await authenticatedFetch(ENDPOINTS.EMERGENCIAS, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

@@ -54,6 +54,34 @@ Una vez levantada toda la infraestructura, podras acceder a:
 - Nacional: `http://localhost:4000`
 - Swagger de la api Nacional: `http://localhost:4000/api-docs/`
 
+## Login y logout
+
+El frontend solicita el **usuario de Bonita** y su contraseña. Envía JSON con
+`username` y `password` a `POST /api/rescue/auth/login` y conserva el JWT en
+`sessionStorage` durante la sesión de la pestaña, respetando `expires_in`.
+El botón **Cerrar sesión** llama a `POST /api/rescue/auth/logout` con
+`Authorization: Bearer <token>` y elimina la sesión cuando termina correctamente
+o el servidor rechaza el token con 401. Si falla la conexión, permite reintentar.
+
+Las pantallas del frontend requieren sesión. Esto no reemplaza los controles de
+autorización que cada endpoint del backend necesite implementar.
+
+Para pruebas locales se creó en esta instancia el usuario `rescue.prueba`, con
+perfil estándar `User`. Se conserva en el volumen de datos de Bonita; no se crea
+automáticamente en instalaciones nuevas. Este usuario permite probar login y
+logout, pero no instala el proceso de emergencias ni la organización del equipo.
+
+En Docker, el backend se conecta a `http://bonita-engine:8080/bonita` por la red
+interna. La instancia de Bonita debe tener cargada la organización del proyecto
+(usuarios, grupos y roles). Los usuarios de otra instalación de Bonita Studio no
+aparecen automáticamente en este contenedor. Si la instancia está vacía, pedir al
+equipo la organización del proyecto para importarla antes de probar el login.
+
+Después de actualizar las dependencias del backend, reconstruir su imagen con
+`docker compose up -d --build backend`.
+Las pruebas del servicio de autenticación del front se ejecutan desde `frontend/`
+con `npm test`; la compilación, con `npm run build`.
+
 ## Actualizar solo el backend
 
 Si hiciste cambios en `backend/` y quieres reconstruir solo ese servicio:

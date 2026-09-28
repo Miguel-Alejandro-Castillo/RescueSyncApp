@@ -1,14 +1,8 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import styles from "./Dashboard.module.css";
 export default function Dashboard() {
-  const { state } = useLocation();
   return (
     <>
-      {state?.loginPreview && (
-        <p className="notice" role="status">
-          Estás explorando la demostración. No se inició una sesión autenticada.
-        </p>
-      )}
       <div className="page-heading">
         <h1 id="actions-title">Accesos rápidos</h1>
       </div>
