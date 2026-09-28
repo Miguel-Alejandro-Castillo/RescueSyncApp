@@ -47,6 +47,12 @@ Si querés reconstruir la imagen:
 docker compose up -d --build backend
 ```
 
+Si cambiaste variables de entorno y necesitás recrear el contenedor para que tome los nuevos valores:
+
+```bash
+docker compose up -d --force-recreate backend
+```
+
 Si además modificaste dependencias y querés forzar una reconstrucción completa sin reutilizar capas previas:
 
 ```bash

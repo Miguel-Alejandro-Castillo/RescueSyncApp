@@ -43,6 +43,7 @@ Esto levanta y construye estos servicios:
 - `bonita-engine`
 - `backend`
 - `frontend`
+- `nacional`
 
 ## URLs publicadas
 
