@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './CargarOfertas.module.css';
+import { API_RESCUE } from '../../config/api';
+import { authenticatedFetch } from '../../services/authService';
 
 export default function CargarOfertas() {
   const [emergencias, setEmergencias] = useState([]);
@@ -12,7 +14,7 @@ export default function CargarOfertas() {
   const fetchEmergencias = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3000/api/rescue/ofertas/emergencias-disponibles');
+      const response = await authenticatedFetch(`${API_RESCUE}/ofertas/emergencias-disponibles`);
       if (!response.ok) throw new Error('Error al obtener emergencias disponibles');
       const data = await response.json();
       setEmergencias(data);

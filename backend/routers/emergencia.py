@@ -2,6 +2,9 @@ import os
 from datetime import datetime, timezone
 from dependencies.jwt_auth import get_current_user
 from dependencies.bonita import get_bonita_service
+from dependencies.rbac import (
+    require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
+)
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database import get_session
@@ -15,7 +18,7 @@ router = APIRouter(
     prefix="/emergencias",
     tags=["emergencias"]
 )
-@router.get("")
+@router.get("", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, *AUDITORES))])
 def read_emergencias(
     estado: str | None = None,
     nivelGravedad: str | None = None,
@@ -43,7 +46,7 @@ def read_emergencias(
 
     return session.exec(query).all()
 
-@router.get("/{emergencia_id}")
+@router.get("/{emergencia_id}", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, *AUDITORES))])
 def read_emergencia(
     emergencia_id: int,
     session: Session = Depends(get_session)
@@ -53,7 +56,7 @@ def read_emergencia(
         raise HTTPException(status_code=404, detail="Emergencia no encontrada")
     return emergencia
 
-@router.post("")
+@router.post("", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL))])
 async def create_emergencia(
     emergencia: Emergencia,
     bonita: BonitaService = Depends(get_bonita_service),
@@ -92,7 +95,7 @@ async def create_emergencia(
 
     return emergencia
 
-@router.delete("/{emergencia_id}")
+@router.delete("/{emergencia_id}", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL))])
 def delete_emergencia(
     emergencia_id: int,
     session: Session = Depends(get_session)
@@ -105,7 +108,11 @@ def delete_emergencia(
     return {"ok": True}
 
 
-@router.get("/{emergencia_id}/lotes", response_model=List[Lote])
+@router.get(
+    "/{emergencia_id}/lotes",
+    response_model=List[Lote],
+    dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))]
+)
 def get_lotes_by_emergencia(
     emergencia_id: int,
     session: Session = Depends(get_session)

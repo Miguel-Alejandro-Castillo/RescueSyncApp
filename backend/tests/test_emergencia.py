@@ -3,14 +3,18 @@ from sqlmodel import select
 from models.emergencia import Emergencia
 
 
-def test_post_emergencia_se_guarda_en_la_bd(client, session):
+def test_post_emergencia_se_guarda_en_la_bd(client, session, auth_headers):
     payload = {
         "zonaAfectada": "Zona Norte",
         "nivelGravedad": "alto",
         "descripcionInicial": "Inundacion en el barrio",
     }
 
-    response = client.post("/api/rescue/emergencias", json=payload)
+    response = client.post(
+        "/api/rescue/emergencias",
+        json=payload,
+        headers=auth_headers("operador_municipal"),
+    )
 
     assert response.status_code == 200
 
