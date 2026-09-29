@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from datetime import datetime, timedelta, timezone
 from database import get_session
-from dependencies.rbac import require_roles, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
+from dependencies.rbac import (
+    require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
+)
 from models.emergencia import Emergencia
 from models.lote import Lote
 from models.oferta import Oferta
@@ -13,30 +15,16 @@ router = APIRouter(
 )
 
 
-TIEMPO_LIMITE_GRAVEDAD = {
-    "Critica": timedelta(hours=24),
-    "Alta": timedelta(hours=72),
-    "Medio": timedelta(hours=168)
-}
-
 def es_lote_vigente(lote: Lote, emergencia: Emergencia) -> bool:
+    fecha_limite = lote.fechaLimiteConvocatoria
+    if fecha_limite.tzinfo is None:
+        fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
 
-    duracion_permitida = TIEMPO_LIMITE_GRAVEDAD.get(
-        emergencia.nivelGravedad, 
-        timedelta(hours=48)  
-    )
-    
-    fecha_expiracion = lote.fecha_publicacion + duracion_permitida
-    ahora = datetime.now(timezone.utc)
- 
-    if lote.fecha_publicacion.tzinfo is None:
-        ahora = datetime.now()
-
-    return ahora <= fecha_expiracion
+    return datetime.now(timezone.utc) <= fecha_limite
 
 @router.get(
     "/emergencias-disponibles",
-    dependencies=[Depends(require_roles(REPRESENTANTE_ONG, CENTRO_COORDINADOR, *AUDITORES))]
+    dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))]
 )
 def get_emergencias_con_lotes(
     session: Session = Depends(get_session)
@@ -76,7 +64,7 @@ def create_oferta(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"El lote con ID {oferta.id_lote} no existe."
         )
-    emergencia = session.get(Emergencia, lote.id_emergencia)
+    emergencia = session.get(Emergencia, lote.emergenciaId)
     if not emergencia:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -89,7 +77,7 @@ def create_oferta(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"El plazo para realizar ofertas en este lote ha expirado. (Nivel de gravedad: {emergencia.nivelGravedad})"
         )
-    cant_cubierta_actual = lote.cant_cubierta or 0
+    cant_cubierta_actual = lote.cantidadCubierta or 0
     faltante = lote.cantidad - cant_cubierta_actual
     if oferta.cant_recurso > faltante:
         raise HTTPException(
@@ -98,12 +86,12 @@ def create_oferta(
         )
 
     session.add(oferta)
-    lote.cant_cubierta += oferta.cant_recurso
-    if lote.cant_cubierta == lote.cantidad:
+    lote.cantidadCubierta += oferta.cant_recurso
+    if lote.cantidadCubierta == lote.cantidad:
 
         lote.estado = "cubierto"
 
-    print(lote.cant_cubierta)    
+    print(lote.cantidadCubierta)    
     session.add(lote)
 
     session.commit()

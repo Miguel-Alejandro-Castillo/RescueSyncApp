@@ -5,7 +5,9 @@ from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from database import get_session
-from dependencies.rbac import require_roles, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
+from dependencies.rbac import (
+    require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
+)
 from models.emergencia import Emergencia
 from models.lote import Lote
 
@@ -33,7 +35,7 @@ def calcular_fecha_limite(nivel_gravedad: str) -> datetime:
     horas = horas_map.get(nivel_gravedad.lower(), 96)
     return datetime.now(timezone.utc) + timedelta(hours=horas)
 
-@router.get("", dependencies=[Depends(require_roles(CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))])
+@router.get("", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))])
 def read_lotes(
     emergenciaId: int | None = None,
     estado: str | None = None,
@@ -51,7 +53,7 @@ def read_lotes(
 
     return session.exec(query).all()
 
-@router.get("/{lote_id}", dependencies=[Depends(require_roles(CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))])
+@router.get("/{lote_id}", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))])
 def read_lote(
     lote_id: int,
     session: Session = Depends(get_session)

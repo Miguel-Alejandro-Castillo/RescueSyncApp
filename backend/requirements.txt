@@ -7,3 +7,4 @@ pytest
 httpx
 python-jose[cryptography]
 cryptography
+freezegun

@@ -111,7 +111,7 @@ def delete_emergencia(
 @router.get(
     "/{emergencia_id}/lotes",
     response_model=List[Lote],
-    dependencies=[Depends(require_roles(CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))]
+    dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))]
 )
 def get_lotes_by_emergencia(
     emergencia_id: int,
@@ -123,7 +123,7 @@ def get_lotes_by_emergencia(
         raise HTTPException(status_code=404, detail="Emergencia no encontrada")
     
     abiertos= select(Lote).where(
-        Lote.id_emergencia == emergencia_id,
+        Lote.emergenciaId == emergencia_id,
         Lote.estado == "abierto"
     )
     lotes = session.exec(abiertos).all()
