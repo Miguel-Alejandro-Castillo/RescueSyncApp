@@ -287,6 +287,17 @@ class BonitaService:
         tareas = await self.esperar_tareas_humanas_por_caso(caseId, timeout_segundos, intervalo_ms)
         return tareas[0] if tareas else None
     
+    # Establece una variable de caso específica en Bonita BPM. Devuelve un 200 OK sin cuerpo
+    async def set_case_variable(self, caseId: str, variable_name: str, tipo_variable: str, variable_value):
+        await self.http_client.put(
+            f"{self.api_path}/caseVariable/{caseId}/{variable_name}",
+            headers=self._auth_headers(),
+            json = {
+                "type": tipo_variable,
+                "value": variable_value
+            }
+        )
+
     async def close(self):
         """Cierra las conexiones del cliente HTTP subyacente."""
         await self.http_client.close()
