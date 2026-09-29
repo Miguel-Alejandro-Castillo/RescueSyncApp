@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styles from './DetalleLotes.module.css';
+import { API_RESCUE } from '../../config/api';
+import { authenticatedFetch } from '../../services/authService';
 
 export default function DetalleLotes() {
   const { id } = useParams();
@@ -17,7 +19,7 @@ export default function DetalleLotes() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetch(`http://127.0.0.1:3000/api/rescue/emergencias/${id}/lotes`)
+    authenticatedFetch(`${API_RESCUE}/emergencias/${id}/lotes`)
       .then((res) => {
         if (!res.ok) throw new Error('Error al obtener los lotes');
         return res.json();
@@ -68,7 +70,7 @@ export default function DetalleLotes() {
         cant_recurso: Number(cantRecurso)
       };
 
-      const response = await fetch('http://127.0.0.1:3000/api/rescue/ofertas/', {
+      const response = await authenticatedFetch(`${API_RESCUE}/ofertas/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -85,7 +87,7 @@ export default function DetalleLotes() {
       setCantRecurso('');
 
 
-      const updated = await fetch(`http://127.0.0.1:3000/api/rescue/emergencias/${id}/lotes`);
+      const updated = await authenticatedFetch(`${API_RESCUE}/emergencias/${id}/lotes`);
       const updatedData = await updated.json();
       setLotes(Array.isArray(updatedData) ? updatedData : []);
 
