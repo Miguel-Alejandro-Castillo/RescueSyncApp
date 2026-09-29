@@ -82,7 +82,9 @@ export default function DetalleLotes() {
         throw new Error(data.detail || 'Error al procesar la oferta');
       }
 
-      alert('¡Oferta registrada con éxito!');
+      navigate('/ofertas', { 
+      state: { mensajeExito: '¡Oferta registrada con éxito!' } 
+    });
       setLoteSeleccionadoId(null);
       setCantRecurso('');
 
@@ -100,9 +102,27 @@ export default function DetalleLotes() {
 
   return (
     <div className={styles.page} style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
-      <button onClick={() => navigate('/ofertas')} style={{ marginBottom: '1rem', cursor: 'pointer' }}>
-        ← Volver al portal
-      </button>
+      <button 
+    onClick={() => navigate('/ofertas')} 
+    className={styles.secondaryBtn || styles.button} 
+    style={{
+      marginBottom: '1.5rem',
+      cursor: 'pointer',
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: '0.5rem',
+      padding: '0.5rem 1rem',
+      borderRadius: '0.5rem',
+      border: '1px solid var(--border, #ccc)',
+      backgroundColor: 'transparent',
+      color: 'var(--text-color, #6cb984)',
+      fontWeight: '500',
+      fontSize: '0.9rem',
+      transition: 'all 0.2s ease'
+    }}
+  >
+    ← Volver al portal
+  </button>
 
       <h1>Lotes Disponibles para Emergencia #{id}</h1>
 
@@ -114,7 +134,7 @@ export default function DetalleLotes() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
           {(lotes || []).map((lote) => {
             const estaDesplegado = loteSeleccionadoId === lote.id;
-            const cantCubierta = lote.cant_cubierta || 0;
+            const cantCubierta = lote.cantidadCubierta || 0;
             const faltante = lote.cantidad - cantCubierta;
 
             return (

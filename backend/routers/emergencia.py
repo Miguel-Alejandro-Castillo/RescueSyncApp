@@ -123,7 +123,7 @@ def get_lotes_by_emergencia(
         raise HTTPException(status_code=404, detail="Emergencia no encontrada")
     
     abiertos= select(Lote).where(
-        Lote.id_emergencia == emergencia_id,
+        Lote.emergenciaId == emergencia_id,
         Lote.estado == "abierto"
     )
     lotes = session.exec(abiertos).all()

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import styles from './CargarOfertas.module.css';
 import { API_RESCUE } from '../../config/api';
 import { authenticatedFetch } from '../../services/authService';
@@ -8,9 +8,9 @@ export default function CargarOfertas() {
   const [emergencias, setEmergencias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-
+  const [mensajeExito, setMensajeExito] = useState('');
   const navigate = useNavigate();
-
+  const location = useLocation();
   const fetchEmergencias = async () => {
     try {
       setLoading(true);
@@ -29,12 +29,41 @@ export default function CargarOfertas() {
     fetchEmergencias();
   }, []);
 
+  useEffect(() => {
+    if (location.state?.mensajeExito) {
+      setMensajeExito(location.state.mensajeExito);
+
+      // Limpiar el estado de la navegación para que no vuelva a aparecer al recargar
+      window.history.replaceState({}, document.title);
+
+      // Ocultar el cartel automáticamente después de 5 segundos
+      const timer = setTimeout(() => {
+        setMensajeExito('');
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [location]);
+
   if (loading) return <div className={styles.page}>Cargando emergencias...</div>;
   if (error) return <div className={styles.page}>Error: {error}</div>;
 
   return (
     <div className={styles.page}>
       <div style={{ maxWidth: '900px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+        
+        {}
+        {mensajeExito && (
+          <div className="alert alert-success alert-dismissible fade show mb-0" role="alert">
+            {mensajeExito}
+            <button 
+              type="button" 
+              className="btn-close" 
+              onClick={() => setMensajeExito('')} 
+              aria-label="Close"
+            ></button>
+          </div>
+        )}
         
         {}
         <div className={styles.card}>
