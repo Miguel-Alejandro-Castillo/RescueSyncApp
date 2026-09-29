@@ -1,4 +1,6 @@
+import os
 from datetime import datetime, timedelta, timezone
+from dependencies.bonita import get_bonita_service
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -8,8 +10,10 @@ from database import get_session
 from dependencies.rbac import (
     require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
 )
+from services.bonita_service import BonitaService
 from models.emergencia import Emergencia
 from models.lote import Lote
+PROCESS_NAME = os.getenv("BONITA_PROCESS")
 
 router = APIRouter(
     prefix="/lotes",
@@ -25,7 +29,7 @@ class DesgloseLotesRequest(BaseModel):
     emergenciaId: int
     lotes: list[LoteItemDTO]
 
-def calcular_fecha_limite(nivel_gravedad: str) -> datetime:
+def calcular_fecha_limite(nivel_gravedad: str, fecha_inicio: datetime) -> datetime:
     horas_map = {
         "critico": 24,
         "alto": 48,
@@ -33,7 +37,11 @@ def calcular_fecha_limite(nivel_gravedad: str) -> datetime:
         "bajo": 96
     }
     horas = horas_map.get(nivel_gravedad.lower(), 96)
-    return datetime.now(timezone.utc) + timedelta(hours=horas)
+    return fecha_inicio + timedelta(hours=horas)
+
+def calcular_diferencia_ms(fecha_limite: datetime, fecha_actual: datetime) -> int:
+    diferencia = fecha_limite - fecha_actual
+    return int(diferencia.total_seconds() * 1000)
 
 @router.get("", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))])
 def read_lotes(
@@ -68,8 +76,9 @@ def read_lote(
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_roles(CENTRO_COORDINADOR))]
 )
-def create_lotes(
+async def create_lotes(
     payload: DesgloseLotesRequest,
+    bonita: BonitaService = Depends(get_bonita_service),
     session: Session = Depends(get_session)
 ):
     emergencia = session.get(Emergencia, payload.emergenciaId)
@@ -85,30 +94,74 @@ def create_lotes(
     if not payload.lotes:
         raise HTTPException(status_code=400, detail="Debe incluir al menos un lote")
 
-    fecha_limite = calcular_fecha_limite(emergencia.nivelGravedad)
+    ahora = datetime.now(timezone.utc)
+    fecha_limite = calcular_fecha_limite(emergencia.nivelGravedad, ahora)
+    ventana_emergencia_ms = calcular_diferencia_ms(fecha_limite, ahora)
 
-    lotes_creados = []
-    for item in payload.lotes:
-        nuevo_lote = Lote(
-            emergenciaId=payload.emergenciaId,
-            tipoRecurso=item.tipoRecurso,
-            descripcion=item.descripcion,
-            cantidad=item.cantidad,
-            cantidadCubierta=0,
-            estado="creado",
-            fechaLimiteConvocatoria=fecha_limite
+    try:
+        lotes_creados = []
+        for item in payload.lotes:
+            nuevo_lote = Lote(
+                emergenciaId=payload.emergenciaId,
+                tipoRecurso=item.tipoRecurso,
+                descripcion=item.descripcion,
+                cantidad=item.cantidad,
+                cantidadCubierta=0,
+                estado="creado",
+                fechaLimiteConvocatoria=fecha_limite
+            )
+            session.add(nuevo_lote)
+            lotes_creados.append(nuevo_lote)
+
+        caso_id = emergencia.bonitaCaseId
+
+        # 1. Setear ventana de tiempo
+        await bonita.set_case_variable(
+            caso_id,
+            "ventana_tiempo_ms",
+            "java.lang.Long",
+            ventana_emergencia_ms
         )
-        session.add(nuevo_lote)
-        lotes_creados.append(nuevo_lote)
 
-    emergencia.estado = "publicada"
-    session.add(emergencia)
+        # 2. Obtener tarea humana pendiente
+        tareas = await bonita.obtener_tareas_humanas_por_caso(caso_id)
 
-    session.commit()
+        if not tareas:
+            raise Exception(
+                "No se encontró una tarea humana pendiente para la emergencia"
+            )
 
-    for lote in lotes_creados:
-        session.refresh(lote)
+        # 3. Buscar específicamente Generar lotes de necesidades
+        tarea = next(
+            (
+                tarea for tarea in tareas
+                if tarea["name"] == "Generar lotes de necesidades"
+            ),
+            None
+        )
 
+        if not tarea:
+            raise Exception(
+                "No se encontró la tarea 'Generar lotes de necesidades'"
+            )
+
+        # 4. Completar tarea
+        await bonita.completar_tarea_humana(tarea["id"])    
+
+        emergencia.estado = "publicada"
+        session.add(emergencia)
+
+        session.commit()
+
+        for lote in lotes_creados:
+            session.refresh(lote)
+    except Exception as e:
+        session.rollback()
+        
+        raise HTTPException( 
+                    status_code=500,
+                    detail=str(e)
+        )
     return lotes_creados
 
 @router.delete("/{lote_id}", dependencies=[Depends(require_roles(CENTRO_COORDINADOR))])
