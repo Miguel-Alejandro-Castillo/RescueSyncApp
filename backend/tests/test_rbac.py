@@ -84,3 +84,13 @@ def test_auditor_no_puede_borrar(client, auth_headers, metodo, url):
     response = getattr(client, metodo)(url, headers=auth_headers("auditor"))
 
     assert response.status_code == 403
+
+
+@pytest.mark.parametrize("url", [
+    "/api/rescue/lotes",
+    "/api/rescue/ofertas/emergencias-disponibles",
+])
+def test_operador_municipal_ve_lotes_y_ofertas(client, auth_headers, url):
+    response = client.get(url, headers=auth_headers("operador_municipal"))
+
+    assert response.status_code == 200

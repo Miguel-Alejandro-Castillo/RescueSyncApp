@@ -111,7 +111,7 @@ def delete_emergencia(
 @router.get(
     "/{emergencia_id}/lotes",
     response_model=List[Lote],
-    dependencies=[Depends(require_roles(CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))]
+    dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))]
 )
 def get_lotes_by_emergencia(
     emergencia_id: int,

@@ -2,7 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
 from datetime import datetime, timedelta, timezone
 from database import get_session
-from dependencies.rbac import require_roles, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
+from dependencies.rbac import (
+    require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
+)
 from models.emergencia import Emergencia
 from models.lote import Lote
 from models.oferta import Oferta
@@ -36,7 +38,7 @@ def es_lote_vigente(lote: Lote, emergencia: Emergencia) -> bool:
 
 @router.get(
     "/emergencias-disponibles",
-    dependencies=[Depends(require_roles(REPRESENTANTE_ONG, CENTRO_COORDINADOR, *AUDITORES))]
+    dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))]
 )
 def get_emergencias_con_lotes(
     session: Session = Depends(get_session)
