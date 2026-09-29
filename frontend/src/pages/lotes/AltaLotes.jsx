@@ -99,8 +99,8 @@ const FormularioLotes = () => {
         try {
             setSaving(true);
             await crearLotes(payload);
-            alert('Lotes publicados y convocatoria abierta con éxito.');
-            navigate('/dashboard');
+            // alert('Lotes publicados y convocatoria abierta con éxito.');
+            navigate('/dashboard', {state: { mensajeExito: 'Lotes publicados y convocatoria abierta con éxito.' } });
         } catch (err) {
             setSubmitError(err.message);
         } finally {
