@@ -48,7 +48,7 @@ def read_emergencias(
             fechaHasta = fechaHasta.replace(tzinfo=timezone.utc)
         query = query.where(Emergencia.fechaCreacion <= fechaHasta)
 
-    return session.exec(query).all()
+    return session.exec(query.order_by(Emergencia.fechaCreacion.desc(), Emergencia.id.desc())).all()
 
 @router.get("/{emergencia_id}", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, *AUDITORES))])
 def read_emergencia(
@@ -139,7 +139,7 @@ def get_lotes_by_emergencia(
         Lote.emergenciaId == emergencia_id,
         Lote.estado == "abierto"
     )
-    lotes = session.exec(abiertos).all()
+    lotes = session.exec(abiertos.order_by(Lote.fechaCreacion.desc(), Lote.id.desc())).all()
     return lotes
 
 class NotificarTimeoutRequest(BaseModel):

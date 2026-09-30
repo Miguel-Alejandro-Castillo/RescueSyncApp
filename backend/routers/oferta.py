@@ -30,13 +30,17 @@ def get_emergencias_con_lotes(
     session: Session = Depends(get_session)
 ):
 
-    statement = select(Emergencia).where(Emergencia.estado == "publicada")
+    statement = select(Emergencia).where(Emergencia.estado == "publicada").order_by(
+        Emergencia.fechaCreacion.desc(), Emergencia.id.desc()
+    )
     emergencias = session.exec(statement).all()
     
     resultado = []
     for emergencia in emergencias:
        
-        stmt_lotes = select(Lote).where(Lote.emergenciaId == emergencia.id)
+        stmt_lotes = select(Lote).where(Lote.emergenciaId == emergencia.id).order_by(
+            Lote.fechaCreacion.desc(), Lote.id.desc()
+        )
         lotes = session.exec(stmt_lotes).all()
 
         

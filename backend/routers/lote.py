@@ -70,7 +70,7 @@ def read_lotes(
     if tipoRecurso:
         query = query.where(Lote.tipoRecurso == tipoRecurso)
 
-    return session.exec(query).all()
+    return session.exec(query.order_by(Lote.fechaCreacion.desc(), Lote.id.desc())).all()
 
 @router.get("/{lote_id}", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))])
 def read_lote(
