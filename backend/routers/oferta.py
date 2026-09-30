@@ -58,6 +58,13 @@ def create_oferta(
     session: Session = Depends(get_session)
 ):
 
+    # SQLModel no valida los modelos con table=True, por eso se controla a mano
+    if oferta.cant_recurso <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="La cantidad ofrecida debe ser mayor a 0."
+        )
+
     lote = session.get(Lote, oferta.id_lote)
     if not lote:
         raise HTTPException(

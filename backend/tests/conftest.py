@@ -8,7 +8,7 @@ from jose import jwt
 from sqlmodel import Session, SQLModel, create_engine
 
 from database import get_session
-from dependencies.bonita import get_bonita_service
+from dependencies.bonita import get_bonita_service, get_bonita_service_cuenta_servicio
 from dependencies.jwt_auth import ALGORITHM, SECRET_KEY
 from main import app
 
@@ -38,6 +38,12 @@ class BonitaFalso:
 
     async def esperar_tarea_humana_por_caso(self, case_id, *args, **kwargs):
         return {"id": "1"}
+
+    async def obtener_tareas_humanas_por_caso(self, case_id):
+        return [{"id": "2", "name": "Generar lotes de necesidades"}]
+
+    async def set_case_variable(self, case_id, variable_name, tipo_variable, variable_value):
+        return None
 
     async def completar_tarea_humana(self, task_id, contract=None):
         return None
@@ -78,8 +84,14 @@ def client_fixture():
 
     app.dependency_overrides[get_session] = get_session_override
     app.dependency_overrides[get_bonita_service] = get_bonita_falso
+    app.dependency_overrides[get_bonita_service_cuenta_servicio] = get_bonita_falso
 
-    yield TestClient(app)
+    cliente = TestClient(app)
+    # FastAPI arma las rutas de forma diferida en la primera request. Si eso ocurre dentro de
+    # freeze_time, 'datetime | None' usa el datetime falso de freezegun y falla; se arman antes.
+    cliente.get("/openapi.json")
+
+    yield cliente
 
     app.dependency_overrides.clear()
 
