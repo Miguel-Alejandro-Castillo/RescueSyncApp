@@ -39,6 +39,17 @@ def calcular_fecha_limite(nivel_gravedad: str, fecha_inicio: datetime) -> dateti
     horas = horas_map.get(nivel_gravedad.lower(), 96)
     return fecha_inicio + timedelta(hours=horas)
 
+def calcular_fecha_limite_demo(nivel_gravedad: str, fecha_inicio: datetime) -> datetime:
+    minutos_map = {
+        "critico": 2,
+        "alto": 4,
+        "medio": 6,
+        "bajo": 8
+    }
+
+    minutos = minutos_map.get(nivel_gravedad.lower(), 8)
+    return fecha_inicio + timedelta(minutes=minutos)
+
 def calcular_diferencia_ms(fecha_limite: datetime, fecha_actual: datetime) -> int:
     diferencia = fecha_limite - fecha_actual
     return int(diferencia.total_seconds() * 1000)
@@ -95,7 +106,7 @@ async def create_lotes(
         raise HTTPException(status_code=400, detail="Debe incluir al menos un lote")
 
     ahora = datetime.now(timezone.utc)
-    fecha_limite = calcular_fecha_limite(emergencia.nivelGravedad, ahora)
+    fecha_limite = calcular_fecha_limite_demo(emergencia.nivelGravedad, ahora)
     ventana_emergencia_ms = calcular_diferencia_ms(fecha_limite, ahora)
 
     try:
