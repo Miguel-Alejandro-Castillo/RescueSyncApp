@@ -7,11 +7,12 @@ from models.emergencia import Emergencia
 
 INICIO = datetime(2026, 1, 1, 12, 0, tzinfo=timezone.utc)
 
+# Ventana de tiempo en modo demo (calcular_fecha_limite_demo en routers/lote.py)
 PLAZOS = {
-    "critico": timedelta(hours=24),
-    "alto": timedelta(hours=48),
-    "medio": timedelta(hours=72),
-    "bajo": timedelta(hours=96),
+    "critico": timedelta(minutes=2),
+    "alto": timedelta(minutes=4),
+    "medio": timedelta(minutes=6),
+    "bajo": timedelta(minutes=8),
 }
 
 
@@ -62,7 +63,7 @@ def test_oferta_dentro_del_plazo_se_acepta(client, session, auth_headers, nivel_
     with freeze_time(INICIO) as reloj:
         lote = crear_lote(client, session, auth_headers, nivel_gravedad)
 
-        reloj.move_to(INICIO + plazo - timedelta(hours=1))
+        reloj.move_to(INICIO + plazo - timedelta(seconds=30))
         response = ofertar(client, auth_headers, lote["id"])
 
     assert response.status_code == 201
