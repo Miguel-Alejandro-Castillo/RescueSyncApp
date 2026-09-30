@@ -1,9 +1,10 @@
 import os
 from datetime import datetime, timezone
+from fastapi import Depends, HTTPException, Response
 from dependencies.jwt_auth import get_current_user
 from dependencies.bonita import get_bonita_service
 from dependencies.rbac import (
-    require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
+    require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES, USUARIO_BONITA
 )
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
@@ -12,6 +13,9 @@ from models.emergencia import Emergencia
 from services.bonita_service import BonitaService
 from typing import List
 from models.lote import Lote
+from fastapi import Depends, HTTPException, Response
+from pydantic import BaseModel
+
 PROCESS_NAME = os.getenv("BONITA_PROCESS")
 
 router = APIRouter(
@@ -128,3 +132,23 @@ def get_lotes_by_emergencia(
     )
     lotes = session.exec(abiertos).all()
     return lotes
+
+class NotificarTimeoutRequest(BaseModel):
+    case_id: str
+
+# Endpoint para notificar el timeout de una emergencia en Bonita
+# recibe json
+@router.post("/notificar_timeout", dependencies=[Depends(require_roles(USUARIO_BONITA))], status_code=204)
+async def notificar_por_timeout(
+    request: NotificarTimeoutRequest,
+    session: Session = Depends(get_session)
+):  
+    # buscar emergencia por case_id en Bonita
+    emergencia = session.exec(select(Emergencia).where(Emergencia.bonitaCaseId == request.case_id)).first()
+    if not emergencia:
+        raise HTTPException(status_code=404, detail="Emergencia no encontrada")
+
+    emergencia.estado = "convocatoria_cerrada"
+    session.commit()
+
+    return Response(status_code=204)

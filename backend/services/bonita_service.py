@@ -212,8 +212,6 @@ class BonitaService:
     
     # Devuelve un listado de todas las tareas humanas activas por caso
     async def obtener_tareas_humanas_por_caso(self, caseId: str):
-        print(f"Obteniendo tareas humanas para el caseId {caseId}")
-
         params = [
             ("p", 0),
             ("f", f"caseId={caseId}"),
@@ -226,6 +224,11 @@ class BonitaService:
         )
       
         return response.json()
+
+    # Devuelve la primera tarea humana activa para un caso específico, o None si no hay tareas disponibles.
+    async def obtener_tarea_humana_por_caso(self, caseId: str):
+        tareas = await self.obtener_tareas_humanas_por_caso(caseId)
+        return tareas[0] if tareas else None
 
     # Completa una tarea humana específica por su ID
     async def completar_tarea_humana(self, task_id: str, contract: dict = {}):
@@ -287,7 +290,13 @@ class BonitaService:
         tareas = await self.esperar_tareas_humanas_por_caso(caseId, timeout_segundos, intervalo_ms)
         return tareas[0] if tareas else None
     
-    # Establece una variable de caso específica en Bonita BPM. Devuelve un 200 OK sin cuerpo
+    # Establece una variable de proceso de un caso específica en Bonita BPM. Devuelve un 200 OK sin cuerpo.
+    # Parámetros:
+    # - caseId: ID del caso en Bonita BPM.
+    # - variable_name: Nombre de la variable a establecer.
+    # - tipo_variable: Tipo de la variable en Java (e.g., "java.lang.Long").
+    # - variable_value: Valor de la variable a establecer.
+    # Java type for the variable (e.g., "java.lang.Long")
     async def set_case_variable(self, caseId: str, variable_name: str, tipo_variable: str, variable_value):
         await self.http_client.put(
             f"{self.api_path}/caseVariable/{caseId}/{variable_name}",

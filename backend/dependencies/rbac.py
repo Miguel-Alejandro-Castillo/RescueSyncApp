@@ -7,6 +7,7 @@ CENTRO_COORDINADOR = "centro_coordinador"
 REPRESENTANTE_ONG = "representante_ong"
 AUDITOR = "auditor"
 DIRECTIVO = "directivo"
+USUARIO_BONITA = "bonita_user"
 
 AUDITORES = (AUDITOR, DIRECTIVO)
 
