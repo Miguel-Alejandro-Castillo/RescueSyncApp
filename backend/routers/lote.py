@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timedelta, timezone
-from dependencies.bonita import get_bonita_service_cuenta_servicio
+from dependencies.bonita import get_bonita_service
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -89,7 +89,7 @@ def read_lote(
 )
 async def create_lotes(
     payload: DesgloseLotesRequest,
-    bonita: BonitaService = Depends(get_bonita_service_cuenta_servicio),
+    bonita: BonitaService = Depends(get_bonita_service),
     session: Session = Depends(get_session)
 ):
     emergencia = session.get(Emergencia, payload.emergenciaId)

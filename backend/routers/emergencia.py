@@ -2,7 +2,7 @@ import os
 from datetime import datetime, timezone
 from fastapi import Depends, HTTPException, Response
 from dependencies.jwt_auth import get_current_user
-from dependencies.bonita import get_bonita_service_cuenta_servicio
+from dependencies.bonita import get_bonita_service
 from dependencies.rbac import (
     require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES, USUARIO_BONITA
 )
@@ -63,7 +63,7 @@ def read_emergencia(
 @router.post("", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL))])
 async def create_emergencia(
     emergencia: Emergencia,
-    bonita: BonitaService = Depends(get_bonita_service_cuenta_servicio),
+    bonita: BonitaService = Depends(get_bonita_service),
     session: Session = Depends(get_session)
 ):
     try:
