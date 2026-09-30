@@ -23,3 +23,5 @@ class Oferta(SQLModel, table=True):
         gt=0,
         description="Cantidad de recursos ofrecidos"
     )
+
+

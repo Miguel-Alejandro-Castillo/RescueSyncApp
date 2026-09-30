@@ -137,7 +137,7 @@ def get_lotes_by_emergencia(
     
     abiertos= select(Lote).where(
         Lote.emergenciaId == emergencia_id,
-        Lote.estado == "abierto"
+        Lote.estado.in_(["creado", "activo"])
     )
     lotes = session.exec(abiertos.order_by(Lote.fechaCreacion.desc(), Lote.id.desc())).all()
     return lotes

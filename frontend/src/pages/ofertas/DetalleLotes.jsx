@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import styles from './DetalleLotes.module.css';
 import { API_RESCUE } from '../../config/api';
-import { authenticatedFetch } from '../../services/authService';
+import { authenticatedFetch, getSession } from '../../services/authService';
 
 export default function DetalleLotes() {
   const { id } = useParams();
@@ -46,7 +46,34 @@ export default function DetalleLotes() {
 
   const handleSubmitOferta = async (e, lote) => {
     e.preventDefault();
+    const session = getSession();
+    console.log('📌 [DEBUG] Sesión recuperada:', session);
+    if (!session) {
+      alert('Tu sesión ha expirado. Por favor, volvé a iniciar sesión.');
+      return;
+    }
 
+    // 2. Extraer el ID de la ONG desde el JWT
+    let currentOngId = null;
+    try {
+      const payloadBase64 = session.access_token.split('.')[1];
+      const bytes = Uint8Array.from(
+        atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')),
+        (character) => character.charCodeAt(0)
+      );
+      const claims = JSON.parse(new TextDecoder().decode(bytes));
+    
+      currentOngId = claims.user_id || claims.id_ong || claims.ong_id || claims.sub;
+    
+    } catch (err) {
+     console.log('Error al decodificar el token de usuario:', err);
+      
+    }
+
+    if (!currentOngId) {
+      alert('No se pudo determinar la ONG asociada a tu usuario. Verificá tu inicio de sesión.');
+      return;
+    }
     const faltante = lote.cantidad - (lote.cant_cubierta || 0);
 
 
@@ -66,7 +93,7 @@ export default function DetalleLotes() {
 
       const payload = {
         id_lote: Number(lote.id),
-        id_ong: 1,
+        id_ong: Number(currentOngId),
         cant_recurso: Number(cantRecurso)
       };
 

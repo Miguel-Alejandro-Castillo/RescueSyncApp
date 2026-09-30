@@ -16,6 +16,7 @@ import Header from "../components/layout/Header/Header";
 import Footer from "../components/layout/Footer/Footer";
 import CargarOfertas from "../pages/ofertas/CargarOfertas";
 import DetalleLotes from "../pages/ofertas/DetalleLotes";
+import MisOfertas from '../pages/ofertas/MisOfertas';
 import { useSession } from "../auth/AuthContext";
 import RequirePermission from "../auth/RequirePermission";
 function RequireSession() {
@@ -54,6 +55,7 @@ export default function AppRouter() {
             <Route path="/lotes/nuevo" element={<RequirePermission permission="lotes.crear"><AltaLotes /></RequirePermission>} />
             <Route path="/ofertas" element={<RequirePermission permission="ofertas.crear"><CargarOfertas /></RequirePermission>} />
             <Route path="/emergencias/:id/lotes" element={<RequirePermission permission="ofertas.crear"><DetalleLotes /></RequirePermission>} />
+            <Route path="/ofertas/misofertas" element={<MisOfertas />} />
             <Route
               path="*"
               element={
