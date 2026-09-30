@@ -1,15 +1,15 @@
 import { useRef, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { login } from "../../services/authService";
+import { Navigate, useLocation } from "react-router-dom";
+import { login, getSessionMemberships } from "../../services/authService";
+import { getLoginDestination } from "../../auth/loginDestination";
 import { useSession } from "../../auth/AuthContext";
 import Brand from "../../components/layout/Brand";
 import styles from "./Login.module.css";
 export default function Login() {
-  const navigate = useNavigate();
   const location = useLocation();
   const session = useSession();
   const from = location.state?.from;
-  const destination = typeof from === "string" && from.startsWith("/") && !from.startsWith("//") && from !== "/login" ? from : "/dashboard";
+  const destination = getLoginDestination(from, getSessionMemberships(session));
   const [pending, setPending] = useState(false);
   const [visible, setVisible] = useState(false);
   const [errors, setErrors] = useState({});
@@ -31,7 +31,6 @@ export default function Login() {
     setPending(true);
     try {
       await login(username, passwordRef.current.value);
-      navigate(destination, { replace: true });
     } catch (error) {
       setErrors({ submit: error.message });
     } finally {
