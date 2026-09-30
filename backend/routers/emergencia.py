@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timezone
 from dependencies.jwt_auth import get_current_user
-from dependencies.bonita import get_bonita_service
+from dependencies.bonita import get_bonita_service_cuenta_servicio
 from dependencies.rbac import (
     require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
 )
@@ -59,11 +59,13 @@ def read_emergencia(
 @router.post("", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL))])
 async def create_emergencia(
     emergencia: Emergencia,
-    bonita: BonitaService = Depends(get_bonita_service),
+    bonita: BonitaService = Depends(get_bonita_service_cuenta_servicio),
     session: Session = Depends(get_session)
 ):
     try:
         proceso = await bonita.obtener_proceso_por_nombre(PROCESS_NAME)
+        if not proceso:
+            raise Exception(f"No existe el proceso '{PROCESS_NAME}' en Bonita")
 
         iniciar_proceso_response = await bonita.iniciar_proceso(proceso["id"]) # devuelve un case id, setear a la emergencia
 
@@ -75,7 +77,14 @@ async def create_emergencia(
         tarea_registrar_emergencia = await bonita.esperar_tarea_humana_por_caso(emergencia.bonitaCaseId)
 
         # Si es exitoso devuelve un HTTP 204, no devuelve nada, solo completa la tarea humana
-        await bonita.completar_tarea_humana(tarea_registrar_emergencia["id"])
+        # La tarea "Registrar emergencia" define un contrato con emergenciaInput obligatorio
+        await bonita.completar_tarea_humana(tarea_registrar_emergencia["id"], {
+            "emergenciaInput": {
+                "zonaAfectada": emergencia.zonaAfectada,
+                "nivelGravedad": emergencia.nivelGravedad,
+                "descripcionInicial": emergencia.descripcionInicial
+            }
+        })
 
         session.commit()
         session.refresh(emergencia) # Refresca la instancia de la emergencia desde la base de datos para obtener los valores actualizados
