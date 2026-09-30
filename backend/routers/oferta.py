@@ -216,37 +216,26 @@ def update_oferta(
 
 @router.get(
     "/misofertas",
-    dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
+    status_code=status.HTTP_200_OK
 )
-
 def get_mis_ofertas(
-    request: Request,
+    current_user: dict = Depends(require_roles(REPRESENTANTE_ONG)),
     session: Session = Depends(get_session)
 ):
-    user = getattr(request.state, "user", None)
+    # Extraer el ID del usuario directamente desde el payload JWT
+    id_usuario = current_user.get("user_id") or current_user.get("sub")
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No se pudo autenticar al usuario."
-        )
-
-    if isinstance(user, dict):
-        id_ong_autenticada = user.get("id_ong") or user.get("id") or user.get("user_id") or user.get("sub")
-    else:
-        id_ong_autenticada = getattr(user, "id_ong", getattr(user, "id", None))
-
-    if not id_ong_autenticada:
+    if not id_usuario:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se pudo determinar la ONG del usuario autenticado."
+            detail="No se pudo determinar el ID del usuario autenticado."
         )
 
     stmt = (
         select(Oferta, Lote, Emergencia)
         .join(Lote, Oferta.id_lote == Lote.id)
         .join(Emergencia, Lote.emergenciaId == Emergencia.id)
-        .where(Oferta.id_ong == int(id_ong_autenticada))
+        .where(Oferta.id_ong == int(id_usuario))  # Compara contra el user_id (8)
         .order_by(Oferta.id.desc())
     )
     results = session.exec(stmt).all()

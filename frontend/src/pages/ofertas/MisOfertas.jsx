@@ -21,7 +21,7 @@ export default function MisOfertas() {
     try {
       setLoading(true);
       // Pide directamente las ofertas del usuario autenticado por Token
-      const res = await authenticatedFetch(`${API_RESCUE}/ofertas/misofertas`);
+      const res = await authenticatedFetch(`${API_RESCUE}/ofertas/misofertas/`);
       if (!res.ok) throw new Error('Error al cargar las ofertas');
       const data = await res.json();
       setOfertas(Array.isArray(data) ? data : []);
