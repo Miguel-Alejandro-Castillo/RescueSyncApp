@@ -63,6 +63,7 @@ def read_emergencia(
 @router.post("", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL))])
 async def create_emergencia(
     emergencia: Emergencia,
+    current_user = Depends(get_current_user),
     bonita: BonitaService = Depends(get_bonita_service),
     session: Session = Depends(get_session)
 ):
@@ -75,6 +76,7 @@ async def create_emergencia(
 
         emergencia.bonitaCaseId = iniciar_proceso_response["caseId"] # Asigna el case ID de Bonita a la emergencia
         
+        emergencia.usuarioCreador = current_user["user_id"]  # Asigna el usuario que crea la emergencia, reemplazar "usuario_actual" según corresponda
         session.add(emergencia) # Agrega la emergencia a la sesión de la base de datos
         
         # Espera hasta que aparezcan tareas humanas en estado 'ready' para el caso específico

@@ -36,6 +36,12 @@ class Emergencia(SQLModel, table=True):
         description="Estado de la emergencia"
     )
 
+    usuarioCreador: str = Field(
+        min_length=1,
+        max_length=255,
+        description="Usuario que creó la emergencia"
+    )   
+
     fechaCreacion: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="Fecha de creación de la emergencia"
