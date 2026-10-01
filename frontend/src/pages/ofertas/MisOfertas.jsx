@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 
 import { API_RESCUE } from '../../config/api';
 import { authenticatedFetch } from '../../services/authService';
+import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 
 export default function MisOfertas() {
   const navigate = useNavigate();
@@ -10,6 +11,7 @@ export default function MisOfertas() {
 
   const [ofertas, setOfertas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [mensajeExito, setMensajeExito] = useState(location.state?.mensajeExito || '');
 
   // Estado para controlar la edición
@@ -20,6 +22,7 @@ export default function MisOfertas() {
   const cargarMisOfertas = async () => {
     try {
       setLoading(true);
+      setError('');
       // Pide directamente las ofertas del usuario autenticado por Token
       const res = await authenticatedFetch(`${API_RESCUE}/ofertas/misofertas/`);
       if (!res.ok) throw new Error('Error al cargar las ofertas');
@@ -27,6 +30,7 @@ export default function MisOfertas() {
       setOfertas(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
+      setError(err.message);
       setOfertas([]);
     } finally {
       setLoading(false);
@@ -38,14 +42,17 @@ export default function MisOfertas() {
   }, []);
 
   const handleAbrirEditar = (oferta) => {
+    setError('');
+    setMensajeExito('');
     setEditingOferta(oferta);
     setNuevaCantidad(oferta.cant_recurso);
   };
 
   const handleGuardarEdicion = async (e) => {
     e.preventDefault();
+    setError('');
     if (!nuevaCantidad || Number(nuevaCantidad) <= 0) {
-      alert('Ingresá una cantidad válida.');
+      setError('Ingrese una cantidad válida.');
       return;
     }
 
@@ -67,7 +74,7 @@ export default function MisOfertas() {
       setEditingOferta(null);
       cargarMisOfertas(); // Recargar datos
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      setError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -75,17 +82,18 @@ export default function MisOfertas() {
 
   return (
     <div style={{ padding: '2rem', maxWidth: '900px', margin: '0 auto' }}>
-      <h1>Mis Ofertas Registradas</h1>
+      <h1>Mis ofertas</h1>
+      {error && <div className="notice notice-error" role="alert"><strong>No se pudo completar la acción</strong><p>{error}</p></div>}
 
       {mensajeExito && (
-        <div style={{ padding: '1rem', backgroundColor: '#e6f4ea', color: '#137333', borderRadius: '6px', marginBottom: '1rem' }}>
+        <div className="notice notice-success" role="status">
           {mensajeExito}
         </div>
       )}
 
       {loading ? (
         <p>Cargando ofertas...</p>
-      ) : ofertas.length === 0 ? (
+      ) : error && ofertas.length === 0 ? null : ofertas.length === 0 ? (
         <p>No se encontraron ofertas registradas para esta ONG.</p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -146,44 +154,51 @@ export default function MisOfertas() {
           backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
           alignItems: 'center', justifyContent: 'center', zIndex: 1000
         }}>
-          <div style={{ backgroundColor: '#fff', padding: '2rem', borderRadius: '8px', minWidth: '320px' }}>
-            <h3>Editar Oferta ({editingOferta.lote_tipo})</h3>
-            <p style={{ fontSize: '0.9rem', color: '#666' }}>
+          <div className="panel" role="dialog" aria-modal="true" aria-labelledby="editar-oferta-titulo" style={{ color: 'var(--ink)', padding: '2rem', width: 'min(480px, calc(100vw - 2rem))', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 id="editar-oferta-titulo">Editar oferta ({editingOferta.lote_tipo})</h3>
+            <p style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
               Emergencia: {editingOferta.emergencia_titulo}
             </p>
 
-            <form onSubmit={handleGuardarEdicion}>
+            <ValidatedForm onSubmit={handleGuardarEdicion} aria-busy={submitting}>
+              {error && <p className="notice notice-error" role="alert">{error}</p>}
               <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', marginBottom: '0.3rem', fontWeight: 'bold' }}>
+                <label htmlFor="editar-cantidad" className="form-label">
                   Nueva cantidad a ofertar:
                 </label>
                 <input
+                  id="editar-cantidad"
+                  name="cantidadOferta"
+                  data-required-message="Ingrese la nueva cantidad de la oferta."
+                  step="1"
+                  max={editingOferta.lote_cantidad_total - editingOferta.lote_cantidad_cubierta + editingOferta.cant_recurso}
                   type="number"
                   min="1"
                   value={nuevaCantidad}
                   onChange={(e) => setNuevaCantidad(e.target.value)}
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc' }}
+                  className="form-control"
                   required
                 />
+                <FieldError name="cantidadOferta" />
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+              <div className="form-actions">
                 <button
                   type="button"
                   onClick={() => setEditingOferta(null)}
-                  style={{ padding: '0.5rem 1rem', background: '#ccc', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                  className="btn btn-outline-secondary"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={submitting}
-                  style={{ padding: '0.5rem 1rem', background: '#1a73e8', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+                  className="btn btn-primary"
                 >
-                  {submitting ? 'Guardando...' : 'Guardar Cambios'}
+                  {submitting ? 'Guardando…' : 'Guardar cambios'}
                 </button>
               </div>
-            </form>
+            </ValidatedForm>
           </div>
         </div>
       )}

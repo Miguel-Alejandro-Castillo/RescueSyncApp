@@ -61,7 +61,7 @@ export default function CargarOfertas() {
               type="button" 
               className="btn-close" 
               onClick={() => setMensajeExito('')} 
-              aria-label="Close"
+              aria-label="Cerrar aviso"
             ></button>
           </div>
         )}
@@ -71,7 +71,7 @@ export default function CargarOfertas() {
           <div className={styles.cardBody}>
             <h1 className={styles.title}>Ofertas para emergencias</h1>
             <p style={{ color: 'var(--muted)' }}>
-              Seleccioná una emergencia para consultar sus lotes y ofrecer recursos.
+              Seleccione una emergencia para consultar sus lotes y ofrecer recursos.
             </p>
           </div>
         </div>

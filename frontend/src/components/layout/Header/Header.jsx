@@ -29,7 +29,7 @@ export default function Header() {
         <nav className={styles.nav} aria-label="Navegación principal">
           <NavLink to="/dashboard">Inicio</NavLink>
           {ACTIONS.filter(action => canAccess(getSessionMemberships(session), action.permission)).map(action =>
-            <NavLink key={action.path} to={action.path}>{action.label}</NavLink>
+            <NavLink key={action.path} to={action.path} end>{action.label}</NavLink>
           )}
         </nav>
         <div className={styles.account}>

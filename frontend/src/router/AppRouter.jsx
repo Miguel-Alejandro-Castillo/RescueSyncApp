@@ -55,7 +55,7 @@ export default function AppRouter() {
             <Route path="/lotes/nuevo" element={<RequirePermission permission="lotes.crear"><AltaLotes /></RequirePermission>} />
             <Route path="/ofertas" element={<RequirePermission permission="ofertas.crear"><CargarOfertas /></RequirePermission>} />
             <Route path="/emergencias/:id/lotes" element={<RequirePermission permission="ofertas.crear"><DetalleLotes /></RequirePermission>} />
-            <Route path="/ofertas/misofertas" element={<MisOfertas />} />
+            <Route path="/ofertas/misofertas" element={<RequirePermission permission="ofertas.ver_propias"><MisOfertas /></RequirePermission>} />
             <Route
               path="*"
               element={

@@ -13,6 +13,8 @@ from models.emergencia import Emergencia
 from services.bonita_service import BonitaService
 from typing import List
 from models.lote import Lote
+from models.oferta import Oferta
+from dependencies.rbac import get_user_roles
 from fastapi import Depends, HTTPException, Response
 from pydantic import BaseModel
 
@@ -130,6 +132,7 @@ def delete_emergencia(
 )
 def get_lotes_by_emergencia(
     emergencia_id: int,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
 
@@ -141,6 +144,9 @@ def get_lotes_by_emergencia(
         Lote.emergenciaId == emergencia_id,
         Lote.estado.in_(["creado", "activo"])
     )
+    if REPRESENTANTE_ONG in get_user_roles(current_user):
+        ofertados = select(Oferta.id_lote).where(Oferta.id_ong == int(current_user['user_id']))
+        abiertos = abiertos.where(Lote.id.not_in(ofertados))
     lotes = session.exec(abiertos.order_by(Lote.fechaCreacion.desc(), Lote.id.desc())).all()
     return lotes
 

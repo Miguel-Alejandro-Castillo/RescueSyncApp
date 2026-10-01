@@ -1,4 +1,5 @@
 import styles from './AltaLotes.module.css';
+import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import SeleccionarEmergencia from './SeleccionarEmergencia';
@@ -87,7 +88,7 @@ const FormularioLotes = () => {
         if (!emergenciaSeleccionada || saving) return;
         setSubmitError('');
         if (lotes.some(lote => !lote.descripcion.trim() || !Number.isSafeInteger(Number(lote.cantidad)) || Number(lote.cantidad) < 1)) {
-            setSubmitError('Completá la descripción y una cantidad entera mayor a cero en cada lote.');
+            setSubmitError('Complete la descripción y una cantidad entera mayor a cero en cada lote.');
             return;
         }
 
@@ -123,16 +124,16 @@ const FormularioLotes = () => {
                     <div className="panel">
                         <div className={styles.content}>
                             <h1 className={styles.title}>
-                                Desglose de Lotes y Apertura de Convocatoria
+                                Crear lotes y abrir convocatoria
                             </h1>
 
-                            <form onSubmit={handleSubmit} aria-busy={saving}>
+                            <ValidatedForm key={lotes.length} onSubmit={handleSubmit} aria-busy={saving}>
                                 <fieldset disabled={saving}>
                                 {/* RESUMEN DE LA EMERGENCIA */}
                                 <div className={styles.summary}>
                                     <div className={styles.row}>
                                         <h5 className="mb-0 fw-bold">
-                                            Zona Afectada: {emergenciaSeleccionada.zonaAfectada}
+                                            Zona afectada: {emergenciaSeleccionada.zonaAfectada}
                                         </h5>
                                         {getBadgeGravedad(emergenciaSeleccionada.nivelGravedad)}
                                     </div>
@@ -146,7 +147,7 @@ const FormularioLotes = () => {
 
                                 {/* DESGLOSE DE LOTES */}
                                 <div className={styles.row}>
-                                    <h5 className="mb-0 fw-bold">Lotes de Recursos Requeridos</h5>
+                                    <h5 className="mb-0 fw-bold">Lotes de recursos requeridos</h5>
                                     <button
                                         type="button"
                                         className="btn btn-outline-secondary"
@@ -173,10 +174,12 @@ const FormularioLotes = () => {
 
                                         <div className="row g-3">
                                             <div className="col-md-3">
-                                                <label className="form-label small fw-bold">Tipo de Recurso:</label>
+                                                <label htmlFor={`tipo-${index}`} className="form-label small fw-bold">Tipo de recurso</label>
                                                 <select
                                                     className="form-select form-select-sm"
                                                     name="tipoRecurso"
+                                                    id={`tipo-${index}`}
+                                                    data-validation-key={`tipo-${index}`}
                                                     value={lote.tipoRecurso}
                                                     onChange={(e) => handleLoteChange(index, e)}
                                                     required
@@ -186,32 +189,43 @@ const FormularioLotes = () => {
                                                     <option value="Maquinaria">Maquinaria / Vehículos</option>
                                                     <option value="Refugio">Refugio / Abrigo</option>
                                                 </select>
+                                                <FieldError name={`tipo-${index}`} />
                                             </div>
 
                                             <div className="col-md-6">
-                                                <label className="form-label small fw-bold">Descripción Específica:</label>
+                                                <label htmlFor={`descripcion-${index}`} className="form-label small fw-bold">Descripción específica</label>
                                                 <input
                                                     type="text"
                                                     className="form-control form-control-sm"
                                                     name="descripcion"
+                                                    data-required-message="Ingrese la descripción del recurso."
+                                                    id={`descripcion-${index}`}
+                                                    data-validation-key={`descripcion-${index}`}
+                                                    maxLength={255}
                                                     placeholder="Ej. Agua potable 2L / Paramédicos de emergencia"
                                                     value={lote.descripcion}
                                                     onChange={(e) => handleLoteChange(index, e)}
                                                     required
                                                 />
+                                                <FieldError name={`descripcion-${index}`} />
                                             </div>
 
                                             <div className="col-md-3">
-                                                <label className="form-label small fw-bold">Cantidad Requerida:</label>
+                                                <label htmlFor={`cantidad-${index}`} className="form-label small fw-bold">Cantidad requerida</label>
                                                 <input
                                                     type="number"
                                                     className="form-control form-control-sm"
                                                     name="cantidad"
+                                                    data-required-message="Ingrese la cantidad requerida."
+                                                    id={`cantidad-${index}`}
+                                                    data-validation-key={`cantidad-${index}`}
+                                                    step="1"
                                                     min="1"
                                                     value={lote.cantidad}
                                                     onChange={(e) => handleLoteChange(index, e)}
                                                     required
                                                 />
+                                                <FieldError name={`cantidad-${index}`} />
                                             </div>
                                         </div>
                                     </div>
@@ -228,7 +242,7 @@ const FormularioLotes = () => {
                                 </div>
                                 </fieldset>
                                 {submitError && <p className="notice notice-error mt-3" role="alert">{submitError}</p>}
-                            </form>
+                            </ValidatedForm>
                         </div>
                     </div>
                 </div>

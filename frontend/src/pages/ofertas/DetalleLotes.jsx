@@ -4,6 +4,7 @@ import styles from './DetalleLotes.module.css';
 import { API_RESCUE } from '../../config/api';
 import { authenticatedFetch, getSession } from '../../services/authService';
 import CuentaRegresiva from '../../components/CuentaRegresiva';
+import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 
 export default function DetalleLotes() {
   const { id } = useParams();
@@ -11,6 +12,7 @@ export default function DetalleLotes() {
 
   const [lotes, setLotes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
 
   const [loteSeleccionadoId, setLoteSeleccionadoId] = useState(null);
@@ -34,12 +36,14 @@ export default function DetalleLotes() {
       })
       .catch((err) => {
         console.error(err);
+        setError(err.message);
         setLotes([]);
         setLoading(false);
       });
   }, [id]);
 
   const toggleFormulario = (loteId) => {
+    setError('');
     if (loteSeleccionadoId === loteId) {
       setLoteSeleccionadoId(null);
     } else {
@@ -50,10 +54,10 @@ export default function DetalleLotes() {
 
   const handleSubmitOferta = async (e, lote) => {
     e.preventDefault();
+    setError('');
     const session = getSession();
-    console.log('📌 [DEBUG] Sesión recuperada:', session);
     if (!session) {
-      alert('Tu sesión ha expirado. Por favor, volvé a iniciar sesión.');
+      setError('Su sesión venció. Inicie sesión nuevamente.');
       return;
     }
 
@@ -75,19 +79,19 @@ export default function DetalleLotes() {
     }
 
     if (!currentOngId) {
-      alert('No se pudo determinar la ONG asociada a tu usuario. Verificá tu inicio de sesión.');
+      setError('No se pudo identificar la ONG asociada a su cuenta. Inicie sesión nuevamente.');
       return;
     }
-    const faltante = lote.cantidad - (lote.cant_cubierta || 0);
+    const faltante = lote.cantidad - (lote.cantidadCubierta || 0);
 
 
     if (!cantRecurso || Number(cantRecurso) <= 0) {
-      alert('Ingresa una cantidad válida a ofertar.');
+      setError('Ingrese una cantidad válida a ofertar.');
       return;
     }
 
     if (Number(cantRecurso) > faltante) {
-      alert(`La cantidad ofertada no puede ser mayor a la requerida (${faltante}).`);
+      setError(`Puede ofrecer hasta ${faltante} unidades.`);
       return;
     }
 
@@ -125,7 +129,7 @@ export default function DetalleLotes() {
       setLotes(Array.isArray(updatedData) ? updatedData : []);
 
     } catch (err) {
-      alert(`Error: ${err.message}`);
+      setError(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -133,6 +137,7 @@ export default function DetalleLotes() {
 
   return (
     <div className={styles.page} style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
+      {error && <div className="notice notice-error" role="alert"><strong>No se pudo completar la acción</strong><p>{error}</p></div>}
       <button 
     onClick={() => navigate('/ofertas')} 
     className={styles.secondaryBtn || styles.button} 
@@ -209,14 +214,14 @@ export default function DetalleLotes() {
                         fontWeight: 'bold'
                       }}
                     >
-                      {estaDesplegado ? 'Cancelar' : 'Cargar Oferta'}
+                      {estaDesplegado ? 'Cancelar' : 'Registrar oferta'}
                     </button>
                   )}
                 </div>
 
                 {}
                 {estaDesplegado && (
-                  <form
+                  <ValidatedForm
                     onSubmit={(e) => handleSubmitOferta(e, lote)}
                     style={{
                       marginTop: '1rem',
@@ -232,10 +237,14 @@ export default function DetalleLotes() {
 
 
                       <div style={{ flex: '1 1 200px' }}>
-                        <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '0.2rem' }}>
+                        <label htmlFor={`oferta-cantidad-${lote.id}`} style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '0.2rem' }}>
                           Cantidad a ofertar (Máx: {faltante}):
                         </label>
                         <input className="form-control"
+                          id={`oferta-cantidad-${lote.id}`}
+                          name="cantidadOferta"
+                          data-required-message="Ingrese la cantidad que desea ofrecer."
+                          step="1"
                           type="number"
                           min="1"
                           max={faltante}
@@ -245,6 +254,7 @@ export default function DetalleLotes() {
                           style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border)' }}
                           required
                         />
+                        <FieldError name="cantidadOferta" />
                       </div>
                     </div>
 
@@ -262,9 +272,9 @@ export default function DetalleLotes() {
                         cursor: submitting ? 'not-allowed' : 'pointer'
                       }}
                     >
-                      {submitting ? 'Guardando...' : 'Confirmar Oferta'}
+                      {submitting ? 'Guardando…' : 'Confirmar oferta'}
                     </button>
-                  </form>
+                  </ValidatedForm>
                 )}
 
               </div>

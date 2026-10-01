@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { crearEmergencia } from "../../services/emergenciaService";
 import styles from "./AltaEmergencia.module.css";
+import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 const initialFormData = {
   zonaAfectada: "",
   nivelGravedad: "medio",
@@ -22,7 +23,7 @@ export default function AltaEmergencia() {
     if (!formData.zonaAfectada.trim() || !formData.descripcionInicial.trim()) {
       setFeedback({
         error: true,
-        text: "Completá la zona y la descripción con información válida.",
+        text: "Complete la zona y la descripción con información válida.",
       });
       return;
     }
@@ -39,7 +40,7 @@ export default function AltaEmergencia() {
     } catch {
       setFeedback({
         error: true,
-        text: "No pudimos registrar la emergencia. Revisá la conexión e intentá nuevamente.",
+        text: "No pudimos registrar la emergencia. Revise la conexión e intente nuevamente.",
       });
     } finally {
       setSaving(false);
@@ -50,13 +51,13 @@ export default function AltaEmergencia() {
       <div className="page-heading">
         <h1>Registrar una emergencia</h1>
         <p>
-          Completá la información inicial para comenzar a coordinar la
+          Complete la información inicial para comenzar a coordinar la
           respuesta.
         </p>
       </div>
       <div className="panel">
 
-        <form className="form-stack" onSubmit={handleSubmit} aria-busy={saving}>
+        <ValidatedForm className="form-stack" onSubmit={handleSubmit} aria-busy={saving}>
           <fieldset disabled={saving} className="form-stack">
             <div>
               <label className="form-label" htmlFor="zona">
@@ -66,10 +67,13 @@ export default function AltaEmergencia() {
                 className="form-control"
                 id="zona"
                 name="zonaAfectada"
+                data-required-message="Ingrese la zona afectada."
+                maxLength={255}
                 value={formData.zonaAfectada}
                 onChange={handleChange}
                 required
               />
+              <FieldError name="zonaAfectada" />
             </div>
             <div>
               <label className="form-label" htmlFor="gravedad">
@@ -88,6 +92,7 @@ export default function AltaEmergencia() {
                 <option value="alto">Alto</option>
                 <option value="critico">Crítico</option>
               </select>
+              <FieldError name="nivelGravedad" />
             </div>
             <div>
               <label className="form-label" htmlFor="descripcion">
@@ -97,11 +102,14 @@ export default function AltaEmergencia() {
                 className="form-control"
                 id="descripcion"
                 name="descripcionInicial"
+                data-required-message="Ingrese una descripción de la emergencia."
+                maxLength={500}
                 rows="5"
                 value={formData.descripcionInicial}
                 onChange={handleChange}
                 required
               />
+              <FieldError name="descripcionInicial" />
             </div>
           </fieldset>
           {feedback && (
@@ -120,7 +128,7 @@ export default function AltaEmergencia() {
               {saving ? "Guardando…" : "Registrar emergencia"}
             </button>
           </div>
-        </form>
+        </ValidatedForm>
       </div>
     </div>
   );

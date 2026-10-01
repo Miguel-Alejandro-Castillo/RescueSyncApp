@@ -96,7 +96,7 @@ hr {
   color: var(--ink);
   background-color: var(--input);
 }
-.form-control[aria-invalid="true"] {
+.form-control[aria-invalid="true"], .form-select[aria-invalid="true"], input[aria-invalid="true"] {
   border-color: var(--danger);
 }
 .form-control:disabled,

@@ -9,6 +9,8 @@ from dependencies.rbac import (
 from models.emergencia import Emergencia
 from models.lote import Lote
 from models.oferta import Oferta
+from dependencies.jwt_auth import get_current_user
+from dependencies.rbac import get_user_roles
 
 
 
@@ -34,6 +36,7 @@ def es_lote_vigente(lote: Lote, emergencia: Emergencia) -> bool:
     dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))]
 )
 def get_emergencias_con_lotes(
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
 
@@ -48,7 +51,12 @@ def get_emergencias_con_lotes(
         stmt_lotes = select(Lote).where(Lote.emergenciaId == emergencia.id).order_by(
             Lote.fechaCreacion.desc(), Lote.id.desc()
         )
+        if REPRESENTANTE_ONG in get_user_roles(current_user):
+            ofertados = select(Oferta.id_lote).where(Oferta.id_ong == int(current_user['user_id']))
+            stmt_lotes = stmt_lotes.where(Lote.estado.in_(['creado', 'activo', 'abierto']), Lote.id.not_in(ofertados))
         lotes = session.exec(stmt_lotes).all()
+        if REPRESENTANTE_ONG in get_user_roles(current_user) and not lotes:
+            continue
 
         
         resultado.append({
@@ -66,9 +74,11 @@ def get_emergencias_con_lotes(
 )
 def create_oferta(
     oferta: Oferta,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
 
+    oferta.id_ong = int(current_user['user_id'])
     # SQLModel no valida los modelos con table=True, por eso se controla a mano
     if oferta.cant_recurso <= 0:
         raise HTTPException(
@@ -93,7 +103,7 @@ def create_oferta(
     if not es_lote_vigente(lote, emergencia):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"El plazo para realizar ofertas en este lote ha expirado. (Nivel de gravedad: {emergencia.nivelGravedad})"
+            detail="La convocatoria de este lote ha expirado. Ya no podés enviar una oferta."
         )
    #Evitar que la misma ONG oferte más de una vez para el mismo lote
     stmt_existente = select(Oferta).where(
@@ -140,6 +150,7 @@ def create_oferta(
 def update_oferta(
     oferta_id: int,
     oferta_data: OfertaUpdate,
+    current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
     # 1. Verificar existencia de la oferta
@@ -151,7 +162,7 @@ def update_oferta(
         )
 
     # 2. Verificar que pertenezca a la misma ONG
-    if oferta.id_ong != oferta_data.id_ong:
+    if oferta.id_ong != int(current_user['user_id']):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No tenés permiso para modificar esta oferta."
@@ -176,7 +187,7 @@ def update_oferta(
     if not es_lote_vigente(lote, emergencia):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El plazo de la convocatoria ha expirado. Ya no se pueden editar ofertas para este lote."
+            detail="La convocatoria ha expirado. Ya no podés editar esta oferta."
         )
 
     if oferta_data.cant_recurso <= 0:

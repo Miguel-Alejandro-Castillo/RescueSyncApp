@@ -21,7 +21,7 @@ export default function SeleccionarEmergencia() {
   return <div className={styles.page}>
     <div className="page-heading">
       <h1>Lotes y convocatorias</h1>
-      <p>Seleccioná una emergencia pendiente para definir sus recursos y publicar la convocatoria.</p>
+      <p>Seleccione una emergencia pendiente para definir sus recursos y publicar la convocatoria.</p>
     </div>
     {loading ? <p role="status">Cargando emergencias pendientes…</p> : error ?
       <div className="notice notice-error" role="alert">

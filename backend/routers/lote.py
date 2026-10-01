@@ -105,6 +105,12 @@ async def create_lotes(
     if not payload.lotes:
         raise HTTPException(status_code=400, detail="Debe incluir al menos un lote")
 
+    if not emergencia.bonitaCaseId:
+        raise HTTPException(
+            status_code=409,
+            detail="Esta emergencia no tiene un caso asociado en Bonita. Registrá una nueva emergencia desde la aplicación para poder publicar lotes."
+        )
+
     ahora = datetime.now(timezone.utc)
     fecha_limite = calcular_fecha_limite_demo(emergencia.nivelGravedad, ahora)
     ventana_emergencia_ms = calcular_diferencia_ms(fecha_limite, ahora)

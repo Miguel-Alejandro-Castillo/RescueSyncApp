@@ -18,6 +18,8 @@ PLAZOS = {
 
 def crear_lote(client, session, auth_headers, nivel_gravedad):
     emergencia = Emergencia(
+        usuarioCreador="1",
+        bonitaCaseId="1001",
         zonaAfectada="Zona Norte",
         nivelGravedad=nivel_gravedad,
         descripcionInicial="Inundacion en el barrio",
