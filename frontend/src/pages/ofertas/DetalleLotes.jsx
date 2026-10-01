@@ -195,7 +195,8 @@ export default function DetalleLotes() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
                   <div>
-                    <h3 style={{ margin: '0 0 0.5rem 0' }}>{lote.tipo_recurso}</h3>
+                    <h3 style={{ margin: '0 0 0.5rem 0' }}>{lote.tipoRecurso}</h3>
+                    <p>{lote.descripcion}</p>
                     <p style={{ margin: 0, color: 'var(--muted)' }}>
                       Cubierto: <strong>{cantCubierta}</strong> de {lote.cantidad} (Faltan: <strong style={{ color: 'var(--danger)' }}>{faltante}</strong>)
                     </p>
