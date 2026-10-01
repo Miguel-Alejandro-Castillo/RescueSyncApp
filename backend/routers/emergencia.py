@@ -86,13 +86,7 @@ async def create_emergencia(
 
         # Si es exitoso devuelve un HTTP 204, no devuelve nada, solo completa la tarea humana
         # La tarea "Registrar emergencia" define un contrato con emergenciaInput obligatorio
-        await bonita.completar_tarea_humana(tarea_registrar_emergencia["id"], {
-            "emergenciaInput": {
-                "zonaAfectada": emergencia.zonaAfectada,
-                "nivelGravedad": emergencia.nivelGravedad,
-                "descripcionInicial": emergencia.descripcionInicial
-            }
-        })
+        await bonita.completar_tarea_humana(tarea_registrar_emergencia["id"])
 
         session.commit()
         session.refresh(emergencia) # Refresca la instancia de la emergencia desde la base de datos para obtener los valores actualizados
