@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import styles from './DetalleLotes.module.css';
 import { API_RESCUE } from '../../config/api';
 import { authenticatedFetch, getSession } from '../../services/authService';
+import CuentaRegresiva from '../../components/CuentaRegresiva';
 
 export default function DetalleLotes() {
   const { id } = useParams();
@@ -17,6 +18,9 @@ export default function DetalleLotes() {
   const [idOng, setIdOng] = useState('');
   const [cantRecurso, setCantRecurso] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [convocatoriaCerrada, setConvocatoriaCerrada] = useState(false);
+
+  const fechaLimite = lotes[0]?.fechaLimiteConvocatoria;
 
   useEffect(() => {
     authenticatedFetch(`${API_RESCUE}/emergencias/${id}/lotes`)
@@ -153,6 +157,16 @@ export default function DetalleLotes() {
 
       <h1>Lotes Disponibles para Emergencia #{id}</h1>
 
+      {fechaLimite && (
+        <CuentaRegresiva
+          fechaLimite={fechaLimite}
+          onFinalizar={() => {
+            setConvocatoriaCerrada(true);
+            setLoteSeleccionadoId(null);
+          }}
+        />
+      )}
+
       {loading ? (
         <p>Cargando lotes...</p>
       ) : (lotes || []).length === 0 ? (
@@ -182,7 +196,7 @@ export default function DetalleLotes() {
                     </p>
                   </div>
 
-                  {lote.estado !== 'cubierto' && (
+                  {lote.estado !== 'cubierto' && !convocatoriaCerrada && (
                     <button
                       onClick={() => toggleFormulario(lote.id)}
                       style={{

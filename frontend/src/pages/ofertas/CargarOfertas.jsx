@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import styles from './CargarOfertas.module.css';
 import { API_RESCUE } from '../../config/api';
 import { authenticatedFetch } from '../../services/authService';
+import CuentaRegresiva from '../../components/CuentaRegresiva';
 
 export default function CargarOfertas() {
   const [emergencias, setEmergencias] = useState([]);
@@ -110,6 +111,10 @@ export default function CargarOfertas() {
                       }}>
                         Gravedad: {emergencia.nivelGravedad}
                       </span>
+
+                      {lotes[0]?.fechaLimiteConvocatoria && (
+                        <CuentaRegresiva fechaLimite={lotes[0].fechaLimiteConvocatoria} />
+                      )}
 
                       {/* BOTÓN NAVEGAR A PÁGINA DE LOTES */}
                      <button 
