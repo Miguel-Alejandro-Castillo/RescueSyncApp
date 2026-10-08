@@ -30,8 +30,39 @@ El servicio usa estas variables definidas en `docker-compose.yml`:
 - `HOST=0.0.0.0`
 - `PORT=3000`
 - `DATABASE_URL=postgresql://bonita:bpm@bonita-db:5432/rescuesync`
+- `REDIS_URL=redis://redis-db:6379/0`
+- `REDIS_DECODE_RESPONSES=true`
 
 Alembic y la conexión de SQLModel dependen de `DATABASE_URL`. Si la variable no existe, el backend falla al iniciar.
+
+Redis queda disponible desde el arranque de FastAPI. Si la conexión falla, el backend también falla al iniciar, lo que hace visible el problema temprano.
+
+## Redis en FastAPI
+
+El proyecto ya levanta el servicio `redis-db` en Docker Compose. Con esta configuración, el backend usa la URL interna:
+
+```bash
+redis://redis-db:6379/0
+```
+
+Durante `startup`, FastAPI crea el cliente y ejecuta un `PING`. Durante `shutdown`, cierra la conexión.
+
+Si necesitás usar Redis dentro de una ruta o servicio, podés recuperar el cliente desde `request.app.state.redis`.
+
+Ejemplo mínimo:
+
+```python
+from fastapi import APIRouter, Request
+
+router = APIRouter()
+
+@router.get("/cache-check")
+async def cache_check(request: Request):
+    redis = request.app.state.redis
+    await redis.set("status", "ok", ex=60)
+    value = await redis.get("status")
+    return {"redis": value}
+```
 
 ## Levantar el backend
 

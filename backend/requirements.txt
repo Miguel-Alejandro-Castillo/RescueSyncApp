@@ -2,9 +2,10 @@ fastapi
 uvicorn[standard]
 sqlmodel
 alembic
-psycopg2-binary
+psycopg[binary]
 pytest
 httpx
 python-jose[cryptography]
 cryptography
 freezegun
+redis[hiredis]

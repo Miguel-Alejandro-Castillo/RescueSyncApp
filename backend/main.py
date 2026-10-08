@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from clients.redis_client import close_redis, init_redis
 from routers.emergencia import router as emergencia_router
 from routers.auth import router as auth_router
 from routers.lote import router as lotes_router
@@ -24,9 +25,15 @@ app.add_middleware(
 )
 
 @app.on_event("startup")
-def startup():
+async def startup():
     #create_db()  # Alembic se encargará de la creación de las tablas
+    app.state.redis = await init_redis()
     print("RescueSync iniciado")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await close_redis(app.state.redis)
 
 @app.get("/health", tags=["Health"])
 def health():
