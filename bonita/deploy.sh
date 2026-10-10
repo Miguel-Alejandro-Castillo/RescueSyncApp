@@ -1,7 +1,7 @@
 #!/bin/sh
 
 set -eu
-set -x
+#set -x
 
 ARTIFACTS_DIR="/opt/bonita/artifacts"
 
@@ -14,6 +14,9 @@ BAR_FILE=$(find "$ARTIFACTS_DIR" -type f -name "*.bar" | head -1)
 
 USER_PROFILE_ID="1"
 ADMIN_PROFILE_ID="2"
+
+GROUP_PATH_ROOT="/rescue"
+MEMBERSHIPS_PROFILES_FILE="$ARTIFACTS_DIR/memberships_profiles.ini"
 
 bonita_login() {
   curl -v \
@@ -85,9 +88,16 @@ if [ -z "${BONITA_PROCESS:-}" ]; then
   exit 1
 fi
 
+if [ ! -f "$MEMBERSHIPS_PROFILES_FILE" ]; then
+  echo "ERROR: no existe el archivo de membresías de perfiles:"
+  echo "$MEMBERSHIPS_PROFILES_FILE"
+  exit 1
+fi
+
 echo "Organización: $ORGANIZATION_FILE"
 echo "BAR:          $BAR_FILE"
 echo "Proceso Bonita: $BONITA_PROCESS"
+echo "Membresías de perfiles: $MEMBERSHIPS_PROFILES_FILE"
 
 # --------------------------------------------------
 # Esperar a Bonita
@@ -274,8 +284,34 @@ CONFIGURATION_STATE=$(
 echo "Estado de configuración del proceso: $CONFIGURATION_STATE"
 
 # --------------------------------------------------
-# Helpers para grupos y roles
+# Helpers para grupos, roles y membresias
 # --------------------------------------------------
+
+get_profile_memberships() {
+    target_profile="$1"
+    current_profile=""
+
+    while IFS= read -r line || [ -n "$line" ]
+    do
+        # Limpiar el retorno de carro (\r) si existe
+        line=$(printf '%s' "$line" | tr -d '\r')
+
+        [ -z "$line" ] && continue
+
+        case "$line" in
+            \[*\])
+                current_profile=${line#\[}
+                current_profile=${current_profile%\]}
+                continue
+                ;;
+        esac
+
+        [ "$current_profile" != "$target_profile" ] && continue
+
+        echo "$line"
+
+    done < "$MEMBERSHIPS_PROFILES_FILE"
+}
 
 delete_profile_memberships() {
     PROFILE_ID="$1"
@@ -367,23 +403,7 @@ get_role_id() {
 }
 
 # --------------------------------------------------
-# Membresías de perfiles
-# --------------------------------------------------
-
-echo "Configurando membresias de perfiles..."
-GROUP_PATH_ROOT="/rescue"
-
-# Listado de membresias compatible con sh
-MEMBERSHIPS="
-municipios:operador_municipal
-ongs:representante_ong
-coordinadores:centro_coordinador
-directivos:directivo
-auditores:auditor
-"
-
-# --------------------------------------------------
-# Profile members
+# Funciones para gestionar membresías de perfiles
 # --------------------------------------------------
 
 add_profile_membership() {
@@ -432,10 +452,15 @@ configure_profile() {
   echo "Configurando perfil $PROFILE_NAME..."
 
   echo "Aplicando membresias para el perfil $PROFILE_NAME..."
-  printf '%s\n' "$MEMBERSHIPS" |
+
+  get_profile_memberships "$PROFILE_NAME" |
   while IFS=: read -r GROUP_NAME ROLE_NAME
   do
       [ -z "$GROUP_NAME" ] && continue
+      if [ -z "$ROLE_NAME" ]; then
+        echo "ERROR: la membresía '$GROUP_NAME' no tiene rol asociado"
+        exit 1
+      fi
       echo "Procesando membresia: $GROUP_NAME + $ROLE_NAME"
       GROUP_ID=$(get_group_id "$GROUP_NAME" "$GROUP_PATH_ROOT")
       ROLE_ID=$(get_role_id "$ROLE_NAME")
@@ -450,8 +475,9 @@ configure_profile() {
 
 }
 
-configure_profile "$USER_PROFILE_ID" "User"
-configure_profile "$ADMIN_PROFILE_ID" "Administrator"
+echo "Configurando membresias de perfiles..."
+configure_profile "$USER_PROFILE_ID" "USER"
+configure_profile "$ADMIN_PROFILE_ID" "ADMINISTRATOR"
 
 echo ""
 echo "==================================="
@@ -461,3 +487,4 @@ echo "Proceso: $BONITA_PROCESS"
 echo "ProcessId: $PROCESS_ID"
 echo "User profile configurado"
 echo "Administrator profile configurado"
+echo "Membresias de perfiles configuradas"
