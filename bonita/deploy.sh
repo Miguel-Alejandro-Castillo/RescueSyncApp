@@ -290,10 +290,15 @@ delete_profile_memberships() {
             "$BONITA_URL/API/portal/profileMember"
     )
 
+    #IDS=$(
+    #    echo "$RESPONSE" |
+    #    grep -o '"id":"[^"]*"' |
+    #    sed 's/"id":"//;s/"//'
+    #)
     IDS=$(
-        echo "$RESPONSE" |
+        printf '%s' "$RESPONSE" |
         grep -o '"id":"[^"]*"' |
-        sed 's/"id":"//;s/"//'
+        sed 's/"id":"//;s/"//' || true # Evitar error si no hay IDs
     )
 
     for ID in $IDS; do
@@ -362,38 +367,20 @@ get_role_id() {
 }
 
 # --------------------------------------------------
-# Recuperar IDs
+# Membresías de perfiles
 # --------------------------------------------------
 
-echo ""
-echo "Recuperando IDs de grupos..."
+echo "Configurando membresias de perfiles..."
+GROUP_PATH_ROOT="/rescue"
 
-GROUP_MUNICIPIOS_ID=$(get_group_id "municipios" "/rescue")
-GROUP_ONGS_ID=$(get_group_id "ongs" "/rescue")
-GROUP_DIRECTIVOS_ID=$(get_group_id "directivos" "/rescue")
-GROUP_AUDITORES_ID=$(get_group_id "auditores" "/rescue")
-GROUP_COORDINADORES_ID=$(get_group_id "coordinadores" "/rescue")
-
-echo "municipios:     $GROUP_MUNICIPIOS_ID"
-echo "ongs:           $GROUP_ONGS_ID"
-echo "directivos:     $GROUP_DIRECTIVOS_ID"
-echo "auditores:      $GROUP_AUDITORES_ID"
-echo "coordinadores:  $GROUP_COORDINADORES_ID"
-
-echo ""
-echo "Recuperando IDs de roles..."
-
-ROLE_OPERADOR_ID=$(get_role_id "operador_municipal")
-ROLE_COORDINADOR_ID=$(get_role_id "centro_coordinador")
-ROLE_ONG_ID=$(get_role_id "representante_ong")
-ROLE_AUDITOR_ID=$(get_role_id "auditor")
-ROLE_DIRECTIVO_ID=$(get_role_id "directivo")
-
-echo "operador_municipal:  $ROLE_OPERADOR_ID"
-echo "centro_coordinador:  $ROLE_COORDINADOR_ID"
-echo "representante_ong:   $ROLE_ONG_ID"
-echo "auditor:             $ROLE_AUDITOR_ID"
-echo "directivo:           $ROLE_DIRECTIVO_ID"
+# Listado de membresias compatible con sh
+MEMBERSHIPS="
+municipios:operador_municipal
+ongs:representante_ong
+coordinadores:centro_coordinador
+directivos:directivo
+auditores:auditor
+"
 
 # --------------------------------------------------
 # Profile members
@@ -437,42 +424,30 @@ configure_profile() {
   PROFILE_ID="$1"
   PROFILE_NAME="$2"
 
-  echo "Eliminando membresías del perfil $PROFILE_NAME..."
+  echo "Eliminando membresias del perfil $PROFILE_NAME..."
   delete_profile_memberships "$PROFILE_ID"
-  echo "Membresías eliminadas del perfil $PROFILE_NAME."
+  echo "Membresias eliminadas del perfil $PROFILE_NAME."
 
   echo ""
   echo "Configurando perfil $PROFILE_NAME..."
 
-  add_profile_membership \
-    "$PROFILE_ID" \
-    "$GROUP_MUNICIPIOS_ID" \
-    "$ROLE_OPERADOR_ID" \
-    "$PROFILE_NAME -> Municipios + Operador Municipal"
+  echo "Aplicando membresias para el perfil $PROFILE_NAME..."
+  printf '%s\n' "$MEMBERSHIPS" |
+  while IFS=: read -r GROUP_NAME ROLE_NAME
+  do
+      [ -z "$GROUP_NAME" ] && continue
+      echo "Procesando membresia: $GROUP_NAME + $ROLE_NAME"
+      GROUP_ID=$(get_group_id "$GROUP_NAME" "$GROUP_PATH_ROOT")
+      ROLE_ID=$(get_role_id "$ROLE_NAME")
 
-  add_profile_membership \
-    "$PROFILE_ID" \
-    "$GROUP_ONGS_ID" \
-    "$ROLE_ONG_ID" \
-    "$PROFILE_NAME -> Ongs + Representante ONG"
+      add_profile_membership \
+          "$PROFILE_ID" \
+          "$GROUP_ID" \
+          "$ROLE_ID" \
+          "$PROFILE_NAME -> $GROUP_NAME + $ROLE_NAME"
+      echo "Membresia creada: $PROFILE_NAME -> $GROUP_NAME + $ROLE_NAME"
+  done
 
-  add_profile_membership \
-    "$PROFILE_ID" \
-    "$GROUP_COORDINADORES_ID" \
-    "$ROLE_COORDINADOR_ID" \
-    "$PROFILE_NAME -> Coordinadores + Centro Coordinador"
-
-  add_profile_membership \
-    "$PROFILE_ID" \
-    "$GROUP_DIRECTIVOS_ID" \
-    "$ROLE_DIRECTIVO_ID" \
-    "$PROFILE_NAME -> Directivos + Directivo"
-
-  add_profile_membership \
-    "$PROFILE_ID" \
-    "$GROUP_AUDITORES_ID" \
-    "$ROLE_AUDITOR_ID" \
-    "$PROFILE_NAME -> Auditores + Auditor"
 }
 
 configure_profile "$USER_PROFILE_ID" "User"
