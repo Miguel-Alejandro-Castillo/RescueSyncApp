@@ -19,6 +19,9 @@ services:
     image: bonita:2024.3
     ports:
       - "8080:8080"
+    volumes:
+    - ./bonita/artifacts:/opt/bonita/artifacts
+    - ./bonita/deploy.sh:/opt/bonita/deploy.sh
     environment:
       DB_VENDOR: postgres
       DB_HOST: bonita-db
@@ -26,14 +29,12 @@ services:
       DB_NAME: bonita
       DB_USER: bonita
       DB_PASS: bpm
-
       BIZ_DB_NAME: business_data
       BIZ_DB_USER: business_data
       BIZ_DB_PASS: bpm
-
       BONITA_RUNTIME_ADMIN_USERNAME: tech_user
       BONITA_RUNTIME_ADMIN_PASSWORD: secret
-
+      BONITA_PROCESS: Plataforma RescueSync
       PLATFORM_LOGIN: pfadmin
       PLATFORM_PASSWORD: pfsecret
     healthcheck:

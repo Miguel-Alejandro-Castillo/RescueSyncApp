@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="ASCII"?>
+<organization:Organization xmlns:organization="http://documentation.bonitasoft.com/organization-xml-schema/1.1">
+  <customUserInfoDefinitions/>
+  <users>
+    <user userName="william.jobs">
+      <firstName>William</firstName>
+      <lastName>Jobs</lastName>
+      <title>Mr</title>
+      <jobTitle>Chief Executive Officer</jobTitle>
+      <personalData/>
+      <professionalData>
+        <email>william.jobs@rescue.com</email>
+        <phoneNumber>484-302-5000</phoneNumber>
+        <faxNumber>484-302-0000</faxNumber>
+        <building>70</building>
+        <address>Renwick Drive</address>
+        <zipCode>19108</zipCode>
+        <city>Philadelphia</city>
+        <state>PA</state>
+        <country>United States</country>
+      </professionalData>
+      <metaDatas>
+        <metaData name="Skype ID"/>
+        <metaData name="Twitter"/>
+        <metaData name="Facebook"/>
+      </metaDatas>
+      <enabled>true</enabled>
+      <password encrypted="false">bpm</password>
+    </user>
+    <user userName="walter.bates">
+      <firstName>Walter</firstName>
+      <lastName>Bates</lastName>
+      <title>Mr</title>
+      <jobTitle>Human resources benefits</jobTitle>
+      <manager></manager>
+      <personalData/>
+      <professionalData>
+        <email>walter.bates@rescue.com</email>
+        <phoneNumber>484-302-5000</phoneNumber>
+        <faxNumber>484-302-0000</faxNumber>
+        <building>70</building>
+        <address>Renwick Drive</address>
+        <zipCode>19108</zipCode>
+        <city>Philadelphia</city>
+        <state>PA</state>
+        <country>United States</country>
+      </professionalData>
+      <metaDatas>
+        <metaData name="Skype ID"/>
+        <metaData name="Twitter"/>
+        <metaData name="Facebook"/>
+      </metaDatas>
+      <enabled>true</enabled>
+      <password encrypted="false">bpm</password>
+    </user>
+    <user userName="thorsten.hartmann">
+      <firstName>Thorsten</firstName>
+      <lastName>Hartmann</lastName>
+      <title>Mr</title>
+      <jobTitle>Financial planning manager</jobTitle>
+      <manager>zachary.williamson</manager>
+      <personalData/>
+      <professionalData>
+        <email>thorsten.hartmann@rescue.com</email>
+        <phoneNumber>484-302-5000</phoneNumber>
+        <faxNumber>484-302-0000</faxNumber>
+        <building>70</building>
+        <address>Renwick Drive</address>
+        <zipCode>19108</zipCode>
+        <city>Philadelphia</city>
+        <state>PA</state>
+        <country>United States</country>
+      </professionalData>
+      <metaDatas>
+        <metaData name="Skype ID"/>
+        <metaData name="Twitter"/>
+        <metaData name="Facebook"/>
+      </metaDatas>
+      <enabled>true</enabled>
+      <password encrypted="false">bpm</password>
+    </user>
+    <user userName="michael.morrison">
+      <firstName>Michael</firstName>
+      <lastName>Morrison</lastName>
+      <title>Mr</title>
+      <jobTitle>Chief Technical Officer</jobTitle>
+      <manager></manager>
+      <personalData/>
+      <professionalData>
+        <email>michael.morrison@rescue.com</email>
+        <phoneNumber>484-302-5000</phoneNumber>
+        <faxNumber>484-302-0000</faxNumber>
+        <building>70</building>
+        <address>Renwick Drive</address>
+        <zipCode>19108</zipCode>
+        <city>Philadelphia</city>
+        <state>PA</state>
+        <country>United States</country>
+      </professionalData>
+      <metaDatas>
+        <metaData name="Skype ID"/>
+        <metaData name="Twitter"/>
+        <metaData name="Facebook"/>
+      </metaDatas>
+      <enabled>true</enabled>
+      <password encrypted="false">bpm</password>
+    </user>
+    <user userName="marc.marseau">
+      <firstName>Marc</firstName>
+      <lastName>Marseau</lastName>
+      <title>Mr</title>
+      <jobTitle>Engineer</jobTitle>
+      <manager></manager>
+      <personalData/>
+      <professionalData>
+        <email>marc.marseau@rescue.com</email>
+        <phoneNumber>484-302-5000</phoneNumber>
+        <faxNumber>484-302-0000</faxNumber>
+        <building>70</building>
+        <address>Renwick Drive</address>
+        <zipCode>19108</zipCode>
+        <city>Philadelphia</city>
+        <state>PA</state>
+        <country>United States</country>
+      </professionalData>
+      <metaDatas>
+        <metaData name="Skype ID"/>
+        <metaData name="Twitter"/>
+        <metaData name="Facebook"/>
+      </metaDatas>
+      <enabled>true</enabled>
+      <password encrypted="false">bpm</password>
+    </user>
+    <user userName="joseph.hovell">
+      <firstName>Joseph</firstName>
+      <lastName>Hovell</lastName>
+      <title>Mr</title>
+      <jobTitle>Engineer</jobTitle>
+      <manager></manager>
+      <personalData/>
+      <professionalData>
+        <email>joseph.hovell@rescue.com</email>
+        <phoneNumber>484-302-5000</phoneNumber>
+        <faxNumber>484-302-0000</faxNumber>
+        <building>70</building>
+        <address>Renwick Drive</address>
+        <zipCode>19108</zipCode>
+        <city>Philadelphia</city>
+        <state>PA</state>
+        <country>United States</country>
+      </professionalData>
+      <metaDatas>
+        <metaData name="Skype ID"/>
+        <metaData name="Twitter"/>
+        <metaData name="Facebook"/>
+      </metaDatas>
+      <enabled>true</enabled>
+      <password encrypted="false">bpm</password>
+    </user>
+    <user userName="mauro.zetticci">
+      <firstName>Mauro</firstName>
+      <lastName>Zetticci</lastName>
+      <title>Mr</title>
+      <jobTitle>Consultant</jobTitle>
+      <manager></manager>
+      <personalData/>
+      <professionalData>
+        <email>mauro.zetticci@rescue.com</email>
+        <phoneNumber>484-302-5000</phoneNumber>
+        <faxNumber>484-302-0000</faxNumber>
+        <building>70</building>
+        <address>Renwick Drive</address>
+        <zipCode>19108</zipCode>
+        <city>Philadelphia</city>
+        <state>PA</state>
+        <country>United States</country>
+      </professionalData>
+      <metaDatas>
+        <metaData name="Skype ID"/>
+        <metaData name="Twitter"/>
+        <metaData name="Facebook"/>
+      </metaDatas>
+      <enabled>true</enabled>
+      <password encrypted="false">bpm</password>
+    </user>
+    <user userName="thomas.wallis">
+      <firstName>Thomas</firstName>
+      <lastName>Wallis</lastName>
+      <title>Mr</title>
+      <jobTitle>Consultant</jobTitle>
+      <manager></manager>
+      <personalData/>
+      <professionalData>
+        <email>thomas.wallis@rescue.com</email>
+        <phoneNumber>484-302-5000</phoneNumber>
+        <faxNumber>484-302-0000</faxNumber>
+        <building>70</building>
+        <address>Renwick Drive</address>
+        <zipCode>19108</zipCode>
+        <city>Philadelphia</city>
+        <state>PA</state>
+        <country>United States</country>
+      </professionalData>
+      <metaDatas>
+        <metaData name="Skype ID"/>
+        <metaData name="Twitter"/>
+        <metaData name="Facebook"/>
+      </metaDatas>
+      <enabled>true</enabled>
+      <password encrypted="false">bpm</password>
+    </user>
+    <user userName="misa.kumagai">
+      <firstName>Misa</firstName>
+      <lastName>Kumagai</lastName>
+      <title>Mrs</title>
+      <jobTitle>Account manager</jobTitle>
+      <manager>daniela.angelo</manager>
+      <personalData/>
+      <professionalData>
+        <email>misa.kumagai@rescue.com</email>
+        <phoneNumber>484-302-5000</phoneNumber>
+        <faxNumber>484-302-0000</faxNumber>
+        <building>70</building>
+        <address>Renwick Drive</address>
+        <zipCode>19108</zipCode>
+        <city>Philadelphia</city>
+        <state>PA</state>
+        <country>United States</country>
+      </professionalData>
+      <metaDatas>
+        <metaData name="Skype ID"/>
+        <metaData name="Twitter"/>
+        <metaData name="Facebook"/>
+      </metaDatas>
+      <enabled>true</enabled>
+      <password encrypted="false">bpm</password>
+    </user>
+    <user userName="norio.yamazaki">
+      <firstName>Norio</firstName>
+      <lastName>Yamazaki</lastName>
+      <title>Mr</title>
+      <jobTitle>Account manager</jobTitle>
+      <manager>daniela.angelo</manager>
+      <personalData/>
+      <professionalData>
+        <email>norio.yamazaki@rescue.com</email>
+        <phoneNumber>484-302-5000</phoneNumber>
+        <faxNumber>484-302-0000</faxNumber>
+        <building>70</building>
+        <address>Renwick Drive</address>
+        <zipCode>19108</zipCode>
+        <city>Philadelphia</city>
+        <state>PA</state>
+        <country>United States</country>
+      </professionalData>
+      <metaDatas>
+        <metaData name="Skype ID"/>
+        <metaData name="Twitter"/>
+        <metaData name="Facebook"/>
+      </metaDatas>
+      <enabled>true</enabled>
+      <password encrypted="false">bpm</password>
+    </user>
+    <user userName="bonita.bpm">
+      <firstName>Bonita </firstName>
+      <lastName>BPM</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues/>
+    </user>
+  </users>
+  <roles>
+    <role name="operador_municipal">
+      <displayName>Operador Municipal</displayName>
+    </role>
+    <role name="centro_coordinador">
+      <displayName>Centro Coordinador Regional</displayName>
+    </role>
+    <role name="representante_ong">
+      <displayName>Representante de ONG</displayName>
+    </role>
+    <role name="auditor">
+      <displayName>Auditor</displayName>
+    </role>
+    <role name="directivo">
+      <displayName>Directivo</displayName>
+    </role>
+    <role name="bonita_user">
+      <displayName>Usuario de Bonita</displayName>
+    </role>
+  </roles>
+  <groups>
+    <group name="rescue">
+      <displayName>Rescue</displayName>
+      <description>This group represents the rescue department of the RESCUE organization</description>
+    </group>
+    <group name="municipios" parentPath="/rescue">
+      <displayName>Municipios</displayName>
+      <description>This group represents the municipios of the RESCUE organization</description>
+    </group>
+    <group name="ongs" parentPath="/rescue">
+      <displayName>Ongs</displayName>
+      <description>This group represents the ongs of the RESCUE organization</description>
+    </group>
+    <group name="directivos" parentPath="/rescue">
+      <displayName>Directivos</displayName>
+      <description>This group represents the directivos of the RESCUE organization</description>
+    </group>
+    <group name="auditores" parentPath="/rescue">
+      <displayName>Auditores</displayName>
+      <description>This group represents the auditores of the RESCUE organization</description>
+    </group>
+    <group name="coordinadores" parentPath="/rescue">
+      <displayName>Coordinadores</displayName>
+      <description>This group represents the coordinadores of the RESCUE organization</description>
+    </group>
+    <group name="bonita_bpm">
+      <displayName>BonitaBPM</displayName>
+    </group>
+  </groups>
+  <memberships>
+    <membership>
+      <userName>william.jobs</userName>
+      <roleName>operador_municipal</roleName>
+      <groupName>municipios</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>walter.bates</userName>
+      <roleName>operador_municipal</roleName>
+      <groupName>municipios</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>thorsten.hartmann</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>michael.morrison</userName>
+      <roleName>centro_coordinador</roleName>
+      <groupName>coordinadores</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>marc.marseau</userName>
+      <roleName>auditor</roleName>
+      <groupName>auditores</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>joseph.hovell</userName>
+      <roleName>auditor</roleName>
+      <groupName>auditores</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>mauro.zetticci</userName>
+      <roleName>centro_coordinador</roleName>
+      <groupName>coordinadores</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>thomas.wallis</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>misa.kumagai</userName>
+      <roleName>directivo</roleName>
+      <groupName>directivos</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>norio.yamazaki</userName>
+      <roleName>directivo</roleName>
+      <groupName>directivos</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>bonita.bpm</userName>
+      <roleName>bonita_user</roleName>
+      <groupName>bonita_bpm</groupName>
+    </membership>
+  </memberships>
+</organization:Organization>
