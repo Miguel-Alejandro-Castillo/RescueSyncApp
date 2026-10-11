@@ -1,5 +1,6 @@
 import swaggerJsdoc from "swagger-jsdoc";
 
+const SWAGGER_URL = process.env.SWAGGER_URL;
 const options = {
   definition: {
     openapi: "3.0.0",
@@ -10,7 +11,7 @@ const options = {
     },
     servers: [
       {
-        url: "http://localhost:3000"
+        url: SWAGGER_URL
       }
     ]
   },

@@ -43,7 +43,7 @@ Esto levanta y construye estos servicios:
 - `bonita-engine`
 - `backend`
 - `frontend`
-- `nacional`
+- `api-nacional`
 
 ## URLs publicadas
 
@@ -52,8 +52,8 @@ Una vez levantada toda la infraestructura, podras acceder a:
 - Frontend: `http://localhost:5173`
 - Backend: `http://localhost:3000`
 - Swagger del backend: `http://localhost:3000/docs`
-- Nacional: `http://localhost:4000`
-- Swagger de la api Nacional: `http://localhost:4000/api-docs/`
+- API Nacional: `http://localhost:4000`
+- Swagger de la API Nacional: `http://localhost:4000/api-docs/`
 
 ## Login y logout
 

@@ -1,55 +1,33 @@
-// RescueSync Backend Server
-import express from "express";
+/* API NACIONAL Server */
 import dotenv from "dotenv";
-
-import swaggerUi from "swagger-ui-express";
-import { swaggerSpec } from "./config/swagger.js";
-import { closeRedisClient, initRedisClient } from "./config/redis.js";
-
+// Load environment variables from .env file
 dotenv.config();
 
-const app = express();
-const port = process.env.PORT || 3000;
+import { closeRedisClient, initRedisClient } from "./config/redis.js";
+import app from "./app.js";
 
-app.use(express.json());
+// ---------------------------
+// Arranque del servidor HTTP
+// ---------------------------
 
-app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec)
-);
-
-app.get("/", (req, res) => {
-  console.log("Received request for /");
-  res.send("RescueSync API Nacional is running. Hot reload enabled 1.0.");
-});
-
-app.get("/health", async (req, res) => {
-  const redis = req.app.locals.redis;
-  let redisStatus = "disconnected";
-
-  if (redis?.isOpen) {
-    await redis.ping();
-    redisStatus = "connected";
-  }
-
-  res.json({
-    status: "ok",
-    service: "rescuesync-nacional",
-    redis: redisStatus
-  });
-});
+if (!process.env.PORT) {
+  throw new Error("PORT is required");
+}
+const port = process.env.PORT;
 
 let server;
-
 async function startServer() {
+  // Inicializar Redis y otros recursos necesarios antes de arrancar el servidor
   app.locals.redis = await initRedisClient();
+  console.log("Redis client initialized");
 
+  console.log(`Starting server on port ${port}...`);
   server = app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
   });
 }
 
+/* Graceful shutdown */
 async function shutdown(signal) {
   console.log(`Received ${signal}. Shutting down gracefully.`);
 
@@ -84,6 +62,7 @@ process.on("SIGTERM", () => {
   });
 });
 
+/* Start the server */
 startServer().catch((error) => {
   console.error("Failed to start server", error);
   process.exit(1);
