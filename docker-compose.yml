@@ -6,7 +6,7 @@ services:
       - "5432:5432"
     volumes:
       - bonita_pgdata:/var/lib/postgresql/data
-      - ./database/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ./bonita/database/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U bonita -d bonita"]
@@ -60,34 +60,47 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  nacional-db:
+    container_name: api-nacional-db
+    image: postgres:15.4
+    environment:
+      POSTGRES_DB: api_nacional
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - nacional_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d api_nacional"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
   nacional:
-    container_name: rescuesync-nacional
+    container_name: api-nacional
     build:
-      context: ./nacional
+      context: ./api-nacional
       dockerfile: Dockerfile
     ports:
       - "4000:4000"
+      - "5555:5555" # Puerto expuesto para Prisma Studio
     volumes:
-      - ./nacional:/app
+      - ./api-nacional:/app
       - /app/node_modules
     environment:
       PORT: 4000
       REDIS_URL: redis://redis-db:6379/0
-      # PostgreSQL
-      #DB_HOST: bonita-db
-      #DB_PORT: 5432
-      #DB_NAME: rescuesync
-      #DB_USER: rescuesync
-      #DB_PASSWORD: rescuesync
-
-      # Bonita
-      #BONITA_URL: http://bonita-engine:8080/bonita
-      #BONITA_USER: tech_user
-      #BONITA_PASSWORD: secret
+      DATABASE_URL: postgresql://postgres:postgres@api-nacional-db:5432/api_nacional?schema=public
+      API_PATH: /api/v1
+      JWT_SECRET: una-clave-larga-y-dificil-de-adivinar
+      JWT_EXPIRES_IN: 3600
+      SWAGGER_URL: http://localhost:4000
     depends_on:
-      bonita-engine:
-        condition: service_healthy
       redis-db:
+        condition: service_healthy
+      nacional-db:
         condition: service_healthy
     restart: unless-stopped
 
@@ -118,9 +131,9 @@ services:
       JWT_ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 60
     depends_on:
-      bonita-engine:
-        condition: service_healthy
       redis-db:
+        condition: service_healthy
+      nacional-db:
         condition: service_healthy
     restart: unless-stopped
 
@@ -147,3 +160,4 @@ services:
 volumes:
   bonita_pgdata:
   redis_data:
+  nacional_pgdata:

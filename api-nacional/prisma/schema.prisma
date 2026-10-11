@@ -1,0 +1,43 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Ong {
+  id        Int @id @default(autoincrement())
+  razonSocial    String
+  descripcion String?
+  sigla    String  @unique
+  cuit      String @unique
+  estado String @default("habilitada")
+  recursos  Recurso[]
+}
+
+model Recurso {
+  id      Int @id @default(autoincrement())
+  nombre  String
+  descripcion  String?
+  categoriaId   Int
+  categoria     Categoria @relation(fields: [categoriaId], references: [id])
+  cantidadTotal  Int
+  cantidadComprometida  Int @default(0)
+  ongId   Int
+  ong     Ong @relation(fields: [ongId], references: [id])
+}
+
+model Categoria {
+  id      Int @id @default(autoincrement())
+  nombre  String @unique
+  descripcion   String?
+  recursos  Recurso[]
+}
+
+model User {
+    id      Int @id @default(autoincrement())
+    username String @unique
+    password String   
+}
