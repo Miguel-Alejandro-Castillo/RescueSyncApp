@@ -1,35 +1,62 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session, select
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from database import get_session
 from pydantic import BaseModel
+from typing import List, Optional
 from dependencies.rbac import (
-    require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
+    require_roles, REPRESENTANTE_ONG, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, AUDITORES, get_user_roles
 )
 from models.emergencia import Emergencia
 from models.lote import Lote
 from models.oferta import Oferta
+from models.participante_oferta import ParticipanteOferta
 from dependencies.jwt_auth import get_current_user
-from dependencies.rbac import get_user_roles
-
-
-
-class OfertaUpdate(BaseModel):
-    cant_recurso: int
-    id_ong: int
+from services.bonita_service import BonitaService
 
 router = APIRouter(
     prefix="/ofertas",
     tags=["ofertas"]
 )
 
+# --- SCHEMAS PYDANTIC PARA VALIDACIÓN DE ENTRADA ---
+class ParticipanteCreate(BaseModel):
+    ong_id: int
+    cantidad_aportada: Optional[int] = None  # Si es None, queda como invitación pendiente
+
+class OfertaConsorcioCreate(BaseModel):
+    id_lote: int
+    cantidad_lider: int  # Lo que aporta la ONG líder inicialmente
+    invitados: Optional[List[int]] = []  # IDs de otras ONGs a invitar
+class OfertaUpdate(BaseModel):
+    cant_recurso: int
+    id_ong: Optional[int] = None
+
+class ResponderInvitacion(BaseModel):
+    aceptar: bool
+    cantidad_aportada: Optional[int] = None  # Obligatorio si acepta
+
 
 def es_lote_vigente(lote: Lote, emergencia: Emergencia) -> bool:
     fecha_limite = lote.fechaLimiteConvocatoria
     if fecha_limite.tzinfo is None:
         fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
-
     return datetime.now(timezone.utc) <= fecha_limite
+
+
+def calcular_cantidad_cubierta(session: Session, lote_id: int) -> int:
+    """Calcula la suma real de todos los aportes confirmados en todas las ofertas del lote"""
+    ofertas = session.exec(select(Oferta).where(Oferta.lote_id == lote_id)).all()
+    if not ofertas:
+        return 0
+    oferta_ids = [o.id for o in ofertas]
+    
+    participantes = session.exec(
+        select(ParticipanteOferta).where(ParticipanteOferta.oferta_id.in_(oferta_ids))
+    ).all()
+    
+    return sum(p.cantidad_aportada for p in participantes if p.cantidad_aportada is not None)
+
 
 @router.get(
     "/emergencias-disponibles",
@@ -39,7 +66,6 @@ def get_emergencias_con_lotes(
     current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-
     statement = select(Emergencia).where(Emergencia.estado == "publicada").order_by(
         Emergencia.fechaCreacion.desc(), Emergencia.id.desc()
     )
@@ -47,18 +73,13 @@ def get_emergencias_con_lotes(
     
     resultado = []
     for emergencia in emergencias:
-       
         stmt_lotes = select(Lote).where(Lote.emergenciaId == emergencia.id).order_by(
             Lote.fechaCreacion.desc(), Lote.id.desc()
         )
         if REPRESENTANTE_ONG in get_user_roles(current_user):
-            ofertados = select(Oferta.id_lote).where(Oferta.id_ong == int(current_user['user_id']))
-            stmt_lotes = stmt_lotes.where(Lote.estado.in_(['creado', 'activo', 'abierto']), Lote.id.not_in(ofertados))
-        lotes = session.exec(stmt_lotes).all()
-        if REPRESENTANTE_ONG in get_user_roles(current_user) and not lotes:
-            continue
-
+            stmt_lotes = stmt_lotes.where(Lote.estado.in_(['creado', 'activo', 'abierto']))
         
+        lotes = session.exec(stmt_lotes).all()
         resultado.append({
             "emergencia": emergencia,
             "lotes": lotes
@@ -72,207 +93,434 @@ def get_emergencias_con_lotes(
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
 )
-def create_oferta(
-    oferta: Oferta,
+def create_oferta_consorcio(
+    data: OfertaConsorcioCreate,
     current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
+    ong_id_actual = int(current_user['user_id'])
 
-    oferta.id_ong = int(current_user['user_id'])
-    # SQLModel no valida los modelos con table=True, por eso se controla a mano
-    if oferta.cant_recurso <= 0:
+    if data.cantidad_lider <= 0:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="La cantidad ofrecida debe ser mayor a 0."
         )
 
-    lote = session.get(Lote, oferta.id_lote)
+    lote = session.get(Lote, data.id_lote)
     if not lote:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"El lote con ID {oferta.id_lote} no existe."
-        )
+        raise HTTPException(status_code=404, detail="El lote no existe.")
+
     emergencia = session.get(Emergencia, lote.emergenciaId)
-    if not emergencia:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="La emergencia asociada al lote no existe."
-        )
-
-    #validar tiempo
     if not es_lote_vigente(lote, emergencia):
+        raise HTTPException(status_code=400, detail="La convocatoria de este lote ha expirado.")
+
+    
+    stmt_ofertas_lote = select(Oferta).where(Oferta.lote_id == data.id_lote)
+    ofertas_en_lote = session.exec(stmt_ofertas_lote).all()
+    ofertas_ids = [o.id for o in ofertas_en_lote]
+
+    if ofertas_ids:
+        stmt_participacion_previa = select(ParticipanteOferta).where(
+            ParticipanteOferta.oferta_id.in_(ofertas_ids),
+            ParticipanteOferta.ong_id == ong_id_actual
+        )
+        if session.exec(stmt_participacion_previa).first():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Ya estás participando en una oferta o consorcio para este lote."
+            )
+    # Cada oferta puede pedir hasta el total del lote de forma independiente
+    if data.cantidad_lider > lote.cantidad:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La convocatoria de este lote ha expirado. Ya no podés enviar una oferta."
+            detail=f"Tu aporte no puede superar el total requerido por el lote ({lote.cantidad} unidades)."
         )
-   #Evitar que la misma ONG oferte más de una vez para el mismo lote
-    stmt_existente = select(Oferta).where(
-        Oferta.id_lote == oferta.id_lote,
-        Oferta.id_ong == oferta.id_ong
+
+    # 1. Crear la Oferta cabecera
+    nueva_oferta = Oferta(
+        lote_id=data.id_lote,
+        ong_lider_id=ong_id_actual
     )
-   
-    oferta_existente = session.exec(stmt_existente).first()
-    if oferta_existente:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Ya registraste una oferta para este lote. Podés editar tu oferta existente mientras la convocatoria continúe abierta."
+    session.add(nueva_oferta)
+    session.commit()
+    session.refresh(nueva_oferta)
+
+    # 2. Agregar al líder como participante confirmado
+    lider_participante = ParticipanteOferta(
+        oferta_id=nueva_oferta.id,
+        ong_id=ong_id_actual,
+        cantidad_aportada=data.cantidad_lider
+    )
+    session.add(lider_participante)
+
+    # 3. Registrar invitaciones a otras ONGs
+    for ong_invitada_id in data.invitados:
+        if ong_invitada_id == ong_id_actual:
+            continue
+        invitacion = ParticipanteOferta(
+            oferta_id=nueva_oferta.id,
+            ong_id=ong_invitada_id,
+            cantidad_aportada=None
         )
-    cant_cubierta_actual = lote.cantidadCubierta or 0
-    faltante = lote.cantidad - cant_cubierta_actual
-    if oferta.cant_recurso > faltante:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"La oferta supera lo requerido. Solo faltan {faltante} unidades para completar el lote."
-        )
-
-    session.add(oferta)
-    lote.cantidadCubierta += oferta.cant_recurso
-    if lote.cantidadCubierta == lote.cantidad:
-
-        lote.estado = "cubierto"
-
-    print(lote.cantidadCubierta)    
-    session.add(lote)
+        session.add(invitacion)
 
     session.commit()
+    return {"mensaje": "Oferta en consorcio creada con éxito", "oferta_id": nueva_oferta.id}
 
-    session.refresh(oferta)
-    session.refresh(lote)
-    return oferta
+
+@router.post(
+    "/{oferta_id}/invitar",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
+)
+def invitar_ong_a_oferta(
+    oferta_id: int,
+    data: ParticipanteCreate,
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    oferta = session.get(Oferta, oferta_id)
+    if not oferta:
+        raise HTTPException(status_code=404, detail="La oferta no existe.")
+    
+    if oferta.ong_lider_id != int(current_user['user_id']):
+        raise HTTPException(status_code=403, detail="Solo la ONG líder puede invitar a otros.")
+
+    stmt = select(ParticipanteOferta).where(
+        ParticipanteOferta.oferta_id == oferta_id,
+        ParticipanteOferta.ong_id == data.ong_id
+    )
+    existente = session.exec(stmt).first()
+    if existente:
+        raise HTTPException(status_code=400, detail="Esta ONG ya fue invitada o forma parte de la oferta.")
+
+    nuevo_participante = ParticipanteOferta(
+        oferta_id=oferta_id,
+        ong_id=data.ong_id,
+        cantidad_aportada=None
+    )
+    session.add(nuevo_participante)
+    session.commit()
+    return {"mensaje": "Invitación enviada correctamente."}
+
+
+@router.post(
+    "/{oferta_id}/responder-invitacion",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
+)
+def responder_invitacion(
+    oferta_id: int,
+    data: ResponderInvitacion,
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    ong_id_actual = int(current_user['user_id'])
+
+    stmt = select(ParticipanteOferta).where(
+        ParticipanteOferta.oferta_id == oferta_id,
+        ParticipanteOferta.ong_id == ong_id_actual
+    )
+    participacion = session.exec(stmt).first()
+    if not participacion:
+        raise HTTPException(status_code=404, detail="No tenés ninguna invitación pendiente para esta oferta.")
+
+    if not data.aceptar:
+        session.delete(participacion)
+        session.commit()
+        return {"mensaje": "Has rechazado la invitación al consorcio."}
+
+    if not data.cantidad_aportada or data.cantidad_aportada <= 0:
+        raise HTTPException(status_code=422, detail="Debes indicar una cantidad mayor a 0.")
+
+    oferta = session.get(Oferta, oferta_id)
+    lote = session.get(Lote, oferta.lote_id)
+    emergencia = session.get(Emergencia, lote.emergenciaId)
+
+    if not es_lote_vigente(lote, emergencia):
+        raise HTTPException(status_code=400, detail="La convocatoria del lote ha expirado.")
+
+    # Calcular cuánto lleva sumado ESTA oferta en consorcio en total
+    stmt_parts = select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta_id)
+    todos_participantes = session.exec(stmt_parts).all()
+    
+    aporte_anterior = participacion.cantidad_aportada or 0
+    suma_actual_oferta = sum(p.cantidad_aportada for p in todos_participantes if p.cantidad_aportada is not None and p.ong_id != ong_id_actual)
+    
+    total_propuesto = suma_actual_oferta + data.cantidad_aportada
+    if total_propuesto > lote.cantidad:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"El total de esta oferta ({total_propuesto}) supera el máximo del lote ({lote.cantidad})."
+        )
+
+    participacion.cantidad_aportada = data.cantidad_aportada
+    session.add(participacion)
+    session.commit()
+
+    return {"mensaje": "Invitación aceptada y aporte registrado con éxito."}
+
+
+@router.get(
+    "/misofertas-consorcio",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
+)
+def get_mis_ofertas_consorcio(
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    ong_id_actual = int(current_user['user_id'])
+
+    stmt_participaciones = select(ParticipanteOferta).where(ParticipanteOferta.ong_id == ong_id_actual)
+    participaciones = session.exec(stmt_participaciones).all()
+    ofertas_ids = [p.oferta_id for p in participaciones]
+
+    stmt_ofertas = select(Oferta).where(
+        (Oferta.ong_lider_id == ong_id_actual) | (Oferta.id.in_(ofertas_ids if ofertas_ids else [0]))
+    )
+    ofertas = session.exec(stmt_ofertas).all()
+
+    resultado = []
+    for oferta in ofertas:
+        lote = session.get(Lote, oferta.lote_id)
+        emergencia = session.get(Emergencia, lote.emergenciaId) if lote else None
+        
+        stmt_parts = select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta.id)
+        todos_participantes = session.exec(stmt_parts).all()
+
+        es_lider = (oferta.ong_lider_id == ong_id_actual)
+        mi_participacion = next((p for p in todos_participantes if p.ong_id == ong_id_actual), None)
+        estado_invitacion = "lider" if es_lider else ("pendiente" if mi_participacion and mi_participacion.cantidad_aportada is None else "aceptada")
+
+        resultado.append({
+            "oferta_id": oferta.id,
+            "es_lider": es_lider,
+            "estado_invitacion": estado_invitacion,
+            "mi_aporte": mi_participacion.cantidad_aportada if mi_participacion else None,
+            "lote": lote,
+            "emergencia": emergencia,
+            "participantes": [
+                {"ong_id": p.ong_id, "cantidad_aportada": p.cantidad_aportada} 
+                for p in todos_participantes
+            ]
+        })
+
+    return resultado
+
+
+@router.get(
+    "/misofertas",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
+)
+def get_mis_ofertas_compat(
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+    """Endpoint de compatibilidad para el frontend que consulta /misofertas"""
+    ong_id_actual = int(current_user['user_id'])
+    
+    # 1. Traer solo las participaciones confirmadas (donde cantidad_aportada NO sea None)
+    stmt_participaciones = select(ParticipanteOferta).where(
+        ParticipanteOferta.ong_id == ong_id_actual,
+        ParticipanteOferta.cantidad_aportada != None
+    )
+    participaciones = session.exec(stmt_participaciones).all()
+    ofertas_ids = [p.oferta_id for p in participaciones]
+
+    # 2. Traer las ofertas donde el usuario sea líder o tenga una participación confirmada
+    stmt_ofertas = select(Oferta).where(
+        (Oferta.ong_lider_id == ong_id_actual) | (Oferta.id.in_(ofertas_ids if ofertas_ids else [0]))
+    )
+    ofertas = session.exec(stmt_ofertas).all()
+
+    ahora = datetime.now(timezone.utc)
+    respuesta = []
+    for oferta in ofertas:
+        lote = session.get(Lote, oferta.lote_id)
+        emergencia = session.get(Emergencia, lote.emergenciaId) if lote else None
+        
+        stmt_parts = select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta.id)
+        todos_participantes = session.exec(stmt_parts).all()
+        mi_participacion = next((p for p in todos_participantes if p.ong_id == ong_id_actual), None)
+
+        # 3. Ignorar invitaciones pendientes de respuesta
+        if not mi_participacion or mi_participacion.cantidad_aportada is None:
+            continue
+
+        if lote and lote.fechaLimiteConvocatoria:
+            fecha_limite = lote.fechaLimiteConvocatoria
+            if fecha_limite.tzinfo is None:
+                fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
+            vigente = (emergencia and emergencia.estado == "publicada") and (ahora <= fecha_limite)
+        else:
+            vigente = False
+
+        respuesta.append({
+            "id": oferta.id,
+            "id_lote": oferta.lote_id,
+            "cant_recurso": mi_participacion.cantidad_aportada,
+            "id_ong": oferta.ong_lider_id,
+            "lote_tipo": lote.tipoRecurso if lote else "",
+            "lote_cantidad_total": lote.cantidad if lote else 0,
+            "lote_cantidad_cubierta": lote.cantidadCubierta or 0,
+            "emergencia_titulo": emergencia.zonaAfectada if emergencia else "",
+            "emergencia_estado": emergencia.estado if emergencia else "",
+            "fecha_limite": lote.fechaLimiteConvocatoria.isoformat() if lote and lote.fechaLimiteConvocatoria else "",
+            "es_editable": vigente
+        })
+
+    return respuesta
+
+
+@router.get(
+
+    "/ongs-bonita",
+
+    status_code=status.HTTP_200_OK,
+
+    dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
+
+)
+
+async def listar_ongs_desde_bonita(
+
+    current_user: dict = Depends(get_current_user)
+
+):
+
+    ong_id_actual = int(current_user['user_id'])
+
+    bonita_service = BonitaService()
+
+    try:
+
+        # Autenticación con el usuario técnico de Bonita
+
+        await bonita_service.login("walter.bates", "bpm")  # Ajusta las credenciales si usan variables de entorno
+
+       
+
+        # Usamos el método interno o llamamos directamente al endpoint /API/identity/user
+
+        response = await bonita_service.http_client.get(
+
+            "/API/identity/user",
+
+            headers=bonita_service._auth_headers(),
+
+            params={"p": 0, "c": 100}
+
+        )
+
+       
+
+        if response.status_code != 200:
+
+            print("Error respuesta Bonita:", response.status_code, response.text)
+
+            return []
+
+
+
+        usuarios = response.json()
+
+       
+
+        resultado = []
+
+        for u in usuarios:
+
+            uid = int(u.get("id", 0))
+
+            # Filtrar para no mostrar a la ONG actual
+
+            if uid != ong_id_actual:
+
+                firstname = u.get('firstname', '') or ''
+
+                lastname = u.get('lastname', '') or ''
+
+                nombre_completo = f"{firstname} {lastname}".strip()
+
+                nombre = nombre_completo if nombre_completo else u.get('userName', f"ONG #{uid}")
+
+                resultado.append({
+
+                    "id": uid,
+
+                    "nombre": nombre
+
+                })
+
+               
+
+        return resultado
+
+    except Exception as e:
+
+        print("Error obteniendo usuarios de Bonita:", e)
+
+        return []
+
+    finally:
+
+        await bonita_service.close() 
+
 
 @router.put(
     "/{oferta_id}",
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
 )
-
-
-def update_oferta(
+def editar_aporte_oferta(
     oferta_id: int,
-    oferta_data: OfertaUpdate,
+    data: OfertaUpdate,
     current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    # 1. Verificar existencia de la oferta
+    ong_id_actual = int(current_user['user_id'])
+
+    if data.cant_recurso <= 0:
+        raise HTTPException(status_code=422, detail="La cantidad debe ser mayor a 0.")
+
     oferta = session.get(Oferta, oferta_id)
     if not oferta:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"La oferta con ID {oferta_id} no existe."
-        )
+        raise HTTPException(status_code=404, detail="La oferta no existe.")
 
-    # 2. Verificar que pertenezca a la misma ONG
-    if oferta.id_ong != int(current_user['user_id']):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No tenés permiso para modificar esta oferta."
-        )
-
-    # 3. Verificar existencia de lote y emergencia
-    lote = session.get(Lote, oferta.id_lote)
+    lote = session.get(Lote, oferta.lote_id)
     if not lote:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="El lote asociado a la oferta no existe."
-        )
+        raise HTTPException(status_code=404, detail="El lote asociado no existe.")
 
-    emergencia = session.get(Emergencia, lote.emergenciaId)
-    if not emergencia:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="La emergencia asociada al lote no existe."
-        )
-
-    # 4. Validar vigencia de la convocatoria
-    if not es_lote_vigente(lote, emergencia):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="La convocatoria ha expirado. Ya no podés editar esta oferta."
-        )
-
-    if oferta_data.cant_recurso <= 0:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="La cantidad ofrecida debe ser mayor a 0."
-        )
-
-    # 5. Recalcular espacio disponible excluyendo el valor anterior de esta oferta
-    cant_cubierta_sin_esta_oferta = (lote.cantidadCubierta or 0) - oferta.cant_recurso
-    cupo_disponible = lote.cantidad - cant_cubierta_sin_esta_oferta
-
-    if oferta_data.cant_recurso > cupo_disponible:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"La cantidad ingresada supera el faltante del lote. El máximo posible a ofertar es {cupo_disponible} unidades."
-        )
-
-    # 6. Aplicar cambios
-    oferta.cant_recurso = oferta_data.cant_recurso
-    lote.cantidadCubierta = cant_cubierta_sin_esta_oferta + oferta_data.cant_recurso
-
-    if lote.cantidadCubierta >= lote.cantidad:
-        lote.estado = "cubierto"
-    else:
-        lote.estado = "activo"
-
-    session.add(oferta)
-    session.add(lote)
-    session.commit()
-    session.refresh(oferta)
-    session.refresh(lote)
-
-    return oferta
-
-
-
-@router.get(
-    "/misofertas",
-    status_code=status.HTTP_200_OK
-)
-def get_mis_ofertas(
-    current_user: dict = Depends(require_roles(REPRESENTANTE_ONG)),
-    session: Session = Depends(get_session)
-):
-    # Extraer el ID del usuario directamente desde el payload JWT
-    id_usuario = current_user.get("user_id") or current_user.get("sub")
-
-    if not id_usuario:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No se pudo determinar el ID del usuario autenticado."
-        )
-
-    stmt = (
-        select(Oferta, Lote, Emergencia)
-        .join(Lote, Oferta.id_lote == Lote.id)
-        .join(Emergencia, Lote.emergenciaId == Emergencia.id)
-        .where(Oferta.id_ong == int(id_usuario))  # Compara contra el user_id (8)
-        .order_by(Oferta.id.desc())
+    # Buscar la participación de la ONG actual en esta oferta
+    stmt = select(ParticipanteOferta).where(
+        ParticipanteOferta.oferta_id == oferta_id,
+        ParticipanteOferta.ong_id == ong_id_actual
     )
-    results = session.exec(stmt).all()
+    participacion = session.exec(stmt).first()
+    if not participacion:
+        raise HTTPException(status_code=403, detail="No formas parte de esta oferta en consorcio.")
 
-    ahora = datetime.now(timezone.utc)
+    # 1. Sumar lo aportado por los DEMÁS miembros de la oferta (excluyendo al usuario actual)
+    stmt_otros = select(ParticipanteOferta).where(
+        ParticipanteOferta.oferta_id == oferta_id,
+        ParticipanteOferta.ong_id != ong_id_actual
+    )
+    otros_participantes = session.exec(stmt_otros).all()
+    aporte_otros = sum(p.cantidad_aportada for p in otros_participantes if p.cantidad_aportada is not None)
 
-    respuesta = []
-    for oferta, lote, emergencia in results:
-        fecha_limite = lote.fechaLimiteConvocatoria
-        if fecha_limite.tzinfo is None:
-            fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
+    # 2. Verificar que el nuevo aporte + lo aportado por los demás no supere el total del lote
+    if (aporte_otros + data.cant_recurso) > lote.cantidad:
+        max_permitido = lote.cantidad - aporte_otros
+        raise HTTPException(
+            status_code=400,
+            detail=f"La nueva cantidad supera el límite del lote. Los demás miembros aportan {aporte_otros}. Tu máximo posible es {max_permitido}."
+        )
 
-        vigente = (emergencia.estado == "publicada") and (ahora <= fecha_limite)
+    # 3. Guardar el nuevo aporte
+    participacion.cantidad_aportada = data.cant_recurso
+    session.add(participacion)
+    session.commit()
 
-        respuesta.append({
-            "id": oferta.id,
-            "id_lote": oferta.id_lote,
-            "cant_recurso": oferta.cant_recurso,
-            "id_ong": oferta.id_ong,
-            "lote_tipo": lote.tipoRecurso,
-            "lote_cantidad_total": lote.cantidad,
-            "lote_cantidad_cubierta": lote.cantidadCubierta or 0,
-            "emergencia_titulo": emergencia.zonaAfectada,
-            "emergencia_estado": emergencia.estado,
-            "fecha_limite": fecha_limite.isoformat(),
-            "es_editable": vigente
-        })
-
-    return respuesta
+    return {"mensaje": "Aporte actualizado correctamente en el consorcio."}

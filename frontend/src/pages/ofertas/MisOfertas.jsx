@@ -23,7 +23,6 @@ export default function MisOfertas() {
     try {
       setLoading(true);
       setError('');
-      // Pide directamente las ofertas del usuario autenticado por Token
       const res = await authenticatedFetch(`${API_RESCUE}/ofertas/misofertas/`);
       if (!res.ok) throw new Error('Error al cargar las ofertas');
       const data = await res.json();
@@ -171,7 +170,7 @@ export default function MisOfertas() {
                   name="cantidadOferta"
                   data-required-message="Ingrese la nueva cantidad de la oferta."
                   step="1"
-                  max={editingOferta.lote_cantidad_total - editingOferta.lote_cantidad_cubierta + editingOferta.cant_recurso}
+                  max={editingOferta.lote_cantidad_total}
                   type="number"
                   min="1"
                   value={nuevaCantidad}

@@ -10,18 +10,18 @@ class Oferta(SQLModel, table=True):
         description="ID de la oferta"
     )
 
-    id_lote: int = Field(
+    lote_id: int = Field(
         foreign_key="lotes.id",
-        description="ID del lote asociado a la oferta"
+        description="Lote al que aplica la oferta"
     )
 
-    id_ong: int = Field(
-        description="ID de la ONG que realiza la oferta"
+    ong_lider_id: int = Field(
+        description="ONG responsable de crear y administrar la oferta"
     )
 
-    cant_recurso: int = Field(
-        gt=0,
-        description="Cantidad de recursos ofrecidos"
+    fecha_creacion: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Fecha de creación de la oferta"
     )
 
 

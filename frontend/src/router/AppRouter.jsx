@@ -19,6 +19,7 @@ import DetalleLotes from "../pages/ofertas/DetalleLotes";
 import MisOfertas from '../pages/ofertas/MisOfertas';
 import { useSession } from "../auth/AuthContext";
 import RequirePermission from "../auth/RequirePermission";
+import OfertasConsorcio from '../pages/ofertas/OfertasConsorcio';
 function RequireSession() {
   const session = useSession();
   const location = useLocation();
@@ -56,6 +57,7 @@ export default function AppRouter() {
             <Route path="/ofertas" element={<RequirePermission permission="ofertas.crear"><CargarOfertas /></RequirePermission>} />
             <Route path="/emergencias/:id/lotes" element={<RequirePermission permission="ofertas.crear"><DetalleLotes /></RequirePermission>} />
             <Route path="/ofertas/misofertas" element={<RequirePermission permission="ofertas.ver_propias"><MisOfertas /></RequirePermission>} />
+            <Route path="/ofertas-consorcio" element={<RequirePermission permission="ofertas.ver_propias"><OfertasConsorcio /></RequirePermission>} />
             <Route
               path="*"
               element={
