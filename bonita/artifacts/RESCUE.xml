@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="ASCII"?>
 <organization:Organization xmlns:organization="http://documentation.bonitasoft.com/organization-xml-schema/1.1">
-  <customUserInfoDefinitions/>
+  <customUserInfoDefinitions>
+    <customUserInfoDefinition>
+      <name>cuitONG</name>
+      <description>CUIT de la ONG a la que pertenece el representante</description>
+    </customUserInfoDefinition>
+  </customUserInfoDefinitions>
   <users>
     <user userName="william.jobs">
       <firstName>William</firstName>
@@ -26,6 +31,12 @@
       </metaDatas>
       <enabled>true</enabled>
       <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value></value>
+        </customUserInfoValue>
+      </customUserInfoValues>
     </user>
     <user userName="walter.bates">
       <firstName>Walter</firstName>
@@ -52,6 +63,12 @@
       </metaDatas>
       <enabled>true</enabled>
       <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>20360110800</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
     </user>
     <user userName="thorsten.hartmann">
       <firstName>Thorsten</firstName>
@@ -78,6 +95,12 @@
       </metaDatas>
       <enabled>true</enabled>
       <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-70759612-7</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
     </user>
     <user userName="michael.morrison">
       <firstName>Michael</firstName>
@@ -104,6 +127,12 @@
       </metaDatas>
       <enabled>true</enabled>
       <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value></value>
+        </customUserInfoValue>
+      </customUserInfoValues>
     </user>
     <user userName="marc.marseau">
       <firstName>Marc</firstName>
@@ -130,6 +159,12 @@
       </metaDatas>
       <enabled>true</enabled>
       <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value></value>
+        </customUserInfoValue>
+      </customUserInfoValues>
     </user>
     <user userName="joseph.hovell">
       <firstName>Joseph</firstName>
@@ -156,6 +191,12 @@
       </metaDatas>
       <enabled>true</enabled>
       <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value></value>
+        </customUserInfoValue>
+      </customUserInfoValues>
     </user>
     <user userName="mauro.zetticci">
       <firstName>Mauro</firstName>
@@ -182,6 +223,12 @@
       </metaDatas>
       <enabled>true</enabled>
       <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value></value>
+        </customUserInfoValue>
+      </customUserInfoValues>
     </user>
     <user userName="thomas.wallis">
       <firstName>Thomas</firstName>
@@ -208,6 +255,12 @@
       </metaDatas>
       <enabled>true</enabled>
       <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-70759612-7</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
     </user>
     <user userName="misa.kumagai">
       <firstName>Misa</firstName>
@@ -234,6 +287,12 @@
       </metaDatas>
       <enabled>true</enabled>
       <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value></value>
+        </customUserInfoValue>
+      </customUserInfoValues>
     </user>
     <user userName="norio.yamazaki">
       <firstName>Norio</firstName>
@@ -260,6 +319,12 @@
       </metaDatas>
       <enabled>true</enabled>
       <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value></value>
+        </customUserInfoValue>
+      </customUserInfoValues>
     </user>
     <user userName="bonita.bpm">
       <firstName>Bonita </firstName>
@@ -267,7 +332,194 @@
       <personalData/>
       <professionalData/>
       <password encrypted="false">bpm</password>
-      <customUserInfoValues/>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value></value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="walter.white">
+      <firstName>Walter</firstName>
+      <lastName>White</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-54603392-5</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="jesse.pinkman">
+      <firstName>Jesse</firstName>
+      <lastName>Pinkman</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-54603392-5</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="tuco.salamanca">
+      <firstName>Tuco</firstName>
+      <lastName>Salamanca</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-51731290-4</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="lalo.salamanca">
+      <firstName>Lalo</firstName>
+      <lastName>Salamanca</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-51731290-4</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="saul.goodman">
+      <firstName>Saul</firstName>
+      <lastName>Goodman</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-71250682-9</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="kim.wexler">
+      <firstName>Kim</firstName>
+      <lastName>Wexler</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-71250682-9</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="don.eladio">
+      <firstName>Don</firstName>
+      <lastName>Eladio</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-63749647-2</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="gustavo.fring">
+      <firstName>Gustavo</firstName>
+      <lastName>Fring</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-63749647-2</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="skylar.white">
+      <firstName>Skylar</firstName>
+      <lastName>White</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-58650783-0</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="marie.schrader">
+      <firstName>Marie</firstName>
+      <lastName>Schrader</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-58650783-0</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="leonel.salamanca">
+      <firstName>Leonel</firstName>
+      <lastName>Salamanca</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-71203700-4</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="marco.salamanca">
+      <firstName>Marco</firstName>
+      <lastName>Salamanca</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-71203700-4</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="hector.salamanca">
+      <firstName>Hector</firstName>
+      <lastName>Salamanca</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-71600757-6</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
+    </user>
+    <user userName="juan.bolsa">
+      <firstName>Juan</firstName>
+      <lastName>Bolsa</lastName>
+      <personalData/>
+      <professionalData/>
+      <password encrypted="false">bpm</password>
+      <customUserInfoValues>
+        <customUserInfoValue>
+          <name>cuitONG</name>
+          <value>30-71600757-6</value>
+        </customUserInfoValue>
+      </customUserInfoValues>
     </user>
   </users>
   <roles>
@@ -384,6 +636,90 @@
       <userName>bonita.bpm</userName>
       <roleName>bonita_user</roleName>
       <groupName>bonita_bpm</groupName>
+    </membership>
+    <membership>
+      <userName>walter.white</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>jesse.pinkman</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>tuco.salamanca</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>lalo.salamanca</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>saul.goodman</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>kim.wexler</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>don.eladio</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>gustavo.fring</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>skylar.white</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>marie.schrader</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>leonel.salamanca</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>marco.salamanca</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>hector.salamanca</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
+    </membership>
+    <membership>
+      <userName>juan.bolsa</userName>
+      <roleName>representante_ong</roleName>
+      <groupName>ongs</groupName>
+      <groupParentPath>/rescue</groupParentPath>
     </membership>
   </memberships>
 </organization:Organization>
