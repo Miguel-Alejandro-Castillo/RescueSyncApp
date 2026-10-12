@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from services.bonita_service import BonitaService
 from dependencies.jwt_auth import get_current_user
 import traceback
+import httpx
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "tu_clave_secreta_jwt")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
@@ -77,14 +78,19 @@ async def login(user: UserLogin ):
             "expires_in": int(expire_delta.total_seconds())
         }
 
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 401:
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid username or password"
+            )
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail="Authentication service error"
+        )
     except HTTPException:
-        # Re-lanzar excepciones HTTP explícitas (ej. 401)
-
-        traceback.print_exc()
         raise
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=401, detail="No se pudo autenticar el usuario")
     finally:
         await bonita.close()
    

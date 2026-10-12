@@ -4,6 +4,7 @@ import os
 from clients.http_client import HttpClient
 import asyncio
 import time
+import httpx
 
 class BonitaService:
 
@@ -114,7 +115,19 @@ class BonitaService:
             headers=self._auth_headers()
         )
         return response.json()
-    
+
+    async def get_role_by_name(self, role_name: str):
+        response = await self.http_client.get(
+            "/API/identity/role",
+            headers=self._auth_headers(),
+            params = {
+                "p": 0, # (Required) index of the page to display
+                "f": f"name={role_name}"
+            }
+        )
+        roles = response.json()
+        return roles[0] if roles else None
+
     # Logout de Bonita y limpieza de cookies del cliente HTTP
     async def logout(self):
         await self.http_client.post(
@@ -245,14 +258,29 @@ class BonitaService:
     # Devuelve un listado de todos los usuarios disponibles
     async def obtener_usuarios(self):
         response = await self.http_client.get(
-            f"{self.api_path}/user",
+            "/API/identity/user",
             headers=self._auth_headers(),
             params = {
-                "p": 0 # (Required) index of the page to display
+                "p": 0, # (Required) index of the page to display
+                "f": "enabled=true" # (Optional) filter to only include enabled users
             } 
         )
         return response.json()
     
+    async def obtener_usuarios_por_rol(self, role_name: str):
+        role = await self.get_role_by_name(role_name)
+        if not role:
+            return []
+    
+        response = []
+        usuarios = await self.obtener_usuarios()
+        for usuario in usuarios:
+             memberships = await self.get_memberships_by_user_id(usuario["id"])
+             for membership in memberships:
+                 if membership["role_id"] == role["id"]:
+                     response.append(usuario)
+        return response
+
     # Espera hasta que aparezcan tareas humanas en estado 'ready' para un caso específico o hasta que se agote el tiempo de espera.
     async def esperar_tareas_humanas_por_caso(
         self,
