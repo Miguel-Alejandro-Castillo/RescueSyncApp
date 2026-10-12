@@ -3,7 +3,7 @@
   <customUserInfoDefinitions>
     <customUserInfoDefinition>
       <name>cuitONG</name>
-      <description>CUIT de la ONG a la que pertenece el representante</description>
+      <description>CUIT de la ONG a la que pertenece el usuario</description>
     </customUserInfoDefinition>
   </customUserInfoDefinitions>
   <users>
@@ -66,7 +66,7 @@
       <customUserInfoValues>
         <customUserInfoValue>
           <name>cuitONG</name>
-          <value>20360110800</value>
+          <value></value>
         </customUserInfoValue>
       </customUserInfoValues>
     </user>
@@ -201,20 +201,20 @@
     <user userName="mauro.zetticci">
       <firstName>Mauro</firstName>
       <lastName>Zetticci</lastName>
-      <title>Mr</title>
-      <jobTitle>Consultant</jobTitle>
+      <title></title>
+      <jobTitle></jobTitle>
       <manager></manager>
       <personalData/>
       <professionalData>
-        <email>mauro.zetticci@rescue.com</email>
-        <phoneNumber>484-302-5000</phoneNumber>
-        <faxNumber>484-302-0000</faxNumber>
-        <building>70</building>
-        <address>Renwick Drive</address>
-        <zipCode>19108</zipCode>
-        <city>Philadelphia</city>
-        <state>PA</state>
-        <country>United States</country>
+        <email></email>
+        <phoneNumber></phoneNumber>
+        <faxNumber></faxNumber>
+        <building></building>
+        <address></address>
+        <zipCode></zipCode>
+        <city></city>
+        <state></state>
+        <country></country>
       </professionalData>
       <metaDatas>
         <metaData name="Skype ID"/>
