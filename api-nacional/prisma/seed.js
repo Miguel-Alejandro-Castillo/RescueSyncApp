@@ -43,56 +43,56 @@ const ongsBase = [
     razonSocial: 'Cruz Roja Argentina',
     sigla: 'CRA',
     cuit: '30-54603392-5',
-    estado: 'habilitada',
+    estado: 'HABILITADA',
     descripcion: 'Organización humanitaria internacional dedicada a la asistencia en emergencias, primeros auxilios, resiliencia comunitaria y respuesta ante catástrofes naturales o sanitarias.',
   },
   {
     razonSocial: 'Cáritas Argentina',
     sigla: 'Cáritas',
     cuit: '30-51731290-4',
-    estado: 'habilitada',
+    estado: 'HABILITADA',
     descripcion: 'Organización de la Iglesia Católica dedicada a brindar asistencia inmediata, desarrollo comunitario, comedores, refugios y proyectos de integración social para poblaciones vulnerables.',
   },
   {
     razonSocial: 'Fundación Sí',
     sigla: 'Fundación Sí',
     cuit: '30-71250682-9',
-    estado: 'habilitada',
+    estado: 'HABILITADA',
     descripcion: 'ONG centrada en promover la inclusión social, contención nocturna de personas en situación de calle (recorridas), comedores y residencias universitarias para jóvenes de zonas rurales.',
   },
   {
     razonSocial: 'Fundación Huésped',
     sigla: 'FH',
     cuit: '30-63749647-2',
-    estado: 'habilitada',
+    estado: 'HABILITADA',
     descripcion: 'Organización de salud pública enfáticamente abocada a la lucha contra el VIH/SIDA, la prevención de enfermedades transmisibles y la defensa de los derechos sexuales y reproductivos.',
   },
   {
     razonSocial: 'Fundación Cruzada Patagónica',
     sigla: 'FCP',
     cuit: '30-58650783-0',
-    estado: 'habilitada',
+    estado: 'HABILITADA',
     descripcion: 'ONG orientada a acompañar y potenciar el desarrollo integral de las comunidades rurales del oeste de la Patagonia mediante educación rural y desarrollo sostenible.',
   },
   {
     razonSocial: 'Fundación Potenciar Solidario',
     sigla: 'Potenciar Solidario',
     cuit: '30-71203700-4',
-    estado: 'habilitada',
+    estado: 'HABILITADA',
     descripcion: 'Organización dedicada al fortalecimiento institucional, capacitación y articulación de redes para impulsar el impacto de más de 500 ONGs en Argentina.',
   },
   {
     razonSocial: 'Fundación Cultura de Trabajo',
     sigla: 'FCT',
     cuit: '30-71600757-6',
-    estado: 'habilitada',
+    estado: 'HABILITADA',
     descripcion: 'Organización orientada a facilitar la inserción laboral y reincorporación en el mercado de trabajo formal para personas en situación de vulnerabilidad o exclusión socioeconómica.',
   },
 {
     razonSocial: 'Fundación Banco de Alimentos',
     sigla: 'BDA',
     cuit: '30-70759612-7',
-    estado: 'habilitada',
+    estado: 'HABILITADA',
     descripcion: 'Organización sin fines de lucro que rescata alimentos aptos para el consumo que salieron del circuito comercial y los distribuye entre comedores y organizaciones sociales que asisten a personas con inseguridad alimentaria.',
   }
 ];
@@ -136,25 +136,40 @@ async function ensureOng(ongData) {
   });
 }
 
-async function ensureRecurso({ codigo, nombre, descripcion, categoriaId, cantidadTotal, cantidadComprometida, ongId }) {
+async function ensureRecurso({ codigo, nombre, descripcion, categoriaId }) {
   return prisma.recurso.upsert({
     where: { codigo },
     update: {
       nombre,
       descripcion,
       categoriaId,
-      cantidadTotal,
-      cantidadComprometida,
-      ongId,
     },
     create: {
       codigo,
       nombre,
       descripcion,
       categoriaId,
+    },
+  });
+}
+
+async function ensureOngRecurso({ ongId, recursoId, cantidadTotal, cantidadComprometida }) {
+  return prisma.ongRecurso.upsert({
+    where: {
+      ongId_recursoId: {
+        ongId,
+        recursoId,
+      },
+    },
+    update: {
       cantidadTotal,
       cantidadComprometida,
+    },
+    create: {
       ongId,
+      recursoId,
+      cantidadTotal,
+      cantidadComprometida,
     },
   });
 }
@@ -172,16 +187,20 @@ async function main() {
   for (const [ongIndex, ongData] of ongsBase.entries()) {
     const ong = await ensureOng(ongData);
 
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 3; i++) {
       const categoria = categoriasCreadas[i % categoriasCreadas.length];
-      await ensureRecurso({
-        codigo: buildRecursoCodigo(ongIndex * 2 + i),
+      const recurso = await ensureRecurso({
+        codigo: buildRecursoCodigo(ongIndex * 3 + i),
         nombre: `${ong.sigla} - Recurso ${i + 1}`,
         descripcion: `Recurso ${i + 1} de ${ong.razonSocial}`,
         categoriaId: categoria.id,
+      });
+
+      await ensureOngRecurso({
+        ongId: ong.id,
+        recursoId: recurso.id,
         cantidadTotal: 100 + i * 50,
         cantidadComprometida: i * 10,
-        ongId: ong.id,
       });
     }
   }

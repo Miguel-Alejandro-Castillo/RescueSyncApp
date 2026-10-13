@@ -7,39 +7,54 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum EstadoOng {
+  HABILITADA
+  SUSPENDIDA
+  BAJA
+}
+
 model Ong {
-  id        Int @id @default(autoincrement())
-  razonSocial    String
-  descripcion String?
-  sigla    String  @unique
-  cuit      String @unique
-  estado String @default("habilitada")
-  recursos  Recurso[]
+  id           Int       @id @default(autoincrement())
+  razonSocial  String
+  descripcion  String?
+  sigla        String    @unique
+  cuit         String    @unique
+  estado       EstadoOng @default(HABILITADA)
+  recursos     OngRecurso[]
 }
 
 model Recurso {
-  id      Int @id @default(autoincrement())
-  nombre  String
-  descripcion  String?
-  codigo String @unique
-  categoriaId   Int
-  categoria     Categoria @relation(fields: [categoriaId], references: [id])
-  cantidadTotal  Int
-  cantidadComprometida  Int @default(0)
-  ongId   Int
-  ong     Ong @relation(fields: [ongId], references: [id])
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  descripcion String?
+  codigo      String   @unique
+  categoriaId Int
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+  ongs        OngRecurso[]
+}
+
+model OngRecurso {
+  ongId       Int
+  ong         Ong     @relation(fields: [ongId], references: [id])
+  recursoId   Int
+  recurso     Recurso @relation(fields: [recursoId], references: [id])
+
+  cantidadTotal        Int
+  cantidadComprometida Int @default(0)
+
+  @@id([ongId, recursoId])
 }
 
 model Categoria {
-  id      Int @id @default(autoincrement())
-  nombre  String @unique
-  descripcion   String?
-  codigo String @unique
-  recursos  Recurso[]
+  id          Int      @id @default(autoincrement())
+  nombre      String   @unique
+  descripcion String?
+  codigo      String   @unique
+  recursos    Recurso[]
 }
 
 model User {
-    id      Int @id @default(autoincrement())
-    username String @unique
-    password String
+  id       Int    @id @default(autoincrement())
+  username String @unique
+  password String
 }
