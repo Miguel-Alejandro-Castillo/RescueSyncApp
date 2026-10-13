@@ -21,6 +21,7 @@ model Recurso {
   id      Int @id @default(autoincrement())
   nombre  String
   descripcion  String?
+  codigo String @unique
   categoriaId   Int
   categoria     Categoria @relation(fields: [categoriaId], references: [id])
   cantidadTotal  Int
@@ -33,11 +34,12 @@ model Categoria {
   id      Int @id @default(autoincrement())
   nombre  String @unique
   descripcion   String?
+  codigo String @unique
   recursos  Recurso[]
 }
 
 model User {
     id      Int @id @default(autoincrement())
     username String @unique
-    password String   
+    password String
 }
