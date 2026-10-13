@@ -99,9 +99,9 @@ Resetea toda la base de datos, ideal solo para desarrollo. Reaplica todas las mi
 ## Workflow Típico
 
 1. **Modificar schema**: Edita `prisma/schema.prisma`
-2. **Crear migración**: `docker compose exec api npx prisma migrate dev --name descripcion`
+2. **Crear migración**: `docker compose exec nacional npx prisma migrate dev --name descripcion`
 3. **Verificar cambios**: Usa Prisma Studio o consulta directamente
-4. **Producción**: `docker compose exec api npx prisma migrate deploy`
+4. **Producción**: `docker compose exec nacional npx prisma migrate deploy`
 
 ## Notas Importantes
 
