@@ -24,4 +24,15 @@ class Oferta(SQLModel, table=True):
         description="Fecha de creación de la oferta"
     )
 
+    valida: bool = Field(
+        default=True,
+        description="Indica si la oferta es válida"
+    )
+
+    accion_tomada: str | None = Field(
+        default=None,
+        max_length=20,
+        description="Acción tomada para una oferta inválida"
+    )
+
 

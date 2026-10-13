@@ -3,7 +3,7 @@ import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import SeleccionarEmergencia from './SeleccionarEmergencia';
-import {  obtenerEmergenciaPorId,crearLotes } from '../../services/lotesService';
+import {  obtenerEmergenciaPorId,crearLotes,reformularLotes } from '../../services/lotesService';
 
 export default function AltaLotes() {
     const [params] = useSearchParams();
@@ -15,6 +15,7 @@ const FormularioLotes = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const emergenciaId = searchParams.get('emergenciaId');
+    const ofertaId = searchParams.get('ofertaId');
 
     const [emergenciaSeleccionada, setEmergenciaSeleccionada] = useState(null);
     const [loadingEmergencia, setLoadingEmergencia] = useState(false);
@@ -36,7 +37,7 @@ const FormularioLotes = () => {
 
         obtenerEmergenciaPorId(emergenciaId)
             .then((data) => {
-                if (data.estado !== 'creada') {
+                if (!ofertaId && data.estado !== 'creada') {
                     setError('La emergencia seleccionada no se encuentra pendiente de desglose.');
                     return;
                 }
@@ -99,7 +100,11 @@ const FormularioLotes = () => {
 
         try {
             setSaving(true);
-            await crearLotes(payload);
+            if (ofertaId) {
+                await reformularLotes({ ofertaId: Number(ofertaId), lotes: payload.lotes });
+            } else {
+                await crearLotes(payload);
+            }
             // alert('Lotes publicados y convocatoria abierta con éxito.');
             navigate('/dashboard', {state: { mensajeExito: 'Lotes publicados y convocatoria abierta con éxito.' } });
         } catch (err) {
@@ -124,7 +129,7 @@ const FormularioLotes = () => {
                     <div className="panel">
                         <div className={styles.content}>
                             <h1 className={styles.title}>
-                                Crear lotes y abrir convocatoria
+                                {ofertaId ? 'Reformular lotes y abrir convocatoria' : 'Crear lotes y abrir convocatoria'}
                             </h1>
 
                             <ValidatedForm key={lotes.length} onSubmit={handleSubmit} aria-busy={saving}>

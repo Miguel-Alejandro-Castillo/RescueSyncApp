@@ -32,6 +32,11 @@ class OfertaUpdate(BaseModel):
     cant_recurso: int
     id_ong: Optional[int] = None
 
+class AccionOfertaInvalida(BaseModel):
+    accion: str
+
+ACCIONES_OFERTA_INVALIDA = ["reabrir", "reformular", "parcial"]
+
 class ResponderInvitacion(BaseModel):
     aceptar: bool
     cantidad_aportada: Optional[int] = None  # Obligatorio si acepta
@@ -115,7 +120,7 @@ def create_oferta_consorcio(
         raise HTTPException(status_code=400, detail="La convocatoria de este lote ha expirado.")
 
     
-    stmt_ofertas_lote = select(Oferta).where(Oferta.lote_id == data.id_lote)
+    stmt_ofertas_lote = select(Oferta).where(Oferta.lote_id == data.id_lote, Oferta.valida == True)
     ofertas_en_lote = session.exec(stmt_ofertas_lote).all()
     ofertas_ids = [o.id for o in ofertas_en_lote]
 
@@ -524,3 +529,107 @@ def editar_aporte_oferta(
     session.commit()
 
     return {"mensaje": "Aporte actualizado correctamente en el consorcio."}
+
+@router.patch(
+    "/{oferta_id}/invalida",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles(CENTRO_COORDINADOR))]
+)
+def marcar_oferta_invalida(
+    oferta_id: int,
+    session: Session = Depends(get_session)
+):
+    oferta = session.get(Oferta, oferta_id)
+    if not oferta:
+        raise HTTPException(status_code=404, detail="La oferta no existe.")
+
+    oferta.valida = False
+    session.add(oferta)
+    session.commit()
+
+    return {"mensaje": "Oferta marcada como inválida."}
+
+
+@router.get(
+    "/invalidas",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles(CENTRO_COORDINADOR))]
+)
+def get_ofertas_invalidas(session: Session = Depends(get_session)):
+    ofertas = session.exec(select(Oferta).where(Oferta.valida == False)).all()
+
+    respuesta = []
+    for oferta in ofertas:
+        lote = session.get(Lote, oferta.lote_id)
+        emergencia = session.get(Emergencia, lote.emergenciaId) if lote else None
+        participantes = session.exec(
+            select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta.id)
+        ).all()
+
+        convocatoria_abierta = False
+        if lote:
+            fecha_limite = lote.fechaLimiteConvocatoria
+            if fecha_limite.tzinfo is None:
+                fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
+            convocatoria_abierta = datetime.now(timezone.utc) <= fecha_limite
+
+        lotes_nuevos = session.exec(
+            select(Lote).where(Lote.loteOrigenId == oferta.lote_id)
+        ).all()
+
+        respuesta.append({
+            "id": oferta.id,
+            "id_lote": oferta.lote_id,
+            "lote_tipo": lote.tipoRecurso if lote else "",
+            "lote_descripcion": lote.descripcion if lote else "",
+            "lote_cantidad": lote.cantidad if lote else 0,
+            "lote_estado": lote.estado if lote else "",
+            "convocatoria_abierta": convocatoria_abierta,
+            "lotes_nuevos": [
+                {
+                    "id": nuevo.id,
+                    "tipo": nuevo.tipoRecurso,
+                    "descripcion": nuevo.descripcion,
+                    "cantidad": nuevo.cantidad,
+                    "cantidad_cubierta": nuevo.cantidadCubierta
+                }
+                for nuevo in lotes_nuevos
+            ],
+            "emergencia_id": emergencia.id if emergencia else None,
+            "emergencia_zona": emergencia.zonaAfectada if emergencia else "",
+            "ong_lider_id": oferta.ong_lider_id,
+            "cantidad_ofertada": sum(p.cantidad_aportada for p in participantes if p.cantidad_aportada is not None),
+            "accion_tomada": oferta.accion_tomada
+        })
+
+    return respuesta
+
+
+@router.patch(
+    "/{oferta_id}/accion",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles(CENTRO_COORDINADOR))]
+)
+def confirmar_accion_oferta_invalida(
+    oferta_id: int,
+    data: AccionOfertaInvalida,
+    session: Session = Depends(get_session)
+):
+    if data.accion not in ACCIONES_OFERTA_INVALIDA:
+        raise HTTPException(status_code=422, detail="La acción no es válida.")
+
+    oferta = session.get(Oferta, oferta_id)
+    if not oferta:
+        raise HTTPException(status_code=404, detail="La oferta no existe.")
+
+    if oferta.valida:
+        raise HTTPException(status_code=400, detail="La oferta es válida, no requiere acción.")
+
+    if oferta.accion_tomada:
+        raise HTTPException(status_code=400, detail="Ya se confirmó una acción para esta oferta.")
+
+    oferta.accion_tomada = data.accion
+    session.add(oferta)
+    session.commit()
+
+    return {"mensaje": "Acción confirmada correctamente."}

@@ -55,3 +55,9 @@ class Lote(SQLModel, table=True):
         default_factory=lambda: datetime.now(timezone.utc),
         description="Fecha de creación del lote"
     )
+
+    loteOrigenId: int | None = Field(
+        default=None,
+        foreign_key="lotes.id",
+        description="Lote del que proviene este lote al reformular"
+    )

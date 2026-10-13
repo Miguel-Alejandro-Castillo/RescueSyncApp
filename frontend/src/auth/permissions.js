@@ -11,6 +11,7 @@ export const ACTIONS = [
   { permission: 'emergencias.crear', profiles: ['municipal'], path: '/emergencias/nueva', label: 'Emergencias', title: 'Registrar una emergencia', description: 'Indicá la zona afectada, la gravedad y la situación inicial.' },
   { permission: 'lotes.crear', profiles: ['coordinador'], path: '/lotes/nuevo', label: 'Lotes y convocatorias', title: 'Organizar lotes de ayuda', description: 'Elegí una emergencia pendiente, definí los recursos y publicá la convocatoria.' },
   { permission: 'ofertas.crear', profiles: ['ong'], path: '/ofertas', label: 'Ofertas', title: 'Ofrecer ayuda', description: 'Consultá las convocatorias y cargá ofertas para los lotes disponibles.' },
+  { permission: 'ofertas.ver_invalidas', profiles: ['coordinador'], path: '/ofertas-invalidas', label: 'Ofertas inválidas', title: 'Ofertas inválidas', description: 'Revisá las ofertas inválidas y elegí qué acción tomar.' },
 ];
 
 export function getProfiles(memberships) {
