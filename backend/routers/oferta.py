@@ -51,7 +51,9 @@ def es_lote_vigente(lote: Lote, emergencia: Emergencia) -> bool:
 
 def calcular_cantidad_cubierta(session: Session, lote_id: int) -> int:
     """Calcula la suma real de todos los aportes confirmados en todas las ofertas del lote"""
-    ofertas = session.exec(select(Oferta).where(Oferta.lote_id == lote_id)).all()
+    ofertas = session.exec(
+        select(Oferta).where(Oferta.lote_id == lote_id, Oferta.valida == True)
+    ).all()
     if not ofertas:
         return 0
     oferta_ids = [o.id for o in ofertas]
@@ -498,6 +500,13 @@ def editar_aporte_oferta(
     if not lote:
         raise HTTPException(status_code=404, detail="El lote asociado no existe.")
 
+    if not oferta.valida:
+        raise HTTPException(status_code=400, detail="La oferta es inválida y no se puede editar.")
+
+    emergencia = session.get(Emergencia, lote.emergenciaId)
+    if not es_lote_vigente(lote, emergencia):
+        raise HTTPException(status_code=400, detail="La convocatoria de este lote ha expirado.")
+
     # Buscar la participación de la ONG actual en esta oferta
     stmt = select(ParticipanteOferta).where(
         ParticipanteOferta.oferta_id == oferta_id,
@@ -630,6 +639,24 @@ def confirmar_accion_oferta_invalida(
 
     oferta.accion_tomada = data.accion
     session.add(oferta)
+
+    if data.accion == "parcial":
+        lote_oferta = session.get(Lote, oferta.lote_id)
+        ahora = datetime.now(timezone.utc)
+        lotes = session.exec(
+            select(Lote).where(
+                Lote.emergenciaId == lote_oferta.emergenciaId,
+                Lote.estado != "reformulado"
+            )
+        ).all()
+        for lote in lotes:
+            fecha_limite = lote.fechaLimiteConvocatoria
+            if fecha_limite.tzinfo is None:
+                fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
+            if fecha_limite > ahora:
+                lote.fechaLimiteConvocatoria = ahora
+                session.add(lote)
+
     session.commit()
 
     return {"mensaje": "Acción confirmada correctamente."}
