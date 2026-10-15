@@ -209,12 +209,20 @@ echo "Proceso existente ID: $EXISTING_PROCESS_ID"
 if [ -n "$EXISTING_PROCESS_ID" ]; then
     echo "Proceso existente encontrado: $EXISTING_PROCESS_ID"
 
-    echo "Desactivando..."
-    bonita_curl_json_fail \
-      -v \
-      -X PUT \
-      -d '{"activationState":"DISABLED"}' \
-      "$BONITA_URL/API/bpm/process/$EXISTING_PROCESS_ID"
+    EXISTING_PROCESS_STATE=$(
+      bonita_curl_json_fail "$BONITA_URL/API/bpm/process/$EXISTING_PROCESS_ID" |
+        sed -n 's/.*"activationState":"\([^"]*\)".*/\1/p'
+    )
+    if [ "$EXISTING_PROCESS_STATE" = "ENABLED" ]; then
+      echo "Desactivando..."
+      bonita_curl_json_fail \
+        -X PUT \
+        -d '{"activationState":"DISABLED"}' \
+        "$BONITA_URL/API/bpm/process/$EXISTING_PROCESS_ID"
+    elif [ "$EXISTING_PROCESS_STATE" != "DISABLED" ]; then
+      echo "ERROR: estado inesperado del proceso: $EXISTING_PROCESS_STATE"
+      exit 1
+    fi
 
     echo "Eliminando..."
     bonita_curl_fail \

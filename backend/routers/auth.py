@@ -53,7 +53,21 @@ async def login(user: UserLogin ):
         user_info = await bonita.get_user_info(username=user.username)
         
         # 3. Obtener los memberships (grupos/roles)
-        memberships = await get_memberships_by_user(user_info, bonita)
+        try:
+            memberships = await get_memberships_by_user(user_info, bonita)
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code != 403:
+                raise
+            # Algunos perfiles pueden autenticarse pero no consultar identidad.
+            # Leer sus roles con la cuenta de servicio, conservando su sesión real.
+            identidad = BonitaService()
+            try:
+                auth = await identidad.login(os.getenv("BONITA_USER"), os.getenv("BONITA_PASSWORD"))
+                if not auth["success"]:
+                    raise HTTPException(502, "No se pudieron consultar los roles del usuario")
+                memberships = await get_memberships_by_user(user_info, identidad)
+            finally:
+                await identidad.close()
 
         # 4. Expiración del token
         expire_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)

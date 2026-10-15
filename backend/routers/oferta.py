@@ -13,6 +13,7 @@ from models.oferta import Oferta
 from models.participante_oferta import ParticipanteOferta
 from dependencies.jwt_auth import get_current_user
 from services.bonita_service import BonitaService
+from dependencies.bonita import get_bonita_service
 
 router = APIRouter(
     prefix="/ofertas",
@@ -621,10 +622,11 @@ def get_ofertas_invalidas(session: Session = Depends(get_session)):
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_roles(CENTRO_COORDINADOR))]
 )
-def confirmar_accion_oferta_invalida(
+async def confirmar_accion_oferta_invalida(
     oferta_id: int,
     data: AccionOfertaInvalida,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    bonita: BonitaService = Depends(get_bonita_service),
 ):
     if data.accion not in ACCIONES_OFERTA_INVALIDA:
         raise HTTPException(status_code=422, detail="La acción no es válida.")
@@ -679,6 +681,17 @@ def confirmar_accion_oferta_invalida(
             if fecha_limite > ahora:
                 lote.fechaLimiteConvocatoria = ahora
                 session.add(lote)
+
+    if data.accion == "parcial":
+        emergencia = session.get(Emergencia, lote_oferta.emergenciaId)
+        if not emergencia or not emergencia.bonitaCaseId:
+            session.rollback()
+            raise HTTPException(409, "Esta emergencia no tiene un caso asociado en Bonita.")
+        try:
+            await bonita.resolver_accion_coordinador(emergencia.bonitaCaseId, "ACEPTAR_OFERTAS")
+        except Exception:
+            session.rollback()
+            raise
 
     session.commit()
 

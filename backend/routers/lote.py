@@ -258,23 +258,24 @@ async def reformular_lotes(
             ventana_emergencia_ms
         )
 
-        tareas = await bonita.obtener_tareas_humanas_por_caso(caso_id)
-
-        tarea = next(
-            (
-                tarea for tarea in tareas
-                if tarea["name"] == "Evaluar acciones a tomar"
-            ),
-            None
-        )
-
-        if tarea:
-            await bonita.completar_tarea_humana(tarea["id"])
+        await bonita.resolver_accion_coordinador(caso_id, "GENERAR_LOTES")
+        # Los nuevos lotes ya se cargaron en esta misma solicitud.
+        tareas_generacion = await bonita.esperar_tareas_humanas_por_caso(caso_id)
+        tarea_generacion = next((t for t in tareas_generacion
+                                 if t["name"].strip() == "Generar lotes de necesidades"), None)
+        if not tarea_generacion:
+            raise HTTPException(409, "Bonita no llegó a la tarea de generar los nuevos lotes.")
+        await bonita.completar_tarea_humana(tarea_generacion["id"])
+        emergencia.estado = "publicada"
+        session.add(emergencia)
 
         session.commit()
 
         for lote in lotes_creados:
             session.refresh(lote)
+    except HTTPException:
+        session.rollback()
+        raise
     except Exception as e:
         session.rollback()
 
@@ -339,20 +340,12 @@ async def reabrir_convocatoria(
             ventana_emergencia_ms
         )
 
-        tareas = await bonita.obtener_tareas_humanas_por_caso(caso_id)
-
-        tarea = next(
-            (
-                tarea for tarea in tareas
-                if tarea["name"] == "Evaluar acciones a tomar"
-            ),
-            None
-        )
-
-        if tarea:
-            await bonita.completar_tarea_humana(tarea["id"])
+        await bonita.resolver_accion_coordinador(caso_id, "PUBLICAR_CONVOCATORIA")
 
         session.commit()
+    except HTTPException:
+        session.rollback()
+        raise
     except Exception as e:
         session.rollback()
 

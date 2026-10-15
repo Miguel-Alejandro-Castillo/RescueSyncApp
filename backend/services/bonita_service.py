@@ -5,6 +5,7 @@ from clients.http_client import HttpClient
 import asyncio
 import time
 import httpx
+from fastapi import HTTPException
 
 class BonitaService:
 
@@ -244,6 +245,15 @@ class BonitaService:
         return tareas[0] if tareas else None
 
     # Completa una tarea humana específica por su ID
+    async def resolver_accion_coordinador(self, case_id: str, accion: str):
+        if accion not in {"PUBLICAR_CONVOCATORIA", "GENERAR_LOTES", "ACEPTAR_OFERTAS"}:
+            raise ValueError("Acción de coordinador desconocida")
+        tareas = await self.obtener_tareas_humanas_por_caso(case_id)
+        tarea = next((t for t in tareas if t["name"].strip() == "Evaluar acciones a tomar"), None)
+        if not tarea:
+            raise HTTPException(409, "El caso no está esperando la decisión del coordinador en Bonita.")
+        await self.completar_tarea_humana(tarea["id"], {"accionSeleccionadaInput": accion})
+
     async def completar_tarea_humana(self, task_id: str, contract: dict = {}):
         await self.http_client.post(
             f"{self.api_path}/userTask/{task_id}/execution",
