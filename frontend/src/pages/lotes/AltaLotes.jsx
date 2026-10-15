@@ -3,7 +3,7 @@ import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import SeleccionarEmergencia from './SeleccionarEmergencia';
-import {  obtenerEmergenciaPorId,crearLotes } from '../../services/lotesService';
+import {  obtenerEmergenciaPorId,crearLotes,reformularLotes } from '../../services/lotesService';
 
 export default function AltaLotes() {
     const [params] = useSearchParams();
@@ -11,10 +11,17 @@ export default function AltaLotes() {
     return id ? <FormularioLotes key={id} /> : <SeleccionarEmergencia />;
 }
 
+const recursosPorTipo = {
+  Personal: ['Medicos', 'Policias', 'Bomberos'],
+  Insumos: ['Raciones de comida', 'Agua', 'Medicamentos'],
+  Materiales: ['Arena', 'Ladrillos', 'Tierra', 'Cemento']
+}
+
 const FormularioLotes = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const emergenciaId = searchParams.get('emergenciaId');
+    const ofertaId = searchParams.get('ofertaId');
 
     const [emergenciaSeleccionada, setEmergenciaSeleccionada] = useState(null);
     const [loadingEmergencia, setLoadingEmergencia] = useState(false);
@@ -23,8 +30,26 @@ const FormularioLotes = () => {
     const [submitError, setSubmitError] = useState('');
 
     const [lotes, setLotes] = useState([
-        { tipoRecurso: 'Insumos', descripcion: '', cantidad: 1 }
+        { tipoRecurso: 'Insumos', descripcion: 'Agua', cantidad: 1 }
     ]);
+
+    const handleTipoRecursoChange = (index, e) => {
+      const tipo = e.target.value;
+      const nuevosLotes = [...lotes];
+
+      nuevosLotes[index].tipoRecurso = tipo;
+      nuevosLotes[index].descripcion = recursosPorTipo[tipo][0];
+
+      setLotes(nuevosLotes);
+    };
+
+    const handleRecursoEspecificoChange = (index, e) => {
+        const nuevosLotes = [...lotes];
+
+        nuevosLotes[index].descripcion = e.target.value;
+
+        setLotes(nuevosLotes);
+    };
 
     useEffect(() => {
         if (!emergenciaId) {
@@ -36,7 +61,7 @@ const FormularioLotes = () => {
 
         obtenerEmergenciaPorId(emergenciaId)
             .then((data) => {
-                if (data.estado !== 'creada') {
+                if (!ofertaId && data.estado !== 'creada') {
                     setError('La emergencia seleccionada no se encuentra pendiente de desglose.');
                     return;
                 }
@@ -50,18 +75,23 @@ const FormularioLotes = () => {
             });
     }, [emergenciaId]);
 
-    const handleLoteChange = (index, e) => {
-        const { name, value } = e.target;
-        const nuevosLotes = [...lotes];
-        nuevosLotes[index][name] = value;
-        setLotes(nuevosLotes);
-    };
-
     const handleAddLote = () => {
         setLotes([
             ...lotes,
-            { tipoRecurso: 'Insumos', descripcion: '', cantidad: 1 }
+            {
+                tipoRecurso: 'Insumos',
+                descripcion: 'Agua',
+                cantidad: 1
+            }
         ]);
+    };
+
+    const handleLoteChange = (index, e) => {
+        const nuevosLotes = [...lotes];
+
+        nuevosLotes[index][e.target.name] = e.target.value;
+
+        setLotes(nuevosLotes);
     };
 
     const handleRemoveLote = (index) => {
@@ -85,21 +115,41 @@ const FormularioLotes = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
         if (!emergenciaSeleccionada || saving) return;
+
         setSubmitError('');
-        if (lotes.some(lote => !lote.descripcion.trim() || !Number.isSafeInteger(Number(lote.cantidad)) || Number(lote.cantidad) < 1)) {
-            setSubmitError('Complete la descripción y una cantidad entera mayor a cero en cada lote.');
+
+        if (
+            lotes.some(
+                lote =>
+                    !lote.descripcion?.trim() ||
+                    !Number.isSafeInteger(Number(lote.cantidad)) ||
+                    Number(lote.cantidad) < 1
+            )
+        ) {
+            setSubmitError(
+                'Seleccione un recurso específico y una cantidad entera mayor a cero en cada lote.'
+            );
             return;
         }
 
         const payload = {
             emergenciaId: emergenciaSeleccionada.id,
-            lotes: lotes.map(lote => ({ ...lote, descripcion: lote.descripcion.trim(), cantidad: Number(lote.cantidad) }))
+            lotes: lotes.map(lote => ({
+                ...lote,
+                descripcion: lote.descripcion.trim(),
+                cantidad: Number(lote.cantidad)
+            }))
         };
 
         try {
             setSaving(true);
-            await crearLotes(payload);
+            if (ofertaId) {
+                await reformularLotes({ ofertaId: Number(ofertaId), lotes: payload.lotes });
+            } else {
+                await crearLotes(payload);
+            }
             // alert('Lotes publicados y convocatoria abierta con éxito.');
             navigate('/dashboard', {state: { mensajeExito: 'Lotes publicados y convocatoria abierta con éxito.' } });
         } catch (err) {
@@ -124,7 +174,7 @@ const FormularioLotes = () => {
                     <div className="panel">
                         <div className={styles.content}>
                             <h1 className={styles.title}>
-                                Crear lotes y abrir convocatoria
+                                {ofertaId ? 'Reformular lotes y abrir convocatoria' : 'Crear lotes y abrir convocatoria'}
                             </h1>
 
                             <ValidatedForm key={lotes.length} onSubmit={handleSubmit} aria-busy={saving}>
@@ -181,32 +231,33 @@ const FormularioLotes = () => {
                                                     id={`tipo-${index}`}
                                                     data-validation-key={`tipo-${index}`}
                                                     value={lote.tipoRecurso}
-                                                    onChange={(e) => handleLoteChange(index, e)}
+                                                    onChange={(e) => handleTipoRecursoChange(index, e)}
                                                     required
                                                 >
-                                                    <option value="Insumos">Insumos / Alimentos</option>
-                                                    <option value="Personal">Personal / Voluntarios</option>
-                                                    <option value="Maquinaria">Maquinaria / Vehículos</option>
-                                                    <option value="Refugio">Refugio / Abrigo</option>
+                                                    <option value="Insumos">Insumos</option>
+                                                    <option value="Personal">Personal</option>
+                                                    <option value="Materiales">Materiales</option>
                                                 </select>
                                                 <FieldError name={`tipo-${index}`} />
                                             </div>
 
                                             <div className="col-md-6">
-                                                <label htmlFor={`descripcion-${index}`} className="form-label small fw-bold">Descripción específica</label>
-                                                <input
-                                                    type="text"
-                                                    className="form-control form-control-sm"
+                                                <label htmlFor={`descripcion-${index}`} className="form-label small fw-bold">Recurso específica</label>
+                                                <select
+                                                    className="form-select form-select-sm"
                                                     name="descripcion"
-                                                    data-required-message="Ingrese la descripción del recurso."
                                                     id={`descripcion-${index}`}
                                                     data-validation-key={`descripcion-${index}`}
-                                                    maxLength={255}
-                                                    placeholder="Ej. Agua potable 2L / Paramédicos de emergencia"
                                                     value={lote.descripcion}
-                                                    onChange={(e) => handleLoteChange(index, e)}
+                                                    onChange={(e) => handleRecursoEspecificoChange(index, e)}
                                                     required
-                                                />
+                                                >
+                                                    {recursosPorTipo[lote.tipoRecurso].map((recurso) => (
+                                                        <option key={recurso} value={recurso}>
+                                                            {recurso}
+                                                        </option>
+                                                    ))}
+                                                </select>
                                                 <FieldError name={`descripcion-${index}`} />
                                             </div>
 

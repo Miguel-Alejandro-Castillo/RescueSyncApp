@@ -139,7 +139,10 @@ def get_lotes_by_emergencia(
         Lote.estado.in_(["creado", "activo"])
     )
     if REPRESENTANTE_ONG in get_user_roles(current_user):
-        ofertados = select(Oferta.lote_id).where(Oferta.ong_lider_id == int(current_user['user_id']))
+        ofertados = select(Oferta.lote_id).where(
+            Oferta.ong_lider_id == int(current_user['user_id']),
+            Oferta.valida == True
+        )
         abiertos = abiertos.where(Lote.id.not_in(ofertados))
     lotes = session.exec(abiertos.order_by(Lote.fechaCreacion.desc(), Lote.id.desc())).all()
     return lotes

@@ -13,6 +13,7 @@ from dependencies.rbac import (
 from services.bonita_service import BonitaService
 from models.emergencia import Emergencia
 from models.lote import Lote
+from models.oferta import Oferta
 PROCESS_NAME = os.getenv("BONITA_PROCESS")
 
 router = APIRouter(
@@ -28,6 +29,13 @@ class LoteItemDTO(BaseModel):
 class DesgloseLotesRequest(BaseModel):
     emergenciaId: int
     lotes: list[LoteItemDTO]
+
+class ReformularLotesRequest(BaseModel):
+    ofertaId: int
+    lotes: list[LoteItemDTO]
+
+class ReabrirConvocatoriaRequest(BaseModel):
+    ofertaId: int
 
 def calcular_fecha_limite(nivel_gravedad: str, fecha_inicio: datetime) -> datetime:
     horas_map = {
@@ -180,6 +188,176 @@ async def create_lotes(
                     detail=str(e)
         )
     return lotes_creados
+
+@router.post(
+    "/reformular",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_roles(CENTRO_COORDINADOR))]
+)
+async def reformular_lotes(
+    payload: ReformularLotesRequest,
+    bonita: BonitaService = Depends(get_bonita_service),
+    session: Session = Depends(get_session)
+):
+    oferta = session.get(Oferta, payload.ofertaId)
+    if not oferta:
+        raise HTTPException(status_code=404, detail="Oferta no encontrada")
+
+    if oferta.valida or oferta.accion_tomada != "reformular":
+        raise HTTPException(
+            status_code=400,
+            detail="La oferta no tiene confirmada la acción de reformular lotes."
+        )
+
+    lote_anterior = session.get(Lote, oferta.lote_id)
+    if lote_anterior.estado == "reformulado":
+        raise HTTPException(status_code=400, detail="Los lotes de esta oferta ya fueron reformulados.")
+
+    if not payload.lotes:
+        raise HTTPException(status_code=400, detail="Debe incluir al menos un lote")
+
+    emergencia = session.get(Emergencia, lote_anterior.emergenciaId)
+    if not emergencia.bonitaCaseId:
+        raise HTTPException(
+            status_code=409,
+            detail="Esta emergencia no tiene un caso asociado en Bonita."
+        )
+
+    ahora = datetime.now(timezone.utc)
+    fecha_limite = calcular_fecha_limite_demo(emergencia.nivelGravedad, ahora)
+    ventana_emergencia_ms = calcular_diferencia_ms(fecha_limite, ahora)
+
+    try:
+        lote_anterior.estado = "reformulado"
+        session.add(lote_anterior)
+
+        lotes_creados = []
+        for item in payload.lotes:
+            nuevo_lote = Lote(
+                emergenciaId=emergencia.id,
+                tipoRecurso=item.tipoRecurso,
+                descripcion=item.descripcion,
+                cantidad=item.cantidad,
+                cantidadCubierta=0,
+                estado="creado",
+                fechaLimiteConvocatoria=fecha_limite,
+                loteOrigenId=lote_anterior.id
+            )
+            session.add(nuevo_lote)
+            lotes_creados.append(nuevo_lote)
+
+        caso_id = emergencia.bonitaCaseId
+
+        await bonita.set_case_variable(
+            caso_id,
+            "ventana_tiempo_ms",
+            "java.lang.Long",
+            ventana_emergencia_ms
+        )
+
+        tareas = await bonita.obtener_tareas_humanas_por_caso(caso_id)
+
+        tarea = next(
+            (
+                tarea for tarea in tareas
+                if tarea["name"] == "Evaluar acciones a tomar"
+            ),
+            None
+        )
+
+        if tarea:
+            await bonita.completar_tarea_humana(tarea["id"])
+
+        session.commit()
+
+        for lote in lotes_creados:
+            session.refresh(lote)
+    except Exception as e:
+        session.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+    return lotes_creados
+
+@router.post(
+    "/reabrir",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles(CENTRO_COORDINADOR))]
+)
+async def reabrir_convocatoria(
+    payload: ReabrirConvocatoriaRequest,
+    bonita: BonitaService = Depends(get_bonita_service),
+    session: Session = Depends(get_session)
+):
+    oferta = session.get(Oferta, payload.ofertaId)
+    if not oferta:
+        raise HTTPException(status_code=404, detail="Oferta no encontrada")
+
+    if oferta.valida or oferta.accion_tomada != "reabrir":
+        raise HTTPException(
+            status_code=400,
+            detail="La oferta no tiene confirmada la acción de reabrir la convocatoria."
+        )
+
+    lote_oferta = session.get(Lote, oferta.lote_id)
+    emergencia = session.get(Emergencia, lote_oferta.emergenciaId)
+    if not emergencia.bonitaCaseId:
+        raise HTTPException(
+            status_code=409,
+            detail="Esta emergencia no tiene un caso asociado en Bonita."
+        )
+
+    ahora = datetime.now(timezone.utc)
+    fecha_limite = calcular_fecha_limite_demo(emergencia.nivelGravedad, ahora)
+    ventana_emergencia_ms = calcular_diferencia_ms(fecha_limite, ahora)
+
+    try:
+        lotes = session.exec(
+            select(Lote).where(
+                Lote.emergenciaId == emergencia.id,
+                Lote.estado != "reformulado"
+            )
+        ).all()
+        for lote in lotes:
+            lote.fechaLimiteConvocatoria = fecha_limite
+            session.add(lote)
+
+        emergencia.estado = "publicada"
+        session.add(emergencia)
+
+        caso_id = emergencia.bonitaCaseId
+
+        await bonita.set_case_variable(
+            caso_id,
+            "ventana_tiempo_ms",
+            "java.lang.Long",
+            ventana_emergencia_ms
+        )
+
+        tareas = await bonita.obtener_tareas_humanas_por_caso(caso_id)
+
+        tarea = next(
+            (
+                tarea for tarea in tareas
+                if tarea["name"] == "Evaluar acciones a tomar"
+            ),
+            None
+        )
+
+        if tarea:
+            await bonita.completar_tarea_humana(tarea["id"])
+
+        session.commit()
+    except Exception as e:
+        session.rollback()
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+    return {"mensaje": "Convocatoria reabierta correctamente."}
 
 @router.delete("/{lote_id}", dependencies=[Depends(require_roles(CENTRO_COORDINADOR))])
 def delete_lote(

@@ -19,4 +19,5 @@ RUN sed -i 's/\r$//' start.sh && chmod +x start.sh
 # Usar este comando para producción
 # CMD ["npm", "start"]
 # Usar este comando para desarrollo
-CMD ["./start.sh"] 
+# CMD ["./start.sh"]
+CMD ["sh", "./start.sh"] 

@@ -22,3 +22,13 @@ export const crearLotes = payload => request('/lotes', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(payload),
 });
+export const reformularLotes = payload => request('/lotes/reformular', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(payload),
+});
+export const reabrirConvocatoria = ofertaId => request('/lotes/reabrir', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ ofertaId }),
+});
