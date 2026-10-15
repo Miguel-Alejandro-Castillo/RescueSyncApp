@@ -1,8 +1,6 @@
 import asyncio
-from datetime import time
 import os
 from clients.http_client import HttpClient
-import asyncio
 import time
 import httpx
 
@@ -13,12 +11,19 @@ class BonitaService:
     COOKIE_JSESSIONID = "JSESSIONID"
 
     def __init__(self):
-        base_url = os.getenv(
-            "BONITA_ENGINE_URL"
-        )
-        self.api_path = os.getenv(
-            "BONITA_ENGINE_API_PATH"
-        )
+        base_url = os.getenv("BONITA_ENGINE_URL")
+        self.api_path = os.getenv("BONITA_ENGINE_API_PATH")
+
+        if not base_url:
+            raise RuntimeError(
+                "La variable BONITA_ENGINE_URL no está configurada"
+            )
+
+        if not self.api_path:
+            raise RuntimeError(
+                "La variable BONITA_ENGINE_API_PATH no está configurada"
+            )
+
         self.http_client = HttpClient(base_url=base_url)
 
     # Obtiene el token de autenticación de Bonita desde las cookies del cliente HTTP
@@ -74,6 +79,27 @@ class BonitaService:
             "token": api_token
         }
 
+    # devuelve un array de objetos con la información personalizada del usuario
+    async def get_custom_user_info(self, user_id: str):
+        response = await self.http_client.get(
+            f"/API/customuserinfo/user",
+            params = {
+                "p": 0, # (Required) index of the page to display
+                "f": f"userId={user_id}"
+            },
+            headers=self._auth_headers()
+        )
+        return response.json()
+
+    # Obtiene la información personalizada de un usuario específico por su ID y el nombre de la definición
+    async def get_custom_user_info_by_user_id_and_definition_name(self, user_id: str, definition_name: str):
+        custom_user_info = await self.get_custom_user_info(user_id)
+        for item in custom_user_info:
+            # Verifica si el item corresponde a la definición solicitada y tiene un valor asociado
+            if item["definitionId"]["name"] == definition_name and item["value"]:
+                return item
+        return None
+        
     async def get_user_info(self, username: str):
         # A regular user can read their own identity, but cannot search all users.
         session = await self.http_client.get(
@@ -154,8 +180,6 @@ class BonitaService:
     
     # Devuelve un listado de procesos que coinciden con el nombre proporcionado
     async def obtener_procesos_por_nombre(self, process_name: str):
-        print("cookies", self.http_client.client.cookies)
-        print("Auth headers:", self._auth_headers())
         response = await self.http_client.get(
             f"{self.api_path}/process",
             headers=self._auth_headers(),
@@ -178,11 +202,11 @@ class BonitaService:
         )
         return response.json()
     
-    async def iniciar_proceso(self, process_id: str, contract: dict = {}):
+    async def iniciar_proceso(self, process_id: str, contract: dict | None = None):
         response = await self.http_client.post(
             f"{self.api_path}/process/{process_id}/instantiation",
             headers=self._auth_headers(),
-            json = contract # A JSON object matching process contract.
+            json = contract or {} # A JSON object matching process contract.
         )
         return response.json()
 
@@ -244,11 +268,11 @@ class BonitaService:
         return tareas[0] if tareas else None
 
     # Completa una tarea humana específica por su ID
-    async def completar_tarea_humana(self, task_id: str, contract: dict = {}):
+    async def completar_tarea_humana(self, task_id: str, contract: dict | None = None):
         await self.http_client.post(
             f"{self.api_path}/userTask/{task_id}/execution",
             headers=self._auth_headers(),
-            json = contract, # A JSON object matching task contract.
+            json = contract or {}, # A JSON object matching task contract.
             params = {
                 "assign": True
             }
