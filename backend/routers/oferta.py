@@ -608,7 +608,9 @@ def get_ofertas_invalidas(session: Session = Depends(get_session)):
             "emergencia_zona": emergencia.zonaAfectada if emergencia else "",
             "ong_lider_id": oferta.ong_lider_id,
             "cantidad_ofertada": sum(p.cantidad_aportada for p in participantes if p.cantidad_aportada is not None),
-            "accion_tomada": oferta.accion_tomada
+            "accion_tomada": oferta.accion_tomada,
+            "resultado_validacion": oferta.resultado_validacion,
+            "validada_en": oferta.validada_en,
         })
 
     return respuesta
@@ -637,11 +639,32 @@ def confirmar_accion_oferta_invalida(
     if oferta.accion_tomada:
         raise HTTPException(status_code=400, detail="Ya se confirmó una acción para esta oferta.")
 
+    if data.accion == "parcial":
+        resultado = oferta.resultado_validacion
+        if not resultado or resultado.get('error') or oferta.estado_validacion == 'pendiente':
+            raise HTTPException(status_code=409, detail="Primero debe completarse la consulta de recursos para aceptar una cantidad parcial.")
+        if resultado.get('cantidad_verificada', 0) <= 0:
+            raise HTTPException(status_code=400, detail="No hay recursos disponibles para aceptar una cobertura parcial.")
+        # Conservar lo prometido y aceptar sólo la cantidad respaldada por inventario.
+        resultado = dict(resultado)
+        resultado['cantidad_aceptada'] = resultado['cantidad_verificada']
+        resultado['participantes'] = [dict(p, cantidad_aceptada=p['cantidad_verificada'])
+                                     for p in resultado.get('participantes', [])]
+        oferta.resultado_validacion = resultado
+
     oferta.accion_tomada = data.accion
     session.add(oferta)
 
     if data.accion == "parcial":
         lote_oferta = session.get(Lote, oferta.lote_id)
+        ofertas_lote = session.exec(select(Oferta).where(Oferta.lote_id == lote_oferta.id)).all()
+        lote_oferta.cantidadCubierta = sum(
+            (o.resultado_validacion or {}).get('cantidad_aceptada',
+                (o.resultado_validacion or {}).get('cantidad_verificada', 0)
+                if (o.resultado_validacion or {}).get('inventario_valido', o.valida) else 0)
+            for o in ofertas_lote if o.estado_validacion != 'pendiente'
+        )
+        session.add(lote_oferta)
         ahora = datetime.now(timezone.utc)
         lotes = session.exec(
             select(Lote).where(

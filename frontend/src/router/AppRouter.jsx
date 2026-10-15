@@ -21,6 +21,7 @@ import { useSession } from "../auth/AuthContext";
 import RequirePermission from "../auth/RequirePermission";
 import OfertasConsorcio from '../pages/ofertas/OfertasConsorcio';
 import OfertasInvalidas from '../pages/ofertas/OfertasInvalidas';
+import ValidacionOfertas from '../pages/ofertas/ValidacionOfertas';
 function RequireSession() {
   const session = useSession();
   const location = useLocation();
@@ -49,6 +50,9 @@ export default function AppRouter() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        {import.meta.env.DEV && <Route path="/validacion-ofertas/demo" element={<Layout />}>
+          <Route index element={<ValidacionOfertas demo />} />
+        </Route>}
         <Route element={<RequireSession />}>
           <Route element={<Layout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -60,6 +64,7 @@ export default function AppRouter() {
             <Route path="/ofertas/misofertas" element={<RequirePermission permission="ofertas.ver_propias"><MisOfertas /></RequirePermission>} />
             <Route path="/ofertas-consorcio" element={<RequirePermission permission="ofertas.ver_propias"><OfertasConsorcio /></RequirePermission>} />
             <Route path="/ofertas-invalidas" element={<RequirePermission permission="ofertas.ver_invalidas"><OfertasInvalidas /></RequirePermission>} />
+            <Route path="/validacion-ofertas" element={<RequirePermission permission="ofertas.ver_validacion"><ValidacionOfertas /></RequirePermission>} />
             <Route
               path="*"
               element={

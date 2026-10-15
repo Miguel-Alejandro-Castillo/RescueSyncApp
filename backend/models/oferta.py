@@ -1,8 +1,14 @@
 from datetime import datetime, timezone
 from sqlmodel import Field, SQLModel
+from sqlalchemy import Column, JSON, DateTime
 
 class Oferta(SQLModel, table=True):
     __tablename__ = "ofertas"
+
+    estado_validacion: str = Field(default="pendiente", max_length=20)
+    validada_en: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True)))
+    ventana_validada: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True)))
+    resultado_validacion: dict | None = Field(default=None, sa_column=Column(JSON))
 
     id: int | None = Field(
         default=None,

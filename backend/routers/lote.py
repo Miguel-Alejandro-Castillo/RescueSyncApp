@@ -25,6 +25,7 @@ class LoteItemDTO(BaseModel):
     tipoRecurso: str
     descripcion: str
     cantidad: int
+    recurso_codigo: str | None = None
 
 class DesgloseLotesRequest(BaseModel):
     emergenciaId: int
@@ -130,6 +131,7 @@ async def create_lotes(
                 emergenciaId=payload.emergenciaId,
                 tipoRecurso=item.tipoRecurso,
                 descripcion=item.descripcion,
+                recurso_codigo=item.recurso_codigo,
                 cantidad=item.cantidad,
                 cantidadCubierta=0,
                 estado="creado",
@@ -237,6 +239,7 @@ async def reformular_lotes(
                 emergenciaId=emergencia.id,
                 tipoRecurso=item.tipoRecurso,
                 descripcion=item.descripcion,
+                recurso_codigo=item.recurso_codigo,
                 cantidad=item.cantidad,
                 cantidadCubierta=0,
                 estado="creado",

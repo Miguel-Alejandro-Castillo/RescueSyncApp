@@ -338,3 +338,37 @@ class BonitaService:
     async def close(self):
         """Cierra las conexiones del cliente HTTP subyacente."""
         await self.http_client.close()
+
+    async def obtener_cuit_ong(self, user_id: int):
+        page = 0
+        while True:
+            response = await self.http_client.get(
+                "/API/customuserinfo/user",
+                headers=self._auth_headers(),
+                params={"p": page, "c": 100, "f": f"userId={user_id}"},
+            )
+            values = response.json()
+            for item in values:
+                if item.get("definitionId", {}).get("name") == "cuitONG":
+                    return (item.get("value") or "").strip() or None
+            if len(values) < 100:
+                return None
+            page += 1
+
+
+class BonitaValidacionService(BonitaService):
+    """Autentica al consultar identidades; permite guardar y reintentar fallas."""
+    async def obtener_cuit_ong(self, user_id: int):
+        if not self.api_token:
+            auth = await self.login(os.getenv('BONITA_USER'), os.getenv('BONITA_PASSWORD'))
+            if not auth['success']:
+                raise ValueError('No se pudo autenticar la cuenta de servicio de Bonita')
+        return await super().obtener_cuit_ong(user_id)
+
+
+async def get_bonita_validacion_service():
+    service = BonitaValidacionService()
+    try:
+        yield service
+    finally:
+        await service.close()

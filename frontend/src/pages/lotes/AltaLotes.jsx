@@ -4,17 +4,13 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import SeleccionarEmergencia from './SeleccionarEmergencia';
 import {  obtenerEmergenciaPorId,crearLotes,reformularLotes } from '../../services/lotesService';
+import { authenticatedFetch } from '../../services/authService';
+import { API_RESCUE } from '../../config/api';
 
 export default function AltaLotes() {
     const [params] = useSearchParams();
     const id = params.get('emergenciaId');
     return id ? <FormularioLotes key={id} /> : <SeleccionarEmergencia />;
-}
-
-const recursosPorTipo = {
-  Personal: ['Medicos', 'Policias', 'Bomberos'],
-  Insumos: ['Raciones de comida', 'Agua', 'Medicamentos'],
-  Materiales: ['Arena', 'Ladrillos', 'Tierra', 'Cemento']
 }
 
 const FormularioLotes = () => {
@@ -28,6 +24,20 @@ const FormularioLotes = () => {
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [submitError, setSubmitError] = useState('');
+    const [catalogo, setCatalogo] = useState([]);
+    const [errorCatalogo, setErrorCatalogo] = useState('');
+
+    useEffect(() => {
+        let active = true;
+        authenticatedFetch(`${API_RESCUE}/recursos-nacionales`)
+            .then(async response => {
+                if (!response.ok) throw new Error('No se pudo cargar el catálogo nacional de recursos.');
+                const data = await response.json();
+                if (!data.length) throw new Error('El catálogo nacional está vacío. Cargá los recursos antes de publicar lotes.');
+                if (active) setCatalogo(data);
+            }).catch(e => { if (active) setErrorCatalogo(e.message); });
+        return () => { active = false; };
+    }, []);
 
     const [lotes, setLotes] = useState([
         { tipoRecurso: 'Insumos', descripcion: 'Agua', cantidad: 1 }
@@ -38,17 +48,7 @@ const FormularioLotes = () => {
       const nuevosLotes = [...lotes];
 
       nuevosLotes[index].tipoRecurso = tipo;
-      nuevosLotes[index].descripcion = recursosPorTipo[tipo][0];
-
       setLotes(nuevosLotes);
-    };
-
-    const handleRecursoEspecificoChange = (index, e) => {
-        const nuevosLotes = [...lotes];
-
-        nuevosLotes[index].descripcion = e.target.value;
-
-        setLotes(nuevosLotes);
     };
 
     useEffect(() => {
@@ -90,6 +90,10 @@ const FormularioLotes = () => {
         const nuevosLotes = [...lotes];
 
         nuevosLotes[index][e.target.name] = e.target.value;
+        if (e.target.name === 'recurso_codigo') {
+            const recurso = catalogo.find(r => r.codigo === e.target.value);
+            if (recurso) nuevosLotes[index].descripcion = recurso.nombre;
+        }
 
         setLotes(nuevosLotes);
     };
@@ -123,6 +127,7 @@ const FormularioLotes = () => {
         if (
             lotes.some(
                 lote =>
+                    !lote.recurso_codigo ||
                     !lote.descripcion?.trim() ||
                     !Number.isSafeInteger(Number(lote.cantidad)) ||
                     Number(lote.cantidad) < 1
@@ -194,6 +199,7 @@ const FormularioLotes = () => {
                                 </div>
 
                                 <hr className="my-4" />
+                                {errorCatalogo && <p className="notice notice-error" role="alert">{errorCatalogo}</p>}
 
                                 {/* DESGLOSE DE LOTES */}
                                 <div className={styles.row}>
@@ -224,6 +230,17 @@ const FormularioLotes = () => {
 
                                         <div className="row g-3">
                                             <div className="col-md-3">
+                                                <label htmlFor={`codigo-${index}`} className="form-label">Recurso del Sistema Nacional</label>
+                                                <select id={`codigo-${index}`} name="recurso_codigo" className="form-select"
+                                                    value={lote.recurso_codigo || ''} required onChange={e => handleLoteChange(index, e)}>
+                                                    <option value="">Seleccionar recurso</option>
+                                                    {catalogo.map(recurso => <option key={recurso.codigo} value={recurso.codigo}>
+                                                        {recurso.nombre} ({recurso.codigo})
+                                                    </option>)}
+                                                </select>
+                                                <FieldError name="recurso_codigo" />
+                                            </div>
+                                            <div className="col-md-3">
                                                 <label htmlFor={`tipo-${index}`} className="form-label small fw-bold">Tipo de recurso</label>
                                                 <select
                                                     className="form-select form-select-sm"
@@ -242,22 +259,17 @@ const FormularioLotes = () => {
                                             </div>
 
                                             <div className="col-md-6">
-                                                <label htmlFor={`descripcion-${index}`} className="form-label small fw-bold">Recurso específica</label>
-                                                <select
-                                                    className="form-select form-select-sm"
+                                                <label htmlFor={`descripcion-${index}`} className="form-label small fw-bold">Descripción del recurso</label>
+                                                <input
+                                                    className="form-control form-control-sm"
                                                     name="descripcion"
                                                     id={`descripcion-${index}`}
                                                     data-validation-key={`descripcion-${index}`}
                                                     value={lote.descripcion}
-                                                    onChange={(e) => handleRecursoEspecificoChange(index, e)}
+                                                    onChange={(e) => handleLoteChange(index, e)}
                                                     required
-                                                >
-                                                    {recursosPorTipo[lote.tipoRecurso].map((recurso) => (
-                                                        <option key={recurso} value={recurso}>
-                                                            {recurso}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                    maxLength={255}
+                                                />
                                                 <FieldError name={`descripcion-${index}`} />
                                             </div>
 

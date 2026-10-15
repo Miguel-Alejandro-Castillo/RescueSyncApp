@@ -31,10 +31,16 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
 
-    # 2. Agregar las nuevas columnas requeridas directamente
-    op.add_column('ofertas', sa.Column('lote_id', sa.Integer(), nullable=False))
-    op.add_column('ofertas', sa.Column('ong_lider_id', sa.Integer(), nullable=False))
+    # Conservar los aportes históricos antes de retirar las columnas originales.
+    op.add_column('ofertas', sa.Column('lote_id', sa.Integer(), nullable=True))
+    op.add_column('ofertas', sa.Column('ong_lider_id', sa.Integer(), nullable=True))
     op.add_column('ofertas', sa.Column('fecha_creacion', sa.DateTime(timezone=True), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')))
+    op.execute('UPDATE ofertas SET lote_id = id_lote, ong_lider_id = id_ong')
+    op.execute('INSERT INTO participantes_oferta (oferta_id, ong_id, cantidad_aportada) SELECT id, id_ong, cant_recurso FROM ofertas')
+    op.alter_column('ofertas', 'lote_id', nullable=False)
+    op.alter_column('ofertas', 'ong_lider_id', nullable=False)
+    op.drop_constraint('ofertas_id_lote_fkey', 'ofertas', type_='foreignkey')
+    op.create_foreign_key('ofertas_lote_id_fkey', 'ofertas', 'lotes', ['lote_id'], ['id'])
 
     # 3. Eliminar las columnas viejas que ya no se usan
     op.drop_column('ofertas', 'cant_recurso')

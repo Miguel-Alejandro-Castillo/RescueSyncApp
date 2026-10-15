@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAllOngs, getOngById } from '../controllers/ong.controller.js';
+import { getAllOngs, getOngById, getRecursosOng } from '../controllers/ong.controller.js';
 
 const router = express.Router();
 
@@ -15,6 +15,12 @@ const router = express.Router();
  *   get:
  *     summary: Retrieve a list of all ONGs
  *     tags: [ONGs]
+ *     parameters:
+ *       - in: query
+ *         name: cuit
+ *         schema:
+ *           type: string
+ *         description: CUIT de la ONG (mismo formato que el catálogo nacional)
  *     responses:
  *       200:
  *         description: A list of ONGs
@@ -33,6 +39,28 @@ const router = express.Router();
  *                     example: ONG Example
  */
 router.get('/', getAllOngs);
+/**
+ * @swagger
+ * /api/v1/ongs/{id}/recursos:
+ *   get:
+ *     summary: Consultar inventario y disponibilidad de una ONG sin reservar recursos
+ *     tags: [ONGs]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *     responses:
+ *       200:
+ *         description: Datos de la ONG y recursos con cantidadTotal, cantidadComprometida y cantidadDisponible, dentro de data
+ *       400:
+ *         description: Identificador inválido
+ *       404:
+ *         description: ONG no encontrada
+ */
+router.get('/:id/recursos', getRecursosOng);
 
 /**
  * @swagger

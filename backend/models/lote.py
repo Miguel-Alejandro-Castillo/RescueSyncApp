@@ -5,6 +5,8 @@ from sqlmodel import Field, Relationship, SQLModel
 class Lote(SQLModel, table=True):
     __tablename__ = "lotes"
 
+    recurso_codigo: str | None = Field(default=None, max_length=100)
+
     id: int | None = Field(
         default=None,
         primary_key=True,

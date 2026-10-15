@@ -5,6 +5,7 @@ from routers.emergencia import router as emergencia_router
 from routers.auth import router as auth_router
 from routers.lote import router as lotes_router
 from routers.oferta import router as oferta_router
+from routers.validacion import router as validacion_router
 API_PREFIX = "/api/rescue"
 
 app = FastAPI(
@@ -47,6 +48,7 @@ app.include_router(
     prefix=API_PREFIX
 )
 app.include_router(auth_router, prefix=API_PREFIX)
+app.include_router(validacion_router, prefix=API_PREFIX)
 
 app.include_router(
     lotes_router,

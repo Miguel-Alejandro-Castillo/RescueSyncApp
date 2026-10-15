@@ -1,0 +1,16 @@
+.result { margin: 1rem 0; }
+.date { color: var(--muted); font-size: .85rem; }
+.scroll { overflow-x: auto; padding-bottom: 2px; }
+.table { width: 100%; border-collapse: collapse; min-width: 540px; }
+.table th { font-size: .75rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); font-weight: 600; padding: .5rem .75rem .75rem; border-bottom: 1px solid var(--border); }
+.table td { padding: 1rem .75rem; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); vertical-align: top; }
+.table th:first-child, .table td:first-child { padding-left: 0; }
+.table th:last-child, .table td:last-child { padding-right: 0; }
+.quantity { text-align: right; font-variant-numeric: tabular-nums; }
+.ong { display: block; font-weight: 600; }
+.check { color: var(--primary); }
+.shortage { color: var(--danger); }
+.pending { padding: 1rem 0; border-left: 3px solid #e5c885; padding-left: 1rem; }
+.pending strong { color: #e5c885; }
+.pending p { margin: .4rem 0 0; color: var(--muted); }
+.date { margin-top: .85rem; }

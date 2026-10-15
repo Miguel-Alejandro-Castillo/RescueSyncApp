@@ -4,6 +4,7 @@ import { reabrirConvocatoria } from '../../services/lotesService';
 import { API_RESCUE } from '../../config/api';
 import { authenticatedFetch } from '../../services/authService';
 import styles from './OfertasInvalidas.module.css';
+import ResultadoValidacion from '../../components/ResultadoValidacion';
 
 const ACCIONES = [
   { value: 'reabrir', label: 'Reabrir la convocatoria' },
@@ -92,6 +93,7 @@ export default function OfertasInvalidas() {
                 Lote viejo: <strong>{oferta.lote_tipo}</strong> - {oferta.lote_descripcion} (pedido: {oferta.lote_cantidad})
               </p>
               <p>Cantidad ofertada: <strong>{oferta.cantidad_ofertada}</strong></p>
+              <ResultadoValidacion resultado={oferta.resultado_validacion} fecha={oferta.validada_en} />
               {oferta.lotes_nuevos.length > 0 && (
                 <div>
                   <p>Lotes nuevos ofertados:</p>
