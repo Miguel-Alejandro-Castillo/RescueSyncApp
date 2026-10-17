@@ -19,6 +19,11 @@ class ParticipanteOferta(SQLModel, table=True):
         description="ONG participante"
     )
 
+    ong_cuit: str | None = Field(
+        default=None, max_length=32,
+        description="CUIT de la ONG al confirmar el aporte; no cambia con el representante"
+    )
+
     cantidad_aportada: int | None = Field(
         default=None,
         gt=0,

@@ -15,11 +15,16 @@ function ejemplo(id, recurso, ofrecido, disponible, estado, contexto = {}) {
 }
 
 export const ejemplosValidacion = [
-  ejemplo(101, 'Agua potable', 100, 120, 'valida'),
+  ejemplo(101, 'Agua potable', 100, 120, 'valida', {
+    cobertura_demo: { cantidad_ofertada: 140, ofertado_valido: 140, faltante: 0, completa: true, cubierto: true },
+  }),
   ejemplo(105, 'Agua potable', 40, 50, 'valida', { lote_id: 101, lote_cantidad: 100 }),
-  ejemplo(102, 'Raciones de comida', 100, 60, 'invalida'),
+  ejemplo(102, 'Raciones de comida', 100, 60, 'invalida', {
+    cobertura_demo: { cantidad_ofertada: 100, ofertado_valido: 0, faltante: 100, completa: true, cubierto: false },
+  }),
   ejemplo(103, 'Mantas', 90, 65, 'invalida', {
     emergencia_id: 2,
+    cobertura_demo: { cantidad_ofertada: 90, ofertado_valido: 0, faltante: 90, completa: true, cubierto: false },
     emergencia_zona: 'Evacuación en Berisso · Villa Argüello',
     resultado_validacion: {
       valida: false, cantidad_ofertada: 90, cantidad_verificada: 65,
@@ -32,4 +37,7 @@ export const ejemplosValidacion = [
   ejemplo(104, 'Botiquines', 20, 0, 'pendiente', {
     resultado_validacion: { error: 'No se pudo consultar el Sistema Nacional. La tarea de validación debe reintentarse.' },
   }),
-];
+].map((oferta, _, ejemplos) => {
+  const cobertura = ejemplos.find(o => o.lote_id === oferta.lote_id && o.cobertura_demo)?.cobertura_demo;
+  return { ...oferta, resultado_validacion: { ...oferta.resultado_validacion, cobertura_lote: cobertura } };
+});

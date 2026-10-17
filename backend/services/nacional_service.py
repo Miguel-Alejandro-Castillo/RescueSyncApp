@@ -3,7 +3,7 @@ import httpx
 
 
 class NacionalService:
-    """Consultas de inventario. Nunca modifica ni reserva recursos."""
+    """Delegar validación y cobertura al Sistema Nacional, sin reservar recursos."""
 
     def __init__(self, client=None):
         self.client = client or httpx.AsyncClient(
@@ -18,6 +18,11 @@ class NacionalService:
 
     async def recursos(self):
         return await self.get('recursos')
+
+    async def validar_ofertas(self, solicitud):
+        response = await self.client.post('validaciones/ofertas', json=solicitud)
+        response.raise_for_status()
+        return response.json()['data']
 
     async def inventario(self, cuit):
         ongs = await self.get('ongs', params={'cuit': cuit})

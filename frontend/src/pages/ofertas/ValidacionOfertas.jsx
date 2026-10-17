@@ -10,19 +10,14 @@ import styles from './ValidacionOfertas.module.css';
 
 function CoberturaRecurso({ lote }) {
   if (lote.cantidad == null) return null;
-  const pendientes = lote.ofertas.some(o => !o.resultado_validacion || o.resultado_validacion.error || o.estado_validacion === 'pendiente');
-  const cubierta = lote.ofertas.reduce((total, o) => {
-    const resultado = o.resultado_validacion;
-    if (!resultado || resultado.error || o.estado_validacion === 'pendiente') return total;
-    if (resultado.cantidad_aceptada != null) return total + resultado.cantidad_aceptada;
-    const suficiente = resultado.inventario_valido ?? (resultado.participantes?.length > 0 && resultado.participantes.every(p => p.valida));
-    return total + (suficiente ? (resultado.cantidad_verificada ?? 0) : 0);
-  }, 0);
-  const completa = cubierta >= lote.cantidad;
+  const cobertura = lote.ofertas[0]?.resultado_validacion?.cobertura_lote;
+  const pendientes = !cobertura?.completa;
+  const cubierta = cobertura?.ofertado_valido;
+  const completa = cobertura?.cubierto === true;
   return <div className={styles.coverage} data-state={completa ? 'completa' : pendientes ? 'pendiente' : 'insuficiente'}>
     <strong>{completa ? 'Cantidad necesaria alcanzada' : pendientes ? 'Cobertura por confirmar' : 'Cantidad necesaria no alcanzada'}</strong>
-    <span>{cubierta} de {lote.cantidad} unidades cubiertas{!completa && !pendientes ? ` · Faltan ${lote.cantidad - cubierta}` : ''}</span>
-    {pendientes && <span>Hay ofertas sin verificar.</span>}
+    {cubierta != null && <span>{cubierta} de {lote.cantidad} unidades cubiertas{!completa && !pendientes ? ` · Faltan ${cobertura.faltante}` : ''}</span>}
+    {pendientes && <span>La cobertura debe confirmarse con el Sistema Nacional.</span>}
   </div>;
 }
 
@@ -94,22 +89,16 @@ export default function ValidacionOfertas({ demo = false }) {
           {emergencia.gravedad && <span className={styles.context}>Urgencia: {emergencia.gravedad}</span>}
         </header>
         {Object.values(emergencia.lotes).map(lote => {
-          const ofrecida = lote.ofertas.reduce((total, o) => total + (o.resultado_validacion?.cantidad_ofertada ?? 0), 0);
-          const pendiente = lote.ofertas.some(o => !o.resultado_validacion || o.resultado_validacion.error || o.estado_validacion === 'pendiente');
-          const cubierta = lote.ofertas.reduce((total, o) => {
-            const r = o.resultado_validacion;
-            if (!r || r.error || o.estado_validacion === 'pendiente') return total;
-            const suficiente = r.inventario_valido ?? (r.participantes?.length > 0 && r.participantes.every(p => p.valida));
-            return total + (r.cantidad_aceptada ?? (suficiente ? (r.cantidad_verificada ?? 0) : 0));
-          }, 0);
-          const estado = lote.cantidad == null || pendiente ? 'pendiente' : cubierta >= lote.cantidad ? 'valida' : 'invalida';
+          const cobertura = lote.ofertas[0]?.resultado_validacion?.cobertura_lote;
+          const ofrecida = cobertura?.cantidad_ofertada;
+          const estado = !cobertura?.completa ? 'pendiente' : cobertura.cubierto ? 'valida' : 'invalida';
           return <details key={lote.id} className={styles.resource} open={demo || undefined}>
           <summary className={styles.resourceHeading}>
             <div className={styles.heading}>
               <h3>{lote.descripcion}</h3>
               <div className={styles.resourceQuantities}>
                 {lote.cantidad != null && <span>Se necesitan <strong>{lote.cantidad} unidades</strong></span>}
-                <span>Cantidad ofrecida: <strong>{ofrecida} unidades</strong>{pendiente ? ' (registradas hasta ahora)' : ''}</span>
+                <span>Cantidad ofrecida: <strong>{ofrecida != null ? `${ofrecida} unidades` : 'Sin consultar'}</strong></span>
               </div>
             </div>
             <span className={styles.badge} data-state={estado}>{({ valida: 'Cumple', invalida: 'No cumple', pendiente: 'Pendiente' })[estado]}</span>

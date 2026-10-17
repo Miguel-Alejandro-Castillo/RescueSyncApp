@@ -14,6 +14,10 @@ from models.participante_oferta import ParticipanteOferta
 from dependencies.jwt_auth import get_current_user
 from services.bonita_service import BonitaService
 from dependencies.bonita import get_bonita_service
+from services.bonita_service import get_bonita_validacion_service
+import httpx
+from services.nacional_service import get_nacional_service
+from services.validacion_ofertas import validar_emergencia
 
 router = APIRouter(
     prefix="/ofertas",
@@ -38,6 +42,19 @@ class AccionOfertaInvalida(BaseModel):
 
 ACCIONES_OFERTA_INVALIDA = ["reabrir", "reformular", "parcial"]
 
+
+async def obtener_cuit_aporte(bonita, user_id):
+    try:
+        cuit = await bonita.obtener_cuit_ong(user_id)
+    except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
+        raise HTTPException(502, "No se pudo identificar la ONG del representante. Reintentá el aporte.") from error
+    cuit = (cuit or '').strip()
+    if not cuit:
+        raise HTTPException(422, "El representante no tiene cuitONG configurado en Bonita.")
+    if len(cuit) > 32:
+        raise HTTPException(422, "El cuitONG configurado en Bonita no es válido.")
+    return cuit
+
 class ResponderInvitacion(BaseModel):
     aceptar: bool
     cantidad_aportada: Optional[int] = None  # Obligatorio si acepta
@@ -48,22 +65,6 @@ def es_lote_vigente(lote: Lote, emergencia: Emergencia) -> bool:
     if fecha_limite.tzinfo is None:
         fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
     return datetime.now(timezone.utc) <= fecha_limite
-
-
-def calcular_cantidad_cubierta(session: Session, lote_id: int) -> int:
-    """Calcula la suma real de todos los aportes confirmados en todas las ofertas del lote"""
-    ofertas = session.exec(
-        select(Oferta).where(Oferta.lote_id == lote_id, Oferta.valida == True)
-    ).all()
-    if not ofertas:
-        return 0
-    oferta_ids = [o.id for o in ofertas]
-    
-    participantes = session.exec(
-        select(ParticipanteOferta).where(ParticipanteOferta.oferta_id.in_(oferta_ids))
-    ).all()
-    
-    return sum(p.cantidad_aportada for p in participantes if p.cantidad_aportada is not None)
 
 
 @router.get(
@@ -101,10 +102,11 @@ def get_emergencias_con_lotes(
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
 )
-def create_oferta_consorcio(
+async def create_oferta_consorcio(
     data: OfertaConsorcioCreate,
     current_user: dict = Depends(get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    bonita: BonitaService = Depends(get_bonita_validacion_service),
 ):
     ong_id_actual = int(current_user['user_id'])
 
@@ -144,19 +146,21 @@ def create_oferta_consorcio(
             detail=f"Tu aporte no puede superar el total requerido por el lote ({lote.cantidad} unidades)."
         )
 
+    ong_cuit = await obtener_cuit_aporte(bonita, ong_id_actual)
+
     # 1. Crear la Oferta cabecera
     nueva_oferta = Oferta(
         lote_id=data.id_lote,
         ong_lider_id=ong_id_actual
     )
     session.add(nueva_oferta)
-    session.commit()
-    session.refresh(nueva_oferta)
+    session.flush()
 
     # 2. Agregar al líder como participante confirmado
     lider_participante = ParticipanteOferta(
         oferta_id=nueva_oferta.id,
         ong_id=ong_id_actual,
+        ong_cuit=ong_cuit,
         cantidad_aportada=data.cantidad_lider
     )
     session.add(lider_participante)
@@ -217,11 +221,12 @@ def invitar_ong_a_oferta(
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
 )
-def responder_invitacion(
+async def responder_invitacion(
     oferta_id: int,
     data: ResponderInvitacion,
     current_user: dict = Depends(get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    bonita: BonitaService = Depends(get_bonita_validacion_service),
 ):
     ong_id_actual = int(current_user['user_id'])
 
@@ -262,6 +267,10 @@ def responder_invitacion(
             detail=f"El total de esta oferta ({total_propuesto}) supera el máximo del lote ({lote.cantidad})."
         )
 
+    if participacion.cantidad_aportada is None:
+        participacion.ong_cuit = await obtener_cuit_aporte(bonita, ong_id_actual)
+    elif not participacion.ong_cuit:
+        raise HTTPException(409, "Debe revisarse la ONG de origen del aporte antes de modificarlo.")
     participacion.cantidad_aportada = data.cantidad_aportada
     session.add(participacion)
     session.commit()
@@ -533,6 +542,9 @@ def editar_aporte_oferta(
             detail=f"La nueva cantidad supera el límite del lote. Los demás miembros aportan {aporte_otros}. Tu máximo posible es {max_permitido}."
         )
 
+    if not participacion.ong_cuit:
+        raise HTTPException(409, "Debe revisarse la ONG de origen del aporte antes de modificarlo.")
+
     # 3. Guardar el nuevo aporte
     participacion.cantidad_aportada = data.cant_recurso
     session.add(participacion)
@@ -627,6 +639,7 @@ async def confirmar_accion_oferta_invalida(
     data: AccionOfertaInvalida,
     session: Session = Depends(get_session),
     bonita: BonitaService = Depends(get_bonita_service),
+    nacional=Depends(get_nacional_service),
 ):
     if data.accion not in ACCIONES_OFERTA_INVALIDA:
         raise HTTPException(status_code=422, detail="La acción no es válida.")
@@ -650,8 +663,6 @@ async def confirmar_accion_oferta_invalida(
         # Conservar lo prometido y aceptar sólo la cantidad respaldada por inventario.
         resultado = dict(resultado)
         resultado['cantidad_aceptada'] = resultado['cantidad_verificada']
-        resultado['participantes'] = [dict(p, cantidad_aceptada=p['cantidad_verificada'])
-                                     for p in resultado.get('participantes', [])]
         oferta.resultado_validacion = resultado
 
     oferta.accion_tomada = data.accion
@@ -659,14 +670,6 @@ async def confirmar_accion_oferta_invalida(
 
     if data.accion == "parcial":
         lote_oferta = session.get(Lote, oferta.lote_id)
-        ofertas_lote = session.exec(select(Oferta).where(Oferta.lote_id == lote_oferta.id)).all()
-        lote_oferta.cantidadCubierta = sum(
-            (o.resultado_validacion or {}).get('cantidad_aceptada',
-                (o.resultado_validacion or {}).get('cantidad_verificada', 0)
-                if (o.resultado_validacion or {}).get('inventario_valido', o.valida) else 0)
-            for o in ofertas_lote if o.estado_validacion != 'pendiente'
-        )
-        session.add(lote_oferta)
         ahora = datetime.now(timezone.utc)
         lotes = session.exec(
             select(Lote).where(
@@ -688,6 +691,11 @@ async def confirmar_accion_oferta_invalida(
             session.rollback()
             raise HTTPException(409, "Esta emergencia no tiene un caso asociado en Bonita.")
         try:
+            respuesta = await validar_emergencia(session, emergencia.id, nacional, commit=False)
+            if not respuesta['completa']:
+                raise HTTPException(409, "Debe completarse la validación nacional antes de continuar con cobertura parcial.")
+            if (oferta.resultado_validacion or {}).get('cantidad_aceptada', 0) <= 0:
+                raise HTTPException(409, "El Sistema Nacional ya no informa recursos disponibles para aceptar.")
             await bonita.resolver_accion_coordinador(emergencia.bonitaCaseId, "ACEPTAR_OFERTAS")
         except Exception:
             session.rollback()

@@ -6,7 +6,6 @@ from sqlmodel import Session, select
 from sqlalchemy.exc import OperationalError
 import httpx
 from database import get_session
-from services.bonita_service import get_bonita_validacion_service
 from dependencies.rbac import require_roles, CENTRO_COORDINADOR, OPERADOR_MUNICIPAL, AUDITORES
 from models.oferta import Oferta
 from models.lote import Lote
@@ -58,28 +57,7 @@ async def validar_caso_bonita(caso_id: str, x_validacion_token: str | None = Hea
     emergencia = session.exec(select(Emergencia).where(Emergencia.bonitaCaseId == caso_id)).first()
     if not emergencia:
         raise HTTPException(404, 'El caso de Bonita no tiene una emergencia asociada')
-    # La identidad de la llamada se verificó con la credencial de integración.
-    from contextlib import aclosing
-    async with aclosing(get_bonita_validacion_service()) as services:
-        async for bonita in services:
-            resultados = await validar_ofertas(emergencia.id, session, nacional, bonita)
-    pendientes = sum(o.estado_validacion == 'pendiente' for o in resultados)
-    lotes = session.exec(select(Lote).where(Lote.emergenciaId == emergencia.id,
-                                            Lote.estado != 'reformulado')).all()
-    cobertura = []
-    for lote in lotes:
-        ofertas_lote = session.exec(select(Oferta).where(Oferta.lote_id == lote.id)).all()
-        disponible = sum((o.resultado_validacion or {}).get('cantidad_verificada', 0)
-                         for o in ofertas_lote if o.estado_validacion != 'pendiente'
-                         and (o.resultado_validacion or {}).get('inventario_valido', o.valida))
-        cobertura.append({'lote_id': lote.id, 'requerido': lote.cantidad,
-                          'ofertado_valido': disponible, 'cubierto': disponible >= lote.cantidad})
-    return {'emergencia_id': emergencia.id, 'completa': pendientes == 0,
-            'cobertura_suficiente': pendientes == 0 and bool(cobertura) and all(l['cubierto'] for l in cobertura),
-            'cobertura_por_lote': cobertura,
-            'ofertas_validas': sum(o.estado_validacion == 'valida' for o in resultados),
-            'ofertas_invalidas': sum(o.estado_validacion == 'invalida' for o in resultados),
-            'ofertas_pendientes': pendientes, 'resultados': resultados}
+    return await consultar_validacion_nacional(emergencia.id, session, nacional)
 
 
 @router.get('/recursos-nacionales', dependencies=[Depends(require_roles(CENTRO_COORDINADOR))])
@@ -93,10 +71,13 @@ async def recursos_nacionales(nacional=Depends(get_nacional_service)):
 @router.post('/emergencias/{emergencia_id}/validar-ofertas',
              dependencies=[Depends(require_roles(CENTRO_COORDINADOR))])
 async def validar_ofertas(emergencia_id: int, session: Session = Depends(get_session),
-                         nacional=Depends(get_nacional_service),
-                         bonita=Depends(get_bonita_validacion_service)):
+                         nacional=Depends(get_nacional_service)):
+    return (await consultar_validacion_nacional(emergencia_id, session, nacional))['resultados']
+
+
+async def consultar_validacion_nacional(emergencia_id, session, nacional):
     try:
-        return await validar_emergencia(session, emergencia_id, nacional, bonita)
+        return await validar_emergencia(session, emergencia_id, nacional)
     except ConvocatoriaAbierta as error:
         raise HTTPException(409, str(error)) from error
     except LookupError as error:
