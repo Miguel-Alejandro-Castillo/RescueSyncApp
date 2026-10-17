@@ -50,3 +50,19 @@ export const getOngById = async (req, res) => {
 
   return ApiResponse.ok(res, ong);
 };
+
+export const createOng = async (req, res) => {
+
+  const { razonSocial, descripcion, sigla, cuit } = req.body;
+
+  const ong = await prisma.ong.create({
+    data: {
+      razonSocial,
+      descripcion,
+      sigla,
+      cuit
+    }
+  });
+
+  return ApiResponse.created(res, ong);
+};

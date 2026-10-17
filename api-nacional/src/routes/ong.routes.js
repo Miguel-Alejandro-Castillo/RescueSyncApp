@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAllOngs, getOngById, getRecursosOng } from '../controllers/ong.controller.js';
+import { getAllOngs, getOngById, getRecursosOng, createOng } from '../controllers/ong.controller.js';
 
 const router = express.Router();
 
@@ -93,5 +93,56 @@ router.get('/:id/recursos', getRecursosOng);
  *         description: ONG not found
  */
 router.get('/:id', getOngById);
+
+/**
+ * @swagger
+ * /api/v1/ongs:
+ *   post:
+ *     summary: Create a new ONG
+ *     tags: [ONGs]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               razonSocial:
+ *                 type: string
+ *                 example: ONG Example
+ *               descripcion:
+ *                 type: string
+ *                 example: A description of the ONG
+ *               sigla:
+ *                 type: string
+ *                 example: ONGEX
+ *               cuit:
+ *                 type: string
+ *                 example: 20-12345678-9
+ *     responses:
+ *       201:
+ *         description: ONG created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: integer
+ *                   example: 1
+ *                 razonSocial:
+ *                   type: string
+ *                   example: ONG Example
+ *                 descripcion:
+ *                   type: string
+ *                   example: A description of the ONG
+ *                 sigla:
+ *                   type: string
+ *                   example: ONGEX
+ *                 cuit:
+ *                   type: string
+ *                   example: 20-12345678-9
+ */
+router.post('/', createOng);
 
 export default router;

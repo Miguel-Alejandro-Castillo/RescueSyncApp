@@ -18,4 +18,5 @@ RUN sed -i 's/\r$//' start.sh \
 
 EXPOSE 3000
 
-CMD ["./start.sh"]
+# CMD ["./start.sh"]
+CMD ["sh", "./start.sh"]
