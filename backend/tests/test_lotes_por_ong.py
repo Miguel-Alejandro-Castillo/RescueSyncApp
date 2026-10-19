@@ -1,18 +1,18 @@
 from datetime import datetime, timedelta, timezone
 from jose import jwt
 from dependencies.jwt_auth import SECRET_KEY, ALGORITHM
-from models.emergencia import Emergencia
-from models.lote import Lote
+from models.emergencia import Emergencia, EmergenciaEstado
+from models.lote import Lote, LoteEstado
 
 
 def test_cada_ong_ve_solo_lotes_sin_oferta_propia(client, session, auth_headers):
     now = datetime.now(timezone.utc)
     session.add(Emergencia(id=1, zonaAfectada='Prueba', nivelGravedad='alto',
-                          descripcionInicial='Prueba', estado='publicada', usuarioCreador='1'))
+                          descripcionInicial='Prueba', estado=EmergenciaEstado.PUBLICADA, usuarioCreador='1'))
     session.commit()
     for id in [1, 2, 3]:
         session.add(Lote(id=id, emergenciaId=1, tipoRecurso='Insumos', descripcion='Agua',
-                         cantidad=10, estado='activo', fechaLimiteConvocatoria=now + timedelta(days=1)))
+                         cantidad=10, estado=LoteEstado.ACTIVO, fechaLimiteConvocatoria=now + timedelta(days=1)))
     session.commit()
     own = auth_headers('representante_ong')
     other = {'Authorization': 'Bearer ' + jwt.encode({

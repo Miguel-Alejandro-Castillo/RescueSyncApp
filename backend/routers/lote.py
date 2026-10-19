@@ -1,20 +1,18 @@
 import os
 from datetime import datetime, timedelta, timezone
 from dependencies.bonita import get_bonita_service
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlmodel import Session, select
-
 from database import get_session
 from dependencies.rbac import (
     require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
 )
 from services.bonita_service import BonitaService
-from models.emergencia import Emergencia
-from models.lote import Lote
+from models.emergencia import Emergencia, EmergenciaEstado
+from models.lote import Lote, LoteEstado
 from models.oferta import Oferta
-PROCESS_NAME = os.getenv("BONITA_PROCESS")
+from models.participante_oferta import ParticipanteOferta
 
 router = APIRouter(
     prefix="/lotes",
@@ -36,6 +34,18 @@ class ReformularLotesRequest(BaseModel):
 
 class ReabrirConvocatoriaRequest(BaseModel):
     ofertaId: int
+    
+
+class ParticipanteOfertaResponse(BaseModel):
+    id: int
+    ong_id: int
+    ong_name: str
+    cantidad_aportada: int | None = None
+
+class OfertaLoteResponse(BaseModel):
+    id: int
+    tipo_oferta: str
+    participantes: list[ParticipanteOfertaResponse]
 
 def calcular_fecha_limite(nivel_gravedad: str, fecha_inicio: datetime) -> datetime:
     horas_map = {
@@ -104,10 +114,10 @@ async def create_lotes(
     if not emergencia:
         raise HTTPException(status_code=404, detail="Emergencia no encontrada")
 
-    if emergencia.estado != "creada":
+    if emergencia.estado != EmergenciaEstado.CREADA:
         raise HTTPException(
             status_code=400,
-            detail="La emergencia no se encuentra en estado 'creada'."
+            detail=f"La emergencia no se encuentra en estado '{EmergenciaEstado.CREADA}'."
         )
 
     if not payload.lotes:
@@ -132,7 +142,7 @@ async def create_lotes(
                 descripcion=item.descripcion,
                 cantidad=item.cantidad,
                 cantidadCubierta=0,
-                estado="creado",
+                estado=LoteEstado.CREADO,
                 fechaLimiteConvocatoria=fecha_limite
             )
             session.add(nuevo_lote)
@@ -173,7 +183,7 @@ async def create_lotes(
         # 4. Completar tarea
         await bonita.completar_tarea_humana(tarea["id"])    
 
-        emergencia.estado = "publicada"
+        emergencia.estado = EmergenciaEstado.PUBLICADA
         session.add(emergencia)
 
         session.commit()
@@ -210,7 +220,7 @@ async def reformular_lotes(
         )
 
     lote_anterior = session.get(Lote, oferta.lote_id)
-    if lote_anterior.estado == "reformulado":
+    if lote_anterior.estado == LoteEstado.REFORMULADO:
         raise HTTPException(status_code=400, detail="Los lotes de esta oferta ya fueron reformulados.")
 
     if not payload.lotes:
@@ -228,7 +238,7 @@ async def reformular_lotes(
     ventana_emergencia_ms = calcular_diferencia_ms(fecha_limite, ahora)
 
     try:
-        lote_anterior.estado = "reformulado"
+        lote_anterior.estado = LoteEstado.REFORMULADO
         session.add(lote_anterior)
 
         lotes_creados = []
@@ -239,7 +249,7 @@ async def reformular_lotes(
                 descripcion=item.descripcion,
                 cantidad=item.cantidad,
                 cantidadCubierta=0,
-                estado="creado",
+                estado=LoteEstado.CREADO,
                 fechaLimiteConvocatoria=fecha_limite,
                 loteOrigenId=lote_anterior.id
             )
@@ -317,14 +327,14 @@ async def reabrir_convocatoria(
         lotes = session.exec(
             select(Lote).where(
                 Lote.emergenciaId == emergencia.id,
-                Lote.estado != "reformulado"
+                Lote.estado != LoteEstado.REFORMULADO
             )
         ).all()
         for lote in lotes:
             lote.fechaLimiteConvocatoria = fecha_limite
             session.add(lote)
 
-        emergencia.estado = "publicada"
+        emergencia.estado = EmergenciaEstado.PUBLICADA
         session.add(emergencia)
 
         caso_id = emergencia.bonitaCaseId
@@ -370,3 +380,42 @@ def delete_lote(
     session.delete(lote)
     session.commit()
     return {"ok": True}
+
+@router.get(
+    "/{lote_id}/ofertas",
+    response_model=list[OfertaLoteResponse],
+    dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL))]
+)
+def get_ofertas_lote(
+    lote_id: int,
+    session: Session = Depends(get_session)
+) -> list[OfertaLoteResponse]:
+    lote = session.get(Lote, lote_id)
+
+    if not lote:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+
+    ofertas = session.exec(
+        select(Oferta).where(Oferta.lote_id == lote_id)
+    ).all()
+
+    ofertas_response = []
+    for oferta in ofertas:
+        participantes = session.exec(
+            select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta.id, ParticipanteOferta.cantidad_aportada != None)
+        ).all()
+        tipo_oferta = "CONSORCIO" if len(participantes) > 1 else "INDIVIDUAL"
+
+        oferta_response = OfertaLoteResponse(
+            id=oferta.id,
+            tipo_oferta=tipo_oferta,
+            participantes=[ParticipanteOfertaResponse(
+                id=participante.id,
+                ong_id=participante.ong_id,
+                ong_name="ONG " + str(participante.ong_id),
+                cantidad_aportada=participante.cantidad_aportada
+            ) for participante in participantes]
+        )
+        ofertas_response.append(oferta_response)
+
+    return ofertas_response

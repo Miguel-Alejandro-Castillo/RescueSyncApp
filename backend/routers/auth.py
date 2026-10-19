@@ -25,21 +25,6 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int  # Expuesto en segundos
 
-# Devuelve los memberships(grupo + rol) con name de grupo y rol de un usuario específico por su nombre de usuario
-async def get_memberships_by_user(user_info, bonita: BonitaService):
-    memberships = await bonita.get_memberships_by_user_id(user_id=user_info["id"])
-    print("Memberships fetched for user:", memberships)
-    _memberships = []
-    for membership in memberships:
-        group = await bonita.get_group_by_id(group_id=membership["group_id"])
-        role = await bonita.get_role_by_id(role_id=membership["role_id"])
-
-        _memberships.append({
-            "group": { "name": group["name"], "displayName": group["displayName"] },
-            "role": { "name": role["name"], "displayName": role["displayName"] }
-        })
-    return _memberships
-
 # No conviene incluir la dependencia de Bonita(get_bonita_service) directamente en el login, se instancia manualmente dentro de la función
 @router.post("/login", response_model=LoginResponse, status_code=200)
 async def login(user: UserLogin ):
@@ -48,12 +33,12 @@ async def login(user: UserLogin ):
 
         # 1.Autenticar contra Bonita
         login_response = await bonita.login(user.username, user.password)
-  
+
         # 2. Obtener la información del usuario
         user_info = await bonita.get_user_info(username=user.username)
-        
+
         # 3. Obtener los memberships (grupos/roles)
-        memberships = await get_memberships_by_user(user_info, bonita)
+        memberships = await bonita.get_memberships_by_user(user_info["id"])
 
         # 4. Expiración del token
         expire_delta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -63,12 +48,22 @@ async def login(user: UserLogin ):
         token_data = {
             "sub": user.username,
             "user_id": user_info["id"],
+            "firstname": user_info["firstname"],
+            "lastname": user_info["lastname"],
             "memberships": memberships,
             "bonita_auth": login_response.get("sessionId"), # cifrar mas adelante
             "bonita_token": login_response.get("token"),    # cifrar mas adelante
             "iat": datetime.now(timezone.utc),
             "exp": expire_time
         }
+
+        # 6. Obtener la información personalizada del usuario con rol representante de ONG por su definición "cuitONG"
+        #    Nota: solo los usuarios representantes de ONG deberian tener ese campo custom con un valor no vacío
+        #    Si no existe, custom_user_info será None
+        #    deberia ser mas explicito con el rol del usuario antes de intentar obtener la información personalizada
+        custom_user_info = await bonita.get_custom_user_info_by_user_id_and_definition_name(user_info["id"], "cuitONG") 
+        if custom_user_info:
+            token_data["cuitONG"] = custom_user_info["value"]
 
         fastapi_jwt = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -98,6 +93,11 @@ async def login(user: UserLogin ):
 async def logout(bonita: BonitaService = Depends(get_bonita_service)):
     try:
         await bonita.logout()
+
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 401:
+            raise HTTPException(status_code=401, detail="No se pudo cerrar sesión del usuario")
+        raise HTTPException(status_code=500, detail="Error del servicio de autenticación")
     except Exception as e:
             raise HTTPException(status_code=401, detail="No se pudo cerrar sesión del usuario")
     return Response(status_code=204)

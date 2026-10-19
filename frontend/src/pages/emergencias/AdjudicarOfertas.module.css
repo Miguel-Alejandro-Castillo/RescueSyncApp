@@ -1,0 +1,372 @@
+.page {
+	--card-border: color-mix(in srgb, var(--border) 82%, #ffffff 18%);
+	--warm-surface: linear-gradient(180deg, rgba(255, 252, 245, 0.95) 0%, rgba(255, 255, 255, 0.98) 100%);
+	color: var(--ink);
+	max-width: 800px;
+	margin: 0 auto;
+	/* padding: 2rem 1.25rem 3rem; */
+    padding: 0rem 1.25rem 2rem; /* reducir el padding superior */
+}
+
+.backButton {
+	border: 1px solid var(--border);
+	background: transparent;
+	color: var(--ink);
+	border-radius: 999px;
+	padding: 0.65rem 1rem;
+	cursor: pointer;
+	margin-bottom: 1.5rem;
+}
+
+.hero {
+	display: flex;
+	flex-direction: column; /* los elementos de arriba quedan abajo del otro */
+	justify-content: space-between;
+	/*gap: 1rem; */
+	align-items: flex-start;
+	margin-bottom: 1.75rem;
+}
+
+.title {
+	margin: 0;
+	/* font-size: clamp(2rem, 5vw, 3rem); */
+    font-size: clamp(1.8rem, 4vw, 2.5rem);
+	line-height: 0.95;
+	text-transform: uppercase;
+}
+
+.subtitle {
+	margin: 0.65rem 0 0;
+	max-width: 100ch;
+	color: var(--muted);
+}
+
+.statusPill,
+.loteBadge,
+.offerType {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 999px;
+	padding: 0.45rem 0.85rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-size: 0.78rem;
+	font-weight: 800;
+}
+
+.statusPill,
+.loteBadge {
+	background: #ffe7b8;
+	color: #7c4a03;
+}
+
+.offerType {
+	background: #eef2ff;
+	color: #312e81;
+}
+
+.loteCard,
+.offerCard,
+.summaryCard,
+.panel {
+	border: 1px solid var(--card-border);
+	/* background: var(--warm-surface); */
+    background: var(--surface);
+	box-shadow: 0 18px 45px rgba(22, 29, 37, 0.06);
+}
+
+.loteCard,
+.summaryCard {
+	border-radius: 24px;
+	padding: 1.35rem;
+}
+
+.summaryCard {
+    margin-top: 1.5rem;
+}
+
+.loteHeader,
+.offerHeader {
+	display: flex;
+	justify-content: space-between;
+	gap: 1rem;
+	align-items: flex-start;
+}
+
+.loteId {
+	margin: 0 0 0.35rem;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--muted);
+	font-size: 0.8rem;
+	font-weight: 700;
+}
+
+.loteTitle,
+.offerTitle,
+.summaryTitle,
+.panelTitle,
+.sectionTitle {
+	margin: 0;
+}
+
+.loteTitle {
+	/* font-size: clamp(1.2rem, 3vw, 1.6rem); */
+    font-size: clamp(1rem, 2.5vw, 1.3rem);
+}
+
+.panel {
+	margin-top: 1rem;
+	border-radius: 20px;
+	padding: 1rem;
+}
+
+.panelTitle,
+.sectionTitle,
+.summaryTitle {
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-size: 0.95rem;
+}
+
+.metrics,
+.summaryGrid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.9rem;
+	margin-top: 1rem;
+}
+
+.metricLabel,
+.summaryGrid span {
+	display: block;
+	color: var(--muted);
+	font-size: 0.82rem;
+	margin-bottom: 0.3rem;
+}
+
+.metricValue,
+.summaryGrid strong {
+	/*font-size: clamp(1.5rem, 4vw, 2rem); */
+    font-size: clamp(1.0rem, 2vw, 1.2rem);
+}
+
+.progressBlock {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin-top: 1rem;
+}
+
+.progressTrack {
+	flex: 1;
+	height: 14px;
+	border-radius: 999px;
+	background: #e7e5e4;
+	overflow: hidden;
+}
+
+.progressFill {
+	height: 100%;
+	border-radius: 999px;
+	background: linear-gradient(90deg, #0f766e 0%, #34d399 100%);
+}
+
+.progressText {
+	min-width: 3rem;
+	font-weight: 800;
+	color: #0f766e;
+}
+
+.section {
+	margin-top: 2rem;
+}
+
+.sectionHeader {
+	display: flex;
+	justify-content: space-between;
+	gap: 1rem;
+	align-items: end;
+	margin-bottom: 1rem;
+}
+
+.sectionHint,
+.offerMeta {
+	margin: 0.35rem 0 0;
+	color: var(--muted);
+}
+
+.offerList {
+	display: grid;
+	gap: 1rem;
+}
+
+.offerCard {
+	border-radius: 22px;
+	padding: 1.15rem;
+}
+
+.participantsBlock {
+	margin-top: 1rem;
+}
+
+.participantsHeadingRow {
+	padding-bottom: 0.75rem;
+	border-bottom: 1px solid var(--card-border);
+}
+
+.participantsHeading {
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	font-size: 0.8rem;
+	font-weight: 800;
+}
+
+.participantsList {
+	display: grid;
+	gap: 0.9rem;
+	padding-top: 1rem;
+}
+
+.participantRow {
+	display: flex;
+	justify-content: space-between;
+	gap: 1rem;
+	align-items: center;
+}
+
+.participantInfo {
+	display: grid;
+	gap: 0.2rem;
+}
+
+.participantName {
+	font-size: 1rem;
+}
+
+.participantOffer {
+	color: var(--muted);
+	font-size: 0.92rem;
+}
+
+.stepper {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.stepperButton {
+	width: 2.25rem;
+	height: 2.25rem;
+	border-radius: 10px;
+	border: 1px solid var(--border);
+	/*background: #fff; */
+	color: var(--ink);
+	font-weight: 800;
+	cursor: pointer;
+}
+
+.stepperButton:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+.stepperInput {
+	width: 4rem;
+	border-radius: 10px;
+	border: 1px solid var(--border);
+	/* background: #fff; */
+	padding: 0.55rem;
+	text-align: center;
+	font-weight: 700;
+	appearance: textfield;
+	-moz-appearance: textfield;
+}
+
+.stepperInput::-webkit-outer-spin-button,
+.stepperInput::-webkit-inner-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+.offerFooter {
+	margin-top: 1rem;
+	padding-top: 0.85rem;
+	border-top: 1px solid var(--card-border);
+	color: var(--muted);
+}
+
+.warning,
+.success,
+.error {
+	margin: 1rem 0 0;
+	font-weight: 700;
+}
+
+.warning {
+	color: #b45309;
+}
+
+.error {
+	color: #b91c1c;
+}
+
+.success {
+	color: #0f766e;
+}
+
+.actions {
+	display: flex;
+	justify-content: end;
+	gap: 0.75rem;
+	/*margin-top: 1.5rem;*/
+    margin-top: 1rem;
+}
+
+.primaryAction,
+.secondaryAction {
+	border-radius: 999px;
+	/*padding: 0.9rem 1.35rem;*/
+    /*padding: 0.7rem 1rem;*/
+    padding: 0.5rem 0.85rem;
+	font-weight: 800;
+	cursor: pointer;
+}
+
+.primaryAction {
+	border: none;
+	background: linear-gradient(135deg, #14532d 0%, #22c55e 100%);
+	color: white;
+}
+
+.secondaryAction {
+	border: 1px solid var(--border);
+	/*background: #fff; */
+	color: var(--ink);
+}
+
+@media (max-width: 760px) {
+	.hero,
+	.loteHeader,
+	.offerHeader,
+	.sectionHeader,
+	.participantRow,
+	.actions {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.metrics,
+	.summaryGrid {
+		grid-template-columns: 1fr;
+	}
+
+	.stepper {
+		justify-content: flex-start;
+	}
+
+	.actions > * {
+		width: 100%;
+	}
+}

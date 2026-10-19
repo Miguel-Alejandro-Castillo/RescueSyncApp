@@ -2,15 +2,14 @@
 import argparse
 import os
 from urllib.parse import urlparse
-
 import httpx
 from datetime import datetime, timedelta, timezone
-
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlmodel import Session, create_engine, select
-
 from models import Emergencia, Lote, Oferta
+from models.emergencia import EmergenciaEstado
+from models.lote import LoteEstado
 
 
 PASSWORD = '1234'
@@ -143,7 +142,7 @@ def seed(session, now=None):
         emergency = Emergencia(
             zonaAfectada=marker, nivelGravedad=severity,
             descripcionInicial=f'Datos ficticios de desarrollo. {description}',
-            estado='publicada' if lots else 'creada', fechaCreacion=now,
+            estado=EmergenciaEstado.PUBLICADA if lots else EmergenciaEstado.CREADA, fechaCreacion=now,
             bonitaCaseId=None,
         )
         session.add(emergency)
@@ -154,7 +153,7 @@ def seed(session, now=None):
                 emergenciaId=emergency.id, tipoRecurso=resource,
                 descripcion=f'[DEMO] {detail}', cantidad=quantity,
                 cantidadCubierta=covered,
-                estado='cubierto' if covered == quantity else 'creado',
+                estado=LoteEstado.CUBIERTO if covered == quantity else LoteEstado.CREADO,
                 fechaCreacion=now, fechaLimiteConvocatoria=now + timedelta(days=7),
             )
             session.add(lot)

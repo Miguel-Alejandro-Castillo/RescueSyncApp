@@ -1,4 +1,4 @@
-import { ACTIONS, canAccess } from './permissions.js';
+import { canAccess, getPermissionForPath } from './permissions.js';
 
 export function getLoginDestination(from, memberships) {
   if (typeof from !== 'string' || !from.startsWith('/') || from.startsWith('//') || from.includes('\\')) {
@@ -6,7 +6,6 @@ export function getLoginDestination(from, memberships) {
   }
   const pathname = from.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
   if (pathname === '/' || pathname === '/dashboard') return from;
-  const permission = ACTIONS.find(action => action.path === pathname)?.permission
-    || (/^\/emergencias\/[^/]+\/lotes$/.test(pathname) ? 'ofertas.crear' : null);
+  const permission = getPermissionForPath(pathname);
   return permission && canAccess(memberships, permission) ? from : '/dashboard';
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { obtenerEmergenciasPendientes } from '../../services/lotesService';
+import { getNivelGravedadLabel } from '../../constants/gravedad';
 import styles from './AltaLotes.module.css';
 
 export default function SeleccionarEmergencia() {
@@ -33,7 +34,7 @@ export default function SeleccionarEmergencia() {
         <article className="panel" key={emergencia.id}>
           <div className={styles.row}>
             <h2>{emergencia.zonaAfectada}</h2>
-            <span className="badge bg-secondary">Gravedad: {emergencia.nivelGravedad}</span>
+            <span className="badge bg-secondary">Gravedad: {getNivelGravedadLabel(emergencia.nivelGravedad)}</span>
           </div>
           <p>{emergencia.descripcionInicial}</p>
           <Link className="btn btn-primary" to={`/lotes/nuevo?emergenciaId=${encodeURIComponent(emergencia.id)}`}>Organizar lotes · Emergencia #{emergencia.id}</Link>

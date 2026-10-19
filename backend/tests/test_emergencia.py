@@ -1,6 +1,6 @@
 from sqlmodel import select
 
-from models.emergencia import Emergencia
+from models.emergencia import Emergencia, EmergenciaEstado
 
 
 def test_post_emergencia_se_guarda_en_la_bd(client, session, auth_headers):
@@ -25,7 +25,7 @@ def test_post_emergencia_se_guarda_en_la_bd(client, session, auth_headers):
     assert guardadas[0].zonaAfectada == "Zona Norte"
     assert guardadas[0].nivelGravedad == "alto"
     assert guardadas[0].descripcionInicial == "Inundacion en el barrio"
-    assert guardadas[0].estado == "creada"
+    assert guardadas[0].estado == EmergenciaEstado.CREADA
     assert guardadas[0].id is not None
     assert guardadas[0].fechaCreacion is not None
     assert guardadas[0].usuarioCreador == "1"

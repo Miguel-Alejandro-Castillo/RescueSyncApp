@@ -10,6 +10,9 @@ import {
 } from "react-router-dom";
 import Dashboard from "../pages/dashboard/Dashboard";
 import AltaEmergencia from "../pages/emergencias/AltaEmergencia";
+import MisEmergencias from "../pages/emergencias/MisEmergencias";
+import VerLotes from "../pages/emergencias/VerLotes";
+import AdjudicarOfertas from "../pages/emergencias/AdjudicarOfertas";
 import AltaLotes from "../pages/lotes/AltaLotes";
 import Login from "../pages/auth/Login";
 import Header from "../components/layout/Header/Header";
@@ -54,6 +57,9 @@ export default function AppRouter() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/emergencias/nueva" element={<RequirePermission permission="emergencias.crear"><AltaEmergencia /></RequirePermission>} />
+            <Route path="/emergencias/propias" element={<RequirePermission permission="emergencias.ver_propias"><MisEmergencias /></RequirePermission>} />
+            <Route path="/emergencias/propias/:id/lotes" element={<RequirePermission permission="emergencias.ver_lotes"><VerLotes /></RequirePermission>} />
+            <Route path="/emergencias/propias/:id/lotes/:idLote/adjudicar-ofertas" element={<RequirePermission permission="emergencias.adjudicar_ofertas"><AdjudicarOfertas /></RequirePermission>} />
             <Route path="/lotes/nuevo" element={<RequirePermission permission="lotes.crear"><AltaLotes /></RequirePermission>} />
             <Route path="/ofertas" element={<RequirePermission permission="ofertas.crear"><CargarOfertas /></RequirePermission>} />
             <Route path="/emergencias/:id/lotes" element={<RequirePermission permission="ofertas.crear"><DetalleLotes /></RequirePermission>} />

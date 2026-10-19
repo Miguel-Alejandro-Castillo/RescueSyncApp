@@ -1,6 +1,12 @@
 from datetime import datetime, timezone
+from enum import Enum
 from sqlmodel import Field, SQLModel
 
+
+class EmergenciaEstado(str, Enum):
+    CREADA = "creada"
+    PUBLICADA = "publicada"
+    CONVOCATORIA_CERRADA = "convocatoria_cerrada"
 
 class Emergencia(SQLModel, table=True):
     __tablename__ = "emergencias"
@@ -32,14 +38,14 @@ class Emergencia(SQLModel, table=True):
     estado: str = Field(
         min_length=1,
         max_length=50,
-        default="creada",
+        default=EmergenciaEstado.CREADA,
         description="Estado de la emergencia"
     )
 
     usuarioCreador: str = Field(
         min_length=1,
         max_length=255,
-        description="Usuario que creó la emergencia"
+        description="Usuario Operador Municipal que creó la emergencia"
     )   
 
     fechaCreacion: datetime = Field(
