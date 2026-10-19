@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { crearEmergencia } from "../../services/emergenciaService";
+import { GRAVEDAD_OPTIONS, NIVELES_GRAVEDAD } from "../../constants/gravedad";
 import styles from "./AltaEmergencia.module.css";
 import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 const initialFormData = {
   zonaAfectada: "",
-  nivelGravedad: "medio",
+  nivelGravedad: NIVELES_GRAVEDAD.MEDIO,
   descripcionInicial: "",
 };
 export default function AltaEmergencia() {
@@ -87,10 +88,9 @@ export default function AltaEmergencia() {
                 onChange={handleChange}
                 required
               >
-                <option value="bajo">Bajo</option>
-                <option value="medio">Medio</option>
-                <option value="alto">Alto</option>
-                <option value="critico">Crítico</option>
+                {GRAVEDAD_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
               </select>
               <FieldError name="nivelGravedad" />
             </div>

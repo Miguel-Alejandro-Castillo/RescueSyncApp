@@ -155,7 +155,7 @@ services:
       VITE_API_RESCUE_URL: http://localhost:3000
       VITE_API_RESCUE: /api/rescue
       VITE_API_NACIONAL_URL: http://localhost:4000
-      VITE_API_NACIONAL: /api/nacional
+      VITE_API_NACIONAL: /api/v1
       CHOKIDAR_USEPOLLING: "true" # Asegura que watchers subyacentes como Chokidar detecten cambios
     depends_on:
       - backend

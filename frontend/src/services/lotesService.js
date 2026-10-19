@@ -1,5 +1,6 @@
 import { API_RESCUE } from '../config/api';
 import { authenticatedFetch } from './authService';
+import { EMERGENCIA_ESTADOS } from '../constants/emergencia';
 
 async function request(path, options) {
   const response = await authenticatedFetch(`${API_RESCUE}${path}`, options);
@@ -11,24 +12,33 @@ async function request(path, options) {
   }
   return response.json();
 }
+
 export async function obtenerEmergenciasPendientes() {
-  const data = await request('/emergencias?estado=creada');
+  const data = await request(`/emergencias?estado=${EMERGENCIA_ESTADOS.CREADA}`);
   if (!Array.isArray(data)) throw new Error('No se pudo interpretar el listado de emergencias.');
-  return data.filter(emergencia => emergencia.estado === 'creada');
+  return data.filter(emergencia => emergencia.estado === EMERGENCIA_ESTADOS.CREADA);
 }
+
 export const obtenerEmergenciaPorId = id => request(`/emergencias/${encodeURIComponent(id)}`);
+
 export const crearLotes = payload => request('/lotes', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(payload),
 });
+
 export const reformularLotes = payload => request('/lotes/reformular', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(payload),
 });
+
 export const reabrirConvocatoria = ofertaId => request('/lotes/reabrir', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ ofertaId }),
 });
+
+export const obtenerLote = loteId => request(`/lotes/${encodeURIComponent(loteId)}`);
+
+export const obtenerOfertasLote = loteId => request(`/lotes/${encodeURIComponent(loteId)}/ofertas`);

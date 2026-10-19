@@ -9,10 +9,10 @@ from dependencies.rbac import (
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database import get_session
-from models.emergencia import Emergencia
+from models.emergencia import Emergencia, EmergenciaEstado
+from models.lote import Lote, LoteEstado
 from services.bonita_service import BonitaService
 from typing import List
-from models.lote import Lote
 from models.oferta import Oferta
 from dependencies.rbac import get_user_roles
 from fastapi import Depends, HTTPException, Response
@@ -31,6 +31,7 @@ def read_emergencias(
     zonaAfectada: str | None = None,
     fechaDesde: datetime | None = None,
     fechaHasta: datetime | None = None,
+    usuarioCreador: str | None = None,
     session: Session = Depends(get_session)
 ):
     query = select(Emergencia)
@@ -49,6 +50,8 @@ def read_emergencias(
         if fechaHasta.tzinfo is None:
             fechaHasta = fechaHasta.replace(tzinfo=timezone.utc)
         query = query.where(Emergencia.fechaCreacion <= fechaHasta)
+    if usuarioCreador:
+        query = query.where(Emergencia.usuarioCreador == usuarioCreador)
 
     return session.exec(query.order_by(Emergencia.fechaCreacion.desc(), Emergencia.id.desc())).all()
 
@@ -90,7 +93,7 @@ async def create_emergencia(
 
         session.commit()
         session.refresh(emergencia) # Refresca la instancia de la emergencia desde la base de datos para obtener los valores actualizados
-        
+
     except Exception as e:
         # Revertir los cambios en la sesión de la base de datos en caso de error
         session.rollback()
@@ -118,12 +121,7 @@ def delete_emergencia(
     session.commit()
     return {"ok": True}
 
-
-@router.get(
-    "/{emergencia_id}/lotes",
-    response_model=List[Lote],
-    dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))]
-)
+@router.get("/{emergencia_id}/lotes", response_model=List[Lote], dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))])
 def get_lotes_by_emergencia(
     emergencia_id: int,
     current_user: dict = Depends(get_current_user),
@@ -133,10 +131,29 @@ def get_lotes_by_emergencia(
     emergencia = session.get(Emergencia, emergencia_id)
     if not emergencia:
         raise HTTPException(status_code=404, detail="Emergencia no encontrada")
-    
+
+    lotes = session.exec(select(Lote).where(Lote.emergenciaId == emergencia_id).order_by(Lote.fechaCreacion.desc(), Lote.id.desc())).all()
+    return lotes
+
+# Ahora este metodo se invoca desde la vista DetalleLotes.jsx
+@router.get(
+    "/{emergencia_id}/lotes-disponibles",
+    response_model=List[Lote],
+    dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))]
+)
+def get_lotes_disponibles(
+    emergencia_id: int,
+    current_user: dict = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
+
+    emergencia = session.get(Emergencia, emergencia_id)
+    if not emergencia:
+        raise HTTPException(status_code=404, detail="Emergencia no encontrada")
+
     abiertos= select(Lote).where(
         Lote.emergenciaId == emergencia_id,
-        Lote.estado.in_(["creado", "activo"])
+        Lote.estado.in_([LoteEstado.CREADO, LoteEstado.ACTIVO])
     )
     if REPRESENTANTE_ONG in get_user_roles(current_user):
         ofertados = select(Oferta.lote_id).where(
@@ -156,13 +173,13 @@ class NotificarTimeoutRequest(BaseModel):
 async def notificar_por_timeout(
     request: NotificarTimeoutRequest,
     session: Session = Depends(get_session)
-):  
+):
     # buscar emergencia por case_id en Bonita
     emergencia = session.exec(select(Emergencia).where(Emergencia.bonitaCaseId == request.case_id)).first()
     if not emergencia:
         raise HTTPException(status_code=404, detail="Emergencia no encontrada")
 
-    emergencia.estado = "convocatoria_cerrada"
+    emergencia.estado = EmergenciaEstado.CONVOCATORIA_CERRADA
     session.commit()
 
     return Response(status_code=204)

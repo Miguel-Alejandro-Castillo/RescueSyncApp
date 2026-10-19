@@ -8,5 +8,6 @@ export const ENDPOINTS = {
     LOGIN: `${API_RESCUE}/auth/login`,
     LOGOUT: `${API_RESCUE}/auth/logout`,
     EMERGENCIAS:
-        `${API_RESCUE}/emergencias`
+        `${API_RESCUE}/emergencias`,
+    OFERTAS: `${API_RESCUE}/ofertas`
 };

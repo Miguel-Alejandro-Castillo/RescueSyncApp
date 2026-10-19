@@ -41,7 +41,8 @@ hr {
 .main-content {
   width: min(1120px, 100%);
   margin: auto;
-  padding: 44px 24px 64px;
+  /* padding: 44px 24px 64px; */
+  padding: 2rem 24px 64px; /* reducir el padding superior */
   flex: 1;
 }
 .page-heading {

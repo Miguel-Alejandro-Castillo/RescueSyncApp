@@ -1,0 +1,51 @@
+.page {
+    max-width: 1000px;
+    margin: auto;
+    color: var(--ink);
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.cardBody {
+    padding: 24px;
+}
+
+.title {
+    color: var(--ink);
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+h2.title {
+    font-size: 1.25rem;
+}
+
+.submit {
+    background: var(--primary);
+    color: var(--on-primary);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    /* padding: 10px 16px; */
+    padding: 0.5rem 0.75rem 0.5rem 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.submit:hover {
+    background: var(--primary-hover);
+}
+
+.submit:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+}
+
+@media (max-width: 576px) {
+    .cardBody {
+        padding: 16px;
+    }
+}

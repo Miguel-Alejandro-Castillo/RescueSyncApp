@@ -2,7 +2,6 @@ import asyncio
 import os
 from clients.http_client import HttpClient
 import time
-import httpx
 from fastapi import HTTPException
 
 class BonitaService:
@@ -10,6 +9,9 @@ class BonitaService:
     # definir constantes para la autenticación de la api de bonita
     API_TOKEN_HEADER = "X-Bonita-API-Token"
     COOKIE_JSESSIONID = "JSESSIONID"
+    IDENTITY_API = "/API/identity"
+    SYSTEM_API = "/API/system"
+    CUSTOM_USER_INFO_API = "/API/customuserinfo"
 
     def __init__(self):
         base_url = os.getenv("BONITA_ENGINE_URL")
@@ -83,7 +85,7 @@ class BonitaService:
     # devuelve un array de objetos con la información personalizada del usuario
     async def get_custom_user_info(self, user_id: str):
         response = await self.http_client.get(
-            f"/API/customuserinfo/user",
+            f"{self.CUSTOM_USER_INFO_API}/user",
             params = {
                 "p": 0, # (Required) index of the page to display
                 "f": f"userId={user_id}"
@@ -104,12 +106,12 @@ class BonitaService:
     async def get_user_info(self, username: str):
         # A regular user can read their own identity, but cannot search all users.
         session = await self.http_client.get(
-            "/API/system/session/unusedId",
+            f"{self.SYSTEM_API}/session/unusedId",
             headers=self._auth_headers(),
         )
         user_id = session.json()["user_id"]
         response = await self.http_client.get(
-            f"/API/identity/user/{user_id}",
+            f"{self.IDENTITY_API}/user/{user_id}",
             headers=self._auth_headers(),
         )
         user_info = response.json()
@@ -120,7 +122,7 @@ class BonitaService:
     # Devuelve los memberships(grupo + rol) de un usuario específico por su ID
     async def get_memberships_by_user_id(self, user_id: str):
         response = await self.http_client.get(
-            "/API/identity/membership",
+            f"{self.IDENTITY_API}/membership",
             headers=self._auth_headers(),
             params = {
                 "p": 0, # (Required) index of the page to display
@@ -131,21 +133,21 @@ class BonitaService:
 
     async def get_group_by_id(self, group_id: str):
         response = await self.http_client.get(
-            f"/API/identity/group/{group_id}",
+            f"{self.IDENTITY_API}/group/{group_id}",
             headers=self._auth_headers()
         )
         return response.json()
 
     async def get_role_by_id(self, role_id: str):
         response = await self.http_client.get(
-            f"/API/identity/role/{role_id}",
+            f"{self.IDENTITY_API}/role/{role_id}",
             headers=self._auth_headers()
         )
         return response.json()
 
     async def get_role_by_name(self, role_name: str):
         response = await self.http_client.get(
-            "/API/identity/role",
+            f"{self.IDENTITY_API}/role",
             headers=self._auth_headers(),
             params = {
                 "p": 0, # (Required) index of the page to display
@@ -235,10 +237,10 @@ class BonitaService:
         )
 
     # Devuelve un listado de todas las tareas activas por caso
-    async def obtener_tareas_por_caso(self, caseId: str):
+    async def obtener_tareas_por_caso(self, case_id: str):
         params = [
             ("p", 0),
-            ("f", f"caseId={caseId}"),
+            ("f", f"caseId={case_id}"),
             ("f", "state=ready")
         ]
         response = await self.http_client.get(
@@ -249,10 +251,10 @@ class BonitaService:
         return response.json()
 
     # Devuelve un listado de todas las tareas humanas activas por caso
-    async def obtener_tareas_humanas_por_caso(self, caseId: str):
+    async def obtener_tareas_humanas_por_caso(self, case_id: str):
         params = [
             ("p", 0),
-            ("f", f"caseId={caseId}"),
+            ("f", f"caseId={case_id}"),
             ("f", "state=ready")
         ]
         response = await self.http_client.get(
@@ -264,8 +266,8 @@ class BonitaService:
         return response.json()
 
     # Devuelve la primera tarea humana activa para un caso específico, o None si no hay tareas disponibles.
-    async def obtener_tarea_humana_por_caso(self, caseId: str):
-        tareas = await self.obtener_tareas_humanas_por_caso(caseId)
+    async def obtener_tarea_humana_por_caso(self, case_id: str):
+        tareas = await self.obtener_tareas_humanas_por_caso(case_id)
         return tareas[0] if tareas else None
 
     # Completa una tarea humana específica por su ID
@@ -289,10 +291,15 @@ class BonitaService:
         )
         # retorna un HTTP 204, no devuelve nada, solo completa la tarea humana
 
+    async def completar_tarea_humana_por_caso(self, case_id: str, contract: dict | None = None):
+        tarea_humana = await self.obtener_tarea_humana_por_caso(case_id)
+        if tarea_humana:
+            await self.completar_tarea_humana(tarea_humana["id"], contract)
+
     # Devuelve un listado de todos los usuarios disponibles
     async def obtener_usuarios(self):
         response = await self.http_client.get(
-            "/API/identity/user",
+            f"{self.IDENTITY_API}/user",
             headers=self._auth_headers(),
             params = {
                 "p": 0, # (Required) index of the page to display
@@ -318,7 +325,7 @@ class BonitaService:
     # Espera hasta que aparezcan tareas humanas en estado 'ready' para un caso específico o hasta que se agote el tiempo de espera.
     async def esperar_tareas_humanas_por_caso(
         self,
-        caseId: str,
+        case_id: str,
         timeout_segundos: int = 20,
         intervalo_ms: int = 200
     ):
@@ -326,7 +333,7 @@ class BonitaService:
 
         while True:
 
-            tareas = await self.obtener_tareas_humanas_por_caso(caseId)
+            tareas = await self.obtener_tareas_humanas_por_caso(case_id)
 
             if tareas:
                 return tareas
@@ -335,7 +342,7 @@ class BonitaService:
 
             if transcurrido >= timeout_segundos:
                 raise TimeoutError(
-                    f"No aparecieron tareas para el caso {caseId} "
+                    f"No aparecieron tareas para el caso {case_id} "
                     f"en {timeout_segundos} segundos"
                 )
 
@@ -345,29 +352,43 @@ class BonitaService:
 
     async def esperar_tarea_humana_por_caso(
         self,
-        caseId: str,
+        case_id: str,
         timeout_segundos: int = 20,
         intervalo_ms: int = 200
     ):
-        tareas = await self.esperar_tareas_humanas_por_caso(caseId, timeout_segundos, intervalo_ms)
+        tareas = await self.esperar_tareas_humanas_por_caso(case_id, timeout_segundos, intervalo_ms)
         return tareas[0] if tareas else None
 
     # Establece una variable de proceso de un caso específica en Bonita BPM. Devuelve un 200 OK sin cuerpo.
     # Parámetros:
-    # - caseId: ID del caso en Bonita BPM.
+    # - case_id: ID del caso en Bonita BPM.
     # - variable_name: Nombre de la variable a establecer.
     # - tipo_variable: Tipo de la variable en Java (e.g., "java.lang.Long").
     # - variable_value: Valor de la variable a establecer.
     # Java type for the variable (e.g., "java.lang.Long")
-    async def set_case_variable(self, caseId: str, variable_name: str, tipo_variable: str, variable_value):
+    async def set_case_variable(self, case_id: str, variable_name: str, tipo_variable: str, variable_value):
         await self.http_client.put(
-            f"{self.api_path}/caseVariable/{caseId}/{variable_name}",
+            f"{self.api_path}/caseVariable/{case_id}/{variable_name}",
             headers=self._auth_headers(),
             json = {
                 "type": tipo_variable,
                 "value": variable_value
             }
         )
+
+    # Devuelve los memberships(grupo + rol) con name de grupo y rol de un usuario específico por su nombre de usuario
+    async def get_memberships_by_user(self, user_id):
+        memberships = await self.get_memberships_by_user_id(user_id=user_id)
+        _memberships = []
+        for membership in memberships:
+            group = await self.get_group_by_id(group_id=membership["group_id"])
+            role = await self.get_role_by_id(role_id=membership["role_id"])
+
+        _memberships.append({
+            "group": { "name": group["name"], "displayName": group["displayName"] },
+            "role": { "name": role["name"], "displayName": role["displayName"] }
+        })
+        return _memberships
 
     async def close(self):
         """Cierra las conexiones del cliente HTTP subyacente."""

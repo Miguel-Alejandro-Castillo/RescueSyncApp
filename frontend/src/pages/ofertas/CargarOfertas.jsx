@@ -4,6 +4,22 @@ import styles from './CargarOfertas.module.css';
 import { API_RESCUE } from '../../config/api';
 import { authenticatedFetch } from '../../services/authService';
 import CuentaRegresiva from '../../components/CuentaRegresiva';
+import { NIVELES_GRAVEDAD, getNivelGravedadLabel, normalizeNivelGravedad } from '../../constants/gravedad';
+
+const getNivelStyle = (nivel) => {
+  switch (normalizeNivelGravedad(nivel)) {
+    case NIVELES_GRAVEDAD.CRITICO:
+      return { backgroundColor: '#ffe5e5', color: '#d90429' };
+    case NIVELES_GRAVEDAD.ALTO:
+      return { backgroundColor: '#fff3cd', color: '#856404' };
+    case NIVELES_GRAVEDAD.MEDIO:
+      return { backgroundColor: '#e0f2fe', color: '#0369a1' };
+    case NIVELES_GRAVEDAD.BAJO:
+      return { backgroundColor: '#d1fae5', color: '#065f46' };
+    default:
+      return { backgroundColor: '#e9ecef', color: '#495057' };
+  }
+};
 
 export default function CargarOfertas() {
   const [emergencias, setEmergencias] = useState([]);
@@ -106,10 +122,9 @@ export default function CargarOfertas() {
                         borderRadius: '0.6rem',
                         fontWeight: 'bold',
                         fontSize: '0.85rem',
-                        backgroundColor: emergencia.nivelGravedad === 'Critica' ? '#ffe5e5' : '#fff3cd',
-                        color: emergencia.nivelGravedad === 'Critica' ? '#d90429' : '#856404'
+                        ...getNivelStyle(emergencia.nivelGravedad),
                       }}>
-                        Gravedad: {emergencia.nivelGravedad}
+                        Gravedad: {getNivelGravedadLabel(emergencia.nivelGravedad)}
                       </span>
 
                       {lotes[0]?.fechaLimiteConvocatoria && (

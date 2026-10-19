@@ -5,6 +5,7 @@ import { API_RESCUE } from '../../config/api';
 import { authenticatedFetch, getSession } from '../../services/authService';
 import CuentaRegresiva from '../../components/CuentaRegresiva';
 import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
+import { LOTE_ESTADOS } from '../../constants/lote';
 
 export default function DetalleLotes() {
   const { id } = useParams();
@@ -29,7 +30,7 @@ export default function DetalleLotes() {
       try {
         setLoading(true);
         // 1. Obtener lotes de la emergencia
-        const resLotes = await authenticatedFetch(`${API_RESCUE}/emergencias/${id}/lotes`);
+        const resLotes = await authenticatedFetch(`${API_RESCUE}/emergencias/${id}/lotes-disponibles`);
         if (!resLotes.ok) throw new Error('Error al obtener los lotes');
         const dataLotes = await resLotes.json();
         setLotes(Array.isArray(dataLotes) ? dataLotes : []);
@@ -189,7 +190,7 @@ export default function DetalleLotes() {
                     </p>
                   </div>
 
-                  {lote.estado !== 'cubierto' && !convocatoriaCerrada && (
+                  {lote.estado !== LOTE_ESTADOS.CUBIERTO && !convocatoriaCerrada && (
                     <button
                       onClick={() => toggleFormulario(lote.id)}
                       style={{ padding: '0.5rem 1rem', cursor: 'pointer', borderRadius: '6px', backgroundColor: estaDesplegado ? 'var(--surface-raised)' : 'var(--primary)', color: estaDesplegado ? 'var(--ink)' : 'var(--on-primary)', fontWeight: 'bold' }}

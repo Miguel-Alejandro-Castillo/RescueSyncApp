@@ -6,6 +6,8 @@ import SeleccionarEmergencia from './SeleccionarEmergencia';
 import {  obtenerEmergenciaPorId,crearLotes,reformularLotes } from '../../services/lotesService';
 import { authenticatedFetch } from '../../services/authService';
 import { API_RESCUE } from '../../config/api';
+import { EMERGENCIA_ESTADOS } from '../../constants/emergencia';
+import { NIVELES_GRAVEDAD, getNivelGravedadLabel, normalizeNivelGravedad } from '../../constants/gravedad';
 
 export default function AltaLotes() {
     const [params] = useSearchParams();
@@ -61,7 +63,7 @@ const FormularioLotes = () => {
 
         obtenerEmergenciaPorId(emergenciaId)
             .then((data) => {
-                if (!ofertaId && data.estado !== 'creada') {
+                if (!ofertaId && data.estado !== EMERGENCIA_ESTADOS.CREADA) {
                     setError('La emergencia seleccionada no se encuentra pendiente de desglose.');
                     return;
                 }
@@ -105,15 +107,15 @@ const FormularioLotes = () => {
     };
 
     const getBadgeGravedad = (gravedad) => {
-        switch (gravedad?.toLowerCase()) {
-            case 'critico':
-                return <span className="badge bg-danger text-uppercase px-3 py-2">Gravedad: Crítica</span>;
-            case 'alto':
-                return <span className="badge bg-warning text-dark text-uppercase px-3 py-2">Gravedad: Alta</span>;
-            case 'medio':
-                return <span className="badge bg-info text-dark text-uppercase px-3 py-2">Gravedad: Media</span>;
+        switch (normalizeNivelGravedad(gravedad)) {
+            case NIVELES_GRAVEDAD.CRITICO:
+                return <span className="badge bg-danger text-uppercase px-3 py-2">Gravedad: {getNivelGravedadLabel(gravedad)}</span>;
+            case NIVELES_GRAVEDAD.ALTO:
+                return <span className="badge bg-warning text-dark text-uppercase px-3 py-2">Gravedad: {getNivelGravedadLabel(gravedad)}</span>;
+            case NIVELES_GRAVEDAD.MEDIO:
+                return <span className="badge bg-info text-dark text-uppercase px-3 py-2">Gravedad: {getNivelGravedadLabel(gravedad)}</span>;
             default:
-                return <span className="badge bg-secondary text-uppercase px-3 py-2">Gravedad: Baja</span>;
+                return <span className="badge bg-secondary text-uppercase px-3 py-2">Gravedad: {getNivelGravedadLabel(gravedad)}</span>;
         }
     };
 

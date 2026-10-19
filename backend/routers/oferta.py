@@ -7,17 +7,21 @@ from typing import List, Optional
 from dependencies.rbac import (
     require_roles, REPRESENTANTE_ONG, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, AUDITORES, get_user_roles
 )
-from models.emergencia import Emergencia
-from models.lote import Lote
+from models.emergencia import Emergencia, EmergenciaEstado
+from models.lote import Lote, LoteEstado
 from models.oferta import Oferta
 from models.participante_oferta import ParticipanteOferta
+from models.adjudicacion import Adjudicacion
+from models.adjudicacion_detalle import AdjudicacionDetalle
 from dependencies.jwt_auth import get_current_user
-from services.bonita_service import BonitaService
 from dependencies.bonita import get_bonita_service
+from services.bonita_service import BonitaService
 from services.bonita_service import get_bonita_validacion_service
-import httpx
 from services.nacional_service import get_nacional_service
 from services.validacion_ofertas import validar_emergencia
+from fastapi import Response
+import traceback
+import httpx
 
 router = APIRouter(
     prefix="/ofertas",
@@ -36,6 +40,14 @@ class OfertaConsorcioCreate(BaseModel):
 class OfertaUpdate(BaseModel):
     cant_recurso: int
     id_ong: Optional[int] = None
+
+class AdjudicacionDetalleRequest(BaseModel):
+    participante_id: int
+    cantidad_adjudicada: int
+
+
+class AdjudicacionRequest(BaseModel):
+    detalles: list[AdjudicacionDetalleRequest]
 
 class AccionOfertaInvalida(BaseModel):
     accion: str
@@ -75,7 +87,7 @@ def get_emergencias_con_lotes(
     current_user: dict = Depends(get_current_user),
     session: Session = Depends(get_session)
 ):
-    statement = select(Emergencia).where(Emergencia.estado == "publicada").order_by(
+    statement = select(Emergencia).where(Emergencia.estado == EmergenciaEstado.PUBLICADA).order_by(
         Emergencia.fechaCreacion.desc(), Emergencia.id.desc()
     )
     emergencias = session.exec(statement).all()
@@ -86,7 +98,7 @@ def get_emergencias_con_lotes(
             Lote.fechaCreacion.desc(), Lote.id.desc()
         )
         if REPRESENTANTE_ONG in get_user_roles(current_user):
-            stmt_lotes = stmt_lotes.where(Lote.estado.in_(['creado', 'activo', 'abierto']))
+            stmt_lotes = stmt_lotes.where(Lote.estado.in_([LoteEstado.CREADO, LoteEstado.ACTIVO, LoteEstado.ABIERTO]))
         
         lotes = session.exec(stmt_lotes).all()
         resultado.append({
@@ -370,7 +382,7 @@ def get_mis_ofertas_compat(
             fecha_limite = lote.fechaLimiteConvocatoria
             if fecha_limite.tzinfo is None:
                 fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
-            vigente = (emergencia and emergencia.estado == "publicada") and (ahora <= fecha_limite)
+            vigente = (emergencia and emergencia.estado == EmergenciaEstado.PUBLICADA) and (ahora <= fecha_limite)
         else:
             vigente = False
 
@@ -390,61 +402,20 @@ def get_mis_ofertas_compat(
 
     return respuesta
 
-
 @router.get(
-
     "/ongs-bonita",
-
     status_code=status.HTTP_200_OK,
-
     dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
-
 )
-
 async def listar_ongs_desde_bonita(
-
-    current_user: dict = Depends(get_current_user)
-
+    current_user: dict = Depends(get_current_user),
+    bonita: BonitaService = Depends(get_bonita_service)
 ):
-
     ong_id_actual = int(current_user['user_id'])
-
-    bonita_service = BonitaService()
-
     try:
-
-        # Autenticación con el usuario técnico de Bonita
-
-        await bonita_service.login("walter.bates", "bpm")  # Ajusta las credenciales si usan variables de entorno
-
+        # Usamos el método del servicio BonitaService para obtener los usuarios con el rol "representante_ong"
+        usuarios = await bonita.obtener_usuarios_por_rol(REPRESENTANTE_ONG)
        
-
-        # Usamos el método interno o llamamos directamente al endpoint /API/identity/user
-
-        response = await bonita_service.http_client.get(
-
-            "/API/identity/user",
-
-            headers=bonita_service._auth_headers(),
-
-            params={"p": 0, "c": 100}
-
-        )
-
-       
-
-        if response.status_code != 200:
-
-            print("Error respuesta Bonita:", response.status_code, response.text)
-
-            return []
-
-
-
-        usuarios = response.json()
-
-       
-
         resultado = []
 
         for u in usuarios:
@@ -454,37 +425,21 @@ async def listar_ongs_desde_bonita(
             # Filtrar para no mostrar a la ONG actual
 
             if uid != ong_id_actual:
-
                 firstname = u.get('firstname', '') or ''
-
                 lastname = u.get('lastname', '') or ''
-
                 nombre_completo = f"{firstname} {lastname}".strip()
-
                 nombre = nombre_completo if nombre_completo else u.get('userName', f"ONG #{uid}")
-
                 resultado.append({
-
                     "id": uid,
-
                     "nombre": nombre
-
                 })
-
-               
 
         return resultado
 
     except Exception as e:
-
+        traceback.print_exc()
         print("Error obteniendo usuarios de Bonita:", e)
-
-        return []
-
-    finally:
-
-        await bonita_service.close() 
-
+        raise HTTPException(status_code=500, detail="Error obteniendo usuarios de Bonita.")
 
 @router.put(
     "/{oferta_id}",
@@ -674,7 +629,7 @@ async def confirmar_accion_oferta_invalida(
         lotes = session.exec(
             select(Lote).where(
                 Lote.emergenciaId == lote_oferta.emergenciaId,
-                Lote.estado != "reformulado"
+                Lote.estado != LoteEstado.REFORMULADO
             )
         ).all()
         for lote in lotes:
@@ -704,3 +659,154 @@ async def confirmar_accion_oferta_invalida(
     session.commit()
 
     return {"mensaje": "Acción confirmada correctamente."}
+
+class AdjudicacionDetalleRequest(BaseModel):
+    participante_id: int
+    cantidad_adjudicada: int
+class AdjudicacionRequest(BaseModel):
+    detalles: list[AdjudicacionDetalleRequest]
+
+
+@router.post(
+    "/{lote_id}/adjudicaciones",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL))]
+)
+async def adjudicar_ofertas(
+    lote_id: int,
+    data: list[AdjudicacionRequest],
+    current_user: dict = Depends(get_current_user),
+    bonita: BonitaService = Depends(get_bonita_service),
+    session: Session = Depends(get_session),
+):
+    lote: Lote | None = session.get(Lote, lote_id)
+
+    if not lote:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="El lote no existe."
+        )
+
+    # Validar cantidades antes de realizar modificaciones
+    total_adjudicado = 0
+    hay_detalles = False
+
+    for adjudicacion in data:
+        for detalle in adjudicacion.detalles:
+
+            if detalle.cantidad_adjudicada <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="La cantidad adjudicada debe ser mayor a 0."
+                )
+
+            hay_detalles = True
+            total_adjudicado += detalle.cantidad_adjudicada
+
+    if not hay_detalles:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Debe adjudicar al menos una cantidad antes de confirmar."
+        )
+
+    if total_adjudicado > lote.cantidad:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La cantidad adjudicada excede la cantidad requerida del lote."
+        )
+
+    try:
+        for adjudicacion in data:
+
+            # Crear la adjudicación
+            adjudicacion_model = Adjudicacion(
+                lote_id=lote_id,
+                usuario_id=str(current_user["user_id"]),
+            )
+
+            session.add(adjudicacion_model)
+
+            # Necesitamos el ID generado antes de crear los detalles
+            session.flush()
+
+            for detalle in adjudicacion.detalles:
+
+                participante_oferta = session.get(
+                    ParticipanteOferta,
+                    detalle.participante_id
+                )
+
+                if not participante_oferta:
+                    raise HTTPException(
+                        status_code=status.HTTP_404_NOT_FOUND,
+                        detail=(
+                            f"La oferta del participante "
+                            f"{detalle.participante_id} no existe."
+                        )
+                    )
+
+                oferta = session.get(
+                    Oferta,
+                    participante_oferta.oferta_id
+                )
+
+                if not oferta or oferta.lote_id != lote_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=(
+                            f"La participación {detalle.participante_id} "
+                            f"no pertenece al lote {lote_id}."
+                        )
+                    )
+
+                adjudicacion_detalle = AdjudicacionDetalle(
+                    adjudicacion_id=adjudicacion_model.id,
+                    participante_oferta_id=participante_oferta.id,
+                    cantidad_adjudicada=detalle.cantidad_adjudicada,
+                )
+
+                session.add(adjudicacion_detalle)                
+
+        # El lote se actualiza una única vez después de procesar correctamente todas las adjudicaciones.
+        lote.estado = LoteEstado.ADJUDICADO
+        session.add(lote)
+        # Hacer explícito que el nuevo estado llegue a BD dentro de la transacción 
+        # antes de consultar los demás lotes.
+        #session.flush()
+        session.commit()
+        # buscar todos los lotes de la emergencia y validar que todos estan correctamente en estado ADJUDICADO
+        #lotes = session.exec(select(Lote).where(Lote.emergenciaId == lote.emergenciaId, Lote.estado != LoteEstado.ADJUDICADO)).all()
+        lote_no_adjudicado = session.exec(
+            select(Lote).where(Lote.emergenciaId == lote.emergenciaId, Lote.estado != LoteEstado.ADJUDICADO)
+        ).first()
+        if not lote_no_adjudicado:
+            # estan todos los lotes adjudicados, se completa la tarea humana en Bonita
+            emergencia: Emergencia = session.get(Emergencia, lote.emergenciaId)
+            if emergencia.bonitaCaseId:
+                await bonita.completar_tarea_humana_por_caso(emergencia.bonitaCaseId)
+    
+    except httpx.HTTPStatusError as e:
+        session.rollback()
+        print(f"HTTP STATUS ERROR: {repr(e)}")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error en la comunicación HTTP: {str(e)}"
+        ) from e
+    
+    except HTTPException:
+        session.rollback()
+        raise
+
+    except Exception as error:
+        session.rollback()
+
+        print(f"ERROR ADJUDICANDO: {repr(error)}")
+        traceback.print_exc()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error al adjudicar ofertas: {str(error)}"
+        ) from error
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

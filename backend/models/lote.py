@@ -1,6 +1,17 @@
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Optional
 from sqlmodel import Field, Relationship, SQLModel
+
+
+class LoteEstado(str, Enum):
+    CREADO = "creado"
+    ACTIVO = "activo"
+    ABIERTO = "abierto"
+    CUBIERTO = "cubierto"
+    REFORMULADO = "reformulado"
+    EN_ADJUDICACION = "en_adjudicacion"
+    ADJUDICADO = "adjudicado"
 
 class Lote(SQLModel, table=True):
     __tablename__ = "lotes"
@@ -45,7 +56,7 @@ class Lote(SQLModel, table=True):
     estado: str = Field(
         min_length=1,
         max_length=50,
-        default="creado",
+        default=LoteEstado.CREADO,
         description="Estado del lote"
     )
 

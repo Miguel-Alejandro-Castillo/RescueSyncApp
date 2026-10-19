@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { reabrirConvocatoria } from '../../services/lotesService';
 import { API_RESCUE } from '../../config/api';
 import { authenticatedFetch } from '../../services/authService';
+import { LOTE_ESTADOS } from '../../constants/lote';
 import styles from './OfertasInvalidas.module.css';
 import ResultadoValidacion from '../../components/ResultadoValidacion';
 
@@ -130,7 +131,7 @@ export default function OfertasInvalidas() {
                   {oferta.accion_tomada ? 'Confirmada' : 'Confirmar'}
                 </button>
               </div>
-              {oferta.accion_tomada === 'reformular' && oferta.lote_estado !== 'reformulado' && (
+              {oferta.accion_tomada === 'reformular' && oferta.lote_estado !== LOTE_ESTADOS.REFORMULADO && (
                 <Link
                   className="btn btn-outline-secondary"
                   to={`/lotes/nuevo?emergenciaId=${oferta.emergencia_id}&ofertaId=${oferta.id}`}
@@ -148,7 +149,7 @@ export default function OfertasInvalidas() {
                 </button>
               )}
               {oferta.accion_tomada === 'reabrir' && oferta.convocatoria_abierta && <p>La convocatoria está abierta.</p>}
-              {oferta.lote_estado === 'reformulado' && <p>Los lotes ya fueron reformulados.</p>}
+              {oferta.lote_estado === LOTE_ESTADOS.REFORMULADO && <p>Los lotes ya fueron reformulados.</p>}
             </details>
           ))}
         </div>

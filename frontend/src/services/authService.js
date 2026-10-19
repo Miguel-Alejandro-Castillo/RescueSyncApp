@@ -3,14 +3,30 @@ import { ENDPOINTS } from "../config/api";
 const SESSION_KEY = "rescuesync.session";
 const SESSION_EVENT = "rescuesync-session";
 
-// Display information only. Authorization must be enforced by the server.
-export function getSessionMemberships(session) {
+export function getSessionClaims(session) {
   try {
     const payload = session.access_token.split(".")[1];
     const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
     const bytes = Uint8Array.from(atob(base64), character => character.charCodeAt(0));
     const claims = JSON.parse(new TextDecoder().decode(bytes));
-    return Array.isArray(claims.memberships) ? claims.memberships : [];
+    return claims;
+  } catch {
+    return null;
+  }
+}
+export function getSessionUserId(session) {
+  try {
+    const claims = getSessionClaims(session);
+    return claims?.user_id;
+  } catch {
+    return null;
+  }
+}
+// Display information only. Authorization must be enforced by the server.
+export function getSessionMemberships(session) {
+  try {
+    const claims = getSessionClaims(session);
+    return Array.isArray(claims?.memberships) ? claims.memberships : [];
   } catch {
     return [];
   }
