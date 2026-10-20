@@ -14,10 +14,11 @@ PERMISSIONS_FILE="platform_conf/current/tenants/$TENANT_ID/tenant_portal/custom-
 
 TEMP_FILE=$(mktemp)
 trap 'rm -f "$TEMP_FILE"' EXIT HUP INT TERM
-awk '
-    BEGIN { key = "user|bonita.bpm"; permission = "organization_visualization" }
-    index($0, key "=") == 1 {
-        found = 1
+awk -v backend_user="${BONITA_USER:-walter.bates}" '
+    BEGIN { permissions["user|bonita.bpm"] = "organization_visualization"; permissions["user|" backend_user] = "read_sistema_nacional" }
+    { key = $0; sub(/=.*/, "", key); permission = permissions[key] }
+    permission != "" {
+        found[key] = 1
         if (index($0, permission) == 0) {
             if ($0 ~ /\[\]/) sub(/\[\]/, "[" permission "]")
             else sub(/\][[:space:]]*$/, "," permission "]")
@@ -26,15 +27,15 @@ awk '
         next
     }
     { print }
-    END { if (!found) print key "=[" permission "]" }
+    END { for (key in permissions) if (!found[key]) print key "=[" permissions[key] "]" }
 ' "$PERMISSIONS_FILE" > "$TEMP_FILE"
 
 if cmp -s "$PERMISSIONS_FILE" "$TEMP_FILE"; then
-    echo "Permiso de lectura de organizaciÃ³n de bonita.bpm ya configurado."
+    echo "Permisos de integracion ya configurados."
     exit 0
 fi
 
 cp "$PERMISSIONS_FILE" "$PERMISSIONS_FILE.before-integration-permissions"
 cat "$TEMP_FILE" > "$PERMISSIONS_FILE"
 ./setup.sh push
-echo "Permiso organization_visualization asignado solo a bonita.bpm. Reiniciar Bonita para aplicarlo."
+echo "Permisos de integración configurados para sus cuentas. Reiniciar Bonita para aplicarlos."

@@ -10,7 +10,9 @@ COOKIE_FILE="/tmp/bonita-cookies.txt"
 
 ORGANIZATION_FILE="$ARTIFACTS_DIR/RESCUE.xml"
 
-BAR_FILE=$(find "$ARTIFACTS_DIR" -type f -name "*.bar" | head -1)
+BONITA_PROCESS_VERSION="${BONITA_PROCESS_VERSION:-1.1}"
+BAR_FILE="$ARTIFACTS_DIR/$BONITA_PROCESS--$BONITA_PROCESS_VERSION.bar"
+[ -f "$BAR_FILE" ] || { echo "No existe el BAR: $BAR_FILE" >&2; exit 1; }
 
 USER_PROFILE_ID="1"
 ADMIN_PROFILE_ID="2"
@@ -200,6 +202,7 @@ EXISTING_PROCESS_ID=$(
     --data-urlencode "p=0" \
     --data-urlencode "c=20" \
     --data-urlencode "f=name=$BONITA_PROCESS" \
+    --data-urlencode "f=version=$BONITA_PROCESS_VERSION" \
     "$BONITA_URL/API/bpm/process" |
   sed -n 's/.*"id":"\([^"]*\)".*/\1/p' |
   head -1
@@ -207,28 +210,10 @@ EXISTING_PROCESS_ID=$(
 echo "Proceso existente ID: $EXISTING_PROCESS_ID"
 
 if [ -n "$EXISTING_PROCESS_ID" ]; then
-    echo "Proceso existente encontrado: $EXISTING_PROCESS_ID"
-
-    EXISTING_PROCESS_STATE=$(
-      bonita_curl_json_fail "$BONITA_URL/API/bpm/process/$EXISTING_PROCESS_ID" |
-        sed -n 's/.*"activationState":"\([^"]*\)".*/\1/p'
-    )
-    if [ "$EXISTING_PROCESS_STATE" = "ENABLED" ]; then
-      echo "Desactivando..."
-      bonita_curl_json_fail \
-        -X PUT \
-        -d '{"activationState":"DISABLED"}' \
-        "$BONITA_URL/API/bpm/process/$EXISTING_PROCESS_ID"
-    elif [ "$EXISTING_PROCESS_STATE" != "DISABLED" ]; then
-      echo "ERROR: estado inesperado del proceso: $EXISTING_PROCESS_STATE"
-      exit 1
-    fi
-
-    echo "Eliminando..."
-    bonita_curl_fail \
-      -X DELETE \
-      "$BONITA_URL/API/bpm/process/$EXISTING_PROCESS_ID"
-fi
+    echo "La versión $BONITA_PROCESS_VERSION ya está instalada; se conservan sus casos."
+    PROCESS_ID="$EXISTING_PROCESS_ID"
+    PROCESS=$(bonita_curl_json_fail "$BONITA_URL/API/bpm/process/$PROCESS_ID")
+else
 
 echo ""
 echo "Subiendo BAR..."
@@ -266,6 +251,8 @@ PROCESS_ID=$(
     sed -n 's/.*"id":"\([^"]*\)".*/\1/p'
 )
 
+fi
+
 # --------------------------------------------------
 # Activar proceso
 # --------------------------------------------------
@@ -274,13 +261,11 @@ if [ -z "$PROCESS_ID" ]; then
   echo "ERROR: No se pudo obtener el ID del proceso"
   exit 1
 fi
-echo "Activando proceso..."
-
-bonita_curl_json_fail \
-  -s \
-  -X PUT \
-  -d '{"activationState":"ENABLED"}' \
-  "$BONITA_URL/API/bpm/process/$PROCESS_ID"
+PROCESS_STATE=$(printf '%s' "$PROCESS" | sed -n 's/.*"activationState":"\([^" ]*\)".*/\1/p')
+if [ "$PROCESS_STATE" != "ENABLED" ]; then
+  echo "Activando proceso..."
+  bonita_curl_json_fail -s -X PUT -d '{"activationState":"ENABLED"}' "$BONITA_URL/API/bpm/process/$PROCESS_ID"
+fi
 
 echo "Proceso activado"
 
@@ -496,5 +481,17 @@ echo "ProcessId: $PROCESS_ID"
 echo "User profile configurado"
 echo "Administrator profile configurado"
 echo "Membresias de perfiles configuradas"
+
+EXTENSION_FILE="$ARTIFACTS_DIR/sistemaNacionalRestAPIExtension.zip"
+[ -f "$EXTENSION_FILE" ] || { echo "No existe la extensión nacional" >&2; exit 1; }
+EXTENSION_UPLOAD=$(bonita_curl_fail -F "file=@${EXTENSION_FILE}" "$BONITA_URL/portal/pageUpload")
+EXTENSION_ID=$(bonita_curl_query -s --data-urlencode "p=0" --data-urlencode "c=100" \
+  --data-urlencode "f=urlToken=custompage_sistemaNacionalRestAPIExtension" \
+  "$BONITA_URL/API/portal/page" | sed -n 's/.*"id":"\([^" ]*\)".*/\1/p')
+if [ -n "$EXTENSION_ID" ]; then
+  bonita_curl_json_fail -X PUT -d "{\"pageZip\":\"$EXTENSION_UPLOAD\"}" "$BONITA_URL/API/portal/page/$EXTENSION_ID"
+else
+  bonita_curl_json_fail -X POST -d "{\"pageZip\":\"$EXTENSION_UPLOAD\"}" "$BONITA_URL/API/portal/page"
+fi
 
 sh "$ARTIFACTS_DIR/configure-integration-permissions.sh"
