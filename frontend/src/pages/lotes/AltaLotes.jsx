@@ -13,12 +13,6 @@ export default function AltaLotes() {
     return id ? <FormularioLotes key={id} /> : <SeleccionarEmergencia />;
 }
 
-const recursosPorTipo = {
-    Personal: ['Medicos', 'Policias', 'Bomberos'],
-    Insumos: ['Raciones de comida', 'Agua', 'Medicamentos'],
-    Materiales: ['Arena', 'Ladrillos', 'Tierra', 'Cemento'],
-};
-
 const FormularioLotes = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
@@ -31,7 +25,7 @@ const FormularioLotes = () => {
     const [saving, setSaving] = useState(false);
     const [submitError, setSubmitError] = useState('');
     const [lotes, setLotes] = useState([
-        { tipoRecurso: 'Insumos', descripcion: 'Agua', cantidad: 1 }
+        { tipoRecurso: 'Insumos', descripcion: '', cantidad: 1 }
     ]);
 
     const handleTipoRecursoChange = (index, e) => {
@@ -39,7 +33,6 @@ const FormularioLotes = () => {
       const nuevosLotes = [...lotes];
 
       nuevosLotes[index].tipoRecurso = tipo;
-      nuevosLotes[index].descripcion = recursosPorTipo[tipo][0];
       setLotes(nuevosLotes);
     };
 
@@ -72,7 +65,7 @@ const FormularioLotes = () => {
             ...lotes,
             {
                 tipoRecurso: 'Insumos',
-                descripcion: 'Agua',
+                descripcion: '',
                 cantidad: 1
             }
         ]);
@@ -236,19 +229,17 @@ const FormularioLotes = () => {
 
                                             <div className="col-md-6">
                                                 <label htmlFor={`descripcion-${index}`} className="form-label small fw-bold">Recurso específico</label>
-                                                <select
-                                                    className="form-select form-select-sm"
+                                                <input
+                                                    type="text"
+                                                    className="form-control form-control-sm"
                                                     name="descripcion"
                                                     id={`descripcion-${index}`}
                                                     data-validation-key={`descripcion-${index}`}
                                                     value={lote.descripcion}
                                                     onChange={(e) => handleLoteChange(index, e)}
                                                     required
-                                                >
-                                                    {recursosPorTipo[lote.tipoRecurso].map(recurso => (
-                                                        <option key={recurso} value={recurso}>{recurso}</option>
-                                                    ))}
-                                                </select>
+                                                    maxLength={255}
+                                                />
                                                 <FieldError name={`descripcion-${index}`} />
                                             </div>
 

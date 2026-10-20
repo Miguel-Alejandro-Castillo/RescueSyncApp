@@ -8,6 +8,7 @@ export function comprobarSolicitud(data) {
   for (const lote of data.lotes) {
     if (!id(lote.lote_id) || lotes.has(lote.lote_id) || !cantidad(lote.cantidad_requerida) || lote.cantidad_requerida === 0 || !Array.isArray(lote.ofertas)) fail();
     if (lote.recurso_codigo != null && (typeof lote.recurso_codigo !== 'string' || !lote.recurso_codigo.trim())) fail();
+    if (lote.recurso_nombre != null && (typeof lote.recurso_nombre !== 'string' || !lote.recurso_nombre.trim() || lote.recurso_nombre.length > 255)) fail();
     lotes.add(lote.lote_id);
     for (const oferta of lote.ofertas) {
       if (!id(oferta.oferta_id) || ofertas.has(oferta.oferta_id) || !Array.isArray(oferta.participantes)) fail();
@@ -23,7 +24,7 @@ export function comprobarSolicitud(data) {
 }
 
 function evaluarOferta(oferta, lote, inventarios) {
-  if (!lote.recurso_codigo) return { error: 'El lote no tiene vinculado un código de recurso nacional' };
+  if (!lote.recurso_nombre?.trim() && !lote.recurso_codigo) return { error: 'El lote no tiene indicado un recurso' };
   if (oferta.participantes.some(p => !p.cuit?.trim())) {
     return { error: 'El aporte no tiene registrada su ONG de origen. Hay que revisar su vinculación histórica.' };
   }
@@ -31,7 +32,10 @@ function evaluarOferta(oferta, lote, inventarios) {
   const participantes = oferta.participantes.map(p => {
     const cuit = p.cuit.trim();
     const ong = inventarios.get(cuit);
-    const recurso = ong?.recursos.find(r => r.recurso.codigo === lote.recurso_codigo);
+    const nombre = lote.recurso_nombre?.trim().toLocaleLowerCase('es');
+    const recurso = ong?.recursos.find(r => nombre
+      ? r.recurso.nombre.trim().toLocaleLowerCase('es') === nombre
+      : r.recurso.codigo === lote.recurso_codigo);
     let disponible = 0, motivo = null;
     if (!ong) motivo = 'ONG no registrada en el Sistema Nacional';
     else if (ong.estado !== 'HABILITADA') motivo = 'ONG no habilitada en el Sistema Nacional';
@@ -43,7 +47,7 @@ function evaluarOferta(oferta, lote, inventarios) {
     if (verificada < p.cantidad_ofertada && !motivo) motivo = 'Disponibilidad insuficiente para el aporte comprometido';
     return { participante_id: p.participante_id, ong_id: p.ong_id, cuit,
       ong_nacional_id: ong?.id ?? null, ong_nombre: ong?.razonSocial ?? null,
-      recurso_codigo: lote.recurso_codigo, cantidad_ofertada: p.cantidad_ofertada,
+      recurso_codigo: recurso?.recurso.codigo ?? null, recurso_nombre: lote.recurso_nombre ?? recurso?.recurso.nombre, cantidad_ofertada: p.cantidad_ofertada,
       cantidad_disponible: disponible, cantidad_verificada: verificada,
       faltante: p.cantidad_ofertada - verificada, valida: motivo === null, motivo };
   });

@@ -7,6 +7,7 @@ export const ROLE_NAMES = {
 };
 
 const PERMISSION_PROFILES = {
+  'ofertas.ver_validacion': ['municipal', 'coordinador', 'auditor'],
   'ofertas.ver_propias': ['ong'],
   'emergencias.crear': ['municipal'],
   'emergencias.ver_propias': ['municipal'],
@@ -18,6 +19,7 @@ const PERMISSION_PROFILES = {
 };
 
 const ROUTE_PERMISSIONS = [
+  { path: '/validacion-ofertas', permission: 'ofertas.ver_validacion' },
   { path: '/ofertas/misofertas', permission: 'ofertas.ver_propias' },
   { path: '/emergencias/nueva', permission: 'emergencias.crear' },
   { path: '/emergencias/propias', permission: 'emergencias.ver_propias' },
