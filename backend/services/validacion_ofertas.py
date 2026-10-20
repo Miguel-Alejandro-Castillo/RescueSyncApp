@@ -1,6 +1,7 @@
 """Preparar aportes y persistir la validación calculada por la API Nacional."""
 from datetime import datetime, timezone
 import httpx
+import unicodedata
 from sqlmodel import select
 from models.emergencia import Emergencia
 from models.lote import Lote
@@ -55,6 +56,25 @@ def comprobar_respuesta(data, solicitud):
         raise ValueError('La respuesta nacional no contiene los conteos de ofertas')
 
 
+def normalizar_recurso(nombre):
+    return ' '.join(''.join(
+        c for c in unicodedata.normalize('NFD', nombre.casefold())
+        if not unicodedata.combining(c)
+    ).split())
+
+
+def resolver_recurso(nombre, catalogo):
+    coincidencias = {
+        r['codigo'] for r in catalogo
+        if normalizar_recurso(r['nombre']) == normalizar_recurso(nombre)
+    }
+    if len(coincidencias) == 1:
+        return coincidencias.pop(), None
+    if coincidencias:
+        return None, f'El recurso "{nombre}" coincide con varios códigos nacionales. Hay que definir su correspondencia.'
+    return None, f'El recurso "{nombre}" no tiene correspondencia en el catálogo nacional.'
+
+
 async def validar_emergencia(session, emergencia_id, nacional, ahora=None, *, commit=True):
     ahora = ahora or datetime.now(timezone.utc)
     emergencia = session.exec(select(Emergencia).where(Emergencia.id == emergencia_id)
@@ -86,7 +106,21 @@ async def validar_emergencia(session, emergencia_id, nacional, ahora=None, *, co
             datos_lote['ofertas'].append(datos)
             ofertas_por_id[oferta.id] = oferta
         solicitud['lotes'].append(datos_lote)
+    codigos_resueltos = {}
+    errores_recursos = {}
     try:
+        sin_codigo = [l for l in lotes if not l.recurso_codigo]
+        if sin_codigo:
+            catalogo = await nacional.recursos()
+            for lote in sin_codigo:
+                codigo, error = resolver_recurso(lote.descripcion, catalogo)
+                if codigo:
+                    codigos_resueltos[lote.id] = codigo
+                else:
+                    errores_recursos[lote.id] = error
+            for datos_lote in solicitud['lotes']:
+                if datos_lote['lote_id'] in codigos_resueltos:
+                    datos_lote['recurso_codigo'] = codigos_resueltos[datos_lote['lote_id']]
         respuesta = await nacional.validar_ofertas(solicitud)
         comprobar_respuesta(respuesta, solicitud)
     except (httpx.HTTPError, ValueError, KeyError, TypeError):
@@ -115,6 +149,8 @@ async def validar_emergencia(session, emergencia_id, nacional, ahora=None, *, co
     for item in respuesta['resultados']:
         oferta = ofertas_por_id[item['oferta_id']]
         resultado = dict(item['resultado_validacion'])
+        if item['estado_validacion'] == 'pendiente' and item['lote_id'] in errores_recursos:
+            resultado['error'] = errores_recursos[item['lote_id']]
         resultado['origen'] = 'sistema_nacional'
         resultado['cobertura_lote'] = cobertura_por_id[item['lote_id']]
         oferta.resultado_validacion = resultado
@@ -128,6 +164,8 @@ async def validar_emergencia(session, emergencia_id, nacional, ahora=None, *, co
             oferta.ventana_validada = lotes_por_id[item['lote_id']].fechaLimiteConvocatoria
         session.add(oferta)
     for lote in lotes:
+        if lote.id in codigos_resueltos:
+            lote.recurso_codigo = codigos_resueltos[lote.id]
         lote.cantidadCubierta = cobertura_por_id[lote.id]['ofertado_valido']
         session.add(lote)
     if commit:
