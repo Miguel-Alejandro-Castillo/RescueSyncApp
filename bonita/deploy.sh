@@ -10,6 +10,8 @@ COOKIE_FILE="/tmp/bonita-cookies.txt"
 
 ORGANIZATION_FILE="$ARTIFACTS_DIR/RESCUE.xml"
 
+API_EXTENSION_ZIP=$(find "$ARTIFACTS_DIR" -type f -name "*.zip" | head -1)
+
 BAR_FILE=$(find "$ARTIFACTS_DIR" -type f -name "*.bar" | head -1)
 
 USER_PROFILE_ID="1"
@@ -83,6 +85,11 @@ if [ -z "$BAR_FILE" ] || [ ! -f "$BAR_FILE" ]; then
   exit 1
 fi
 
+if [ -z "$API_EXTENSION_ZIP" ] || [ ! -f "$API_EXTENSION_ZIP" ]; then
+  echo "ERROR: no se encontró ningún archivo .zip de extensión REST API"
+  exit 1
+fi
+
 if [ -z "${BONITA_PROCESS:-}" ]; then
   echo "ERROR: BONITA_PROCESS no está definida"
   exit 1
@@ -96,6 +103,7 @@ fi
 
 echo "Organización: $ORGANIZATION_FILE"
 echo "BAR:          $BAR_FILE"
+echo "Extensión REST API: $API_EXTENSION_ZIP"
 echo "Proceso Bonita: $BONITA_PROCESS"
 echo "Membresías de perfiles: $MEMBERSHIPS_PROFILES_FILE"
 
@@ -186,7 +194,6 @@ bonita_curl_json_fail \
 
 echo
 echo "Organización importada correctamente"
-
 
 # --------------------------------------------------
 # Subir BAR
@@ -487,6 +494,80 @@ echo "Configurando membresias de perfiles..."
 configure_profile "$USER_PROFILE_ID" "USER"
 configure_profile "$ADMIN_PROFILE_ID" "ADMINISTRATOR"
 
+# --------------------------------------------------
+# Subir e importar extensión REST API
+# Estos endpoints están deprecados desde Bonita 9.0.0.
+# --------------------------------------------------
+
+echo ""
+echo "1/2 Subiendo ZIP de extensión REST API..."
+
+API_EXTENSION_UPLOAD=$(
+  bonita_curl_fail \
+    -F "file=@${API_EXTENSION_ZIP};type=application/zip" \
+    "$BONITA_URL/portal/pageUpload"
+)
+
+# pageUpload devuelve el nombre temporal del ZIP como texto.
+API_EXTENSION_TEMP_FILE=$(printf '%s' "$API_EXTENSION_UPLOAD" | tr -d '\r\n')
+
+if [ -z "$API_EXTENSION_TEMP_FILE" ]; then
+  echo "ERROR: Bonita no devolvió el nombre temporal del ZIP"
+  exit 1
+fi
+
+API_EXTENSION_PAGE_ZIP=$(
+  printf '%s' "$API_EXTENSION_TEMP_FILE" |
+    sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g'
+)
+API_EXTENSION_PAYLOAD=$(printf '{"pageZip":"%s"}' "$API_EXTENSION_PAGE_ZIP")
+
+echo "Buscando extensión REST API existente: Sistema Nacional"
+
+API_EXTENSION_SEARCH_RESULT=$(
+  bonita_curl_json_fail \
+    -G \
+    --data-urlencode "p=0" \
+    --data-urlencode "f=contentType=apiExtension" \
+    --data-urlencode "s=Sistema Nacional" \
+    "$BONITA_URL/API/portal/page"
+)
+
+API_EXTENSION_EXISTING_ID=$(
+  printf '%s' "$API_EXTENSION_SEARCH_RESULT" |
+    sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
+)
+
+# Eliminar únicamente la extensión que se va a importar, no las demás.
+if [ -n "$API_EXTENSION_EXISTING_ID" ]; then
+  echo "Eliminando extensión REST API existente, ID: $API_EXTENSION_EXISTING_ID"
+  bonita_curl_json_fail \
+    -X DELETE \
+    "$BONITA_URL/API/portal/page/$API_EXTENSION_EXISTING_ID"
+fi
+
+echo "2/2 Importando extensión REST API..."
+
+API_EXTENSION_PAGE=$(
+  bonita_curl_json_fail \
+    -X POST \
+    --data "$API_EXTENSION_PAYLOAD" \
+    "$BONITA_URL/API/portal/page"
+)
+
+API_EXTENSION_PAGE_ID=$(
+  printf '%s' "$API_EXTENSION_PAGE" |
+    sed -n 's/.*"id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p'
+)
+
+if [ -z "$API_EXTENSION_PAGE_ID" ]; then
+  echo "ERROR: no se pudo obtener el ID de la extensión REST API"
+  echo "Respuesta: $API_EXTENSION_PAGE"
+  exit 1
+fi
+
+echo "Extensión REST API importada correctamente, ID: $API_EXTENSION_PAGE_ID"
+
 echo ""
 echo "==================================="
 echo "DEPLOY FINALIZADO"
@@ -496,3 +577,6 @@ echo "ProcessId: $PROCESS_ID"
 echo "User profile configurado"
 echo "Administrator profile configurado"
 echo "Membresias de perfiles configuradas"
+echo "Extensión REST API importada correctamente, ID: $API_EXTENSION_PAGE_ID"
+
+echo "Deploy finalizado correctamente"

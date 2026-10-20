@@ -22,6 +22,7 @@ services:
     volumes:
     - ./bonita/artifacts:/opt/bonita/artifacts
     - ./bonita/deploy.sh:/opt/bonita/deploy.sh
+    - ./bonita/configure-platform.sh:/opt/bonita/configure-platform.sh
     environment:
       DB_VENDOR: postgres
       DB_HOST: bonita-db

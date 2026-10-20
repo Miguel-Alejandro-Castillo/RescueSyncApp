@@ -1,30 +1,39 @@
 # Bonita
 
-Este directorio contiene los artefactos y scripts necesarios para desplegar la organización, el proceso BPM y la configuración de membresias en perfiles User y Administrator.
+Este directorio contiene los artefactos y scripts necesarios para desplegar la organización, el proceso BPM, la extensión REST y la configuración de permisos y membresías de Bonita.
 
 ## Estructura
 
 ```text
 bonita/
 ├── deploy.sh
+├── configure-platform.sh
+├── RescueSync-BPMN-v1.0.png
 └── artifacts/
     ├── RESCUE.xml
-    ├── memberships_profiles.ini
-    └── Plataforma RescueSync--1.0.bar
+    ├── Plataforma RescueSync--1.0.bar
+    ├── sistemaNacionalRestAPIExtension-0.0.1.zip
+    ├── custom-permissions-mapping.properties
+    └── memberships_profiles.ini
 ```
 
 ### Archivos principales
 
 - **`deploy.sh`**: script de despliegue e inicialización. Importa la organización, sustituye el proceso existente, activa la nueva versión y configura las membresías de los perfiles User y Administrator.
+- **`configure-platform.sh`**: obtiene la configuración actual de la plataforma Bonita, aplica el mapeo de permisos personalizados y publica nuevamente la configuración.
+- **`RescueSync-BPMN-v1.0.png`**: diagrama de referencia del proceso BPM de RescueSync.
 - **`artifacts/RESCUE.xml`**: definición de la organización de Bonita, incluyendo grupos, roles y estructura organizacional.
-- **`artifacts/memberships_profiles.ini`**: archivo INI con las relaciones entre perfiles y membresias para `USER` y `ADMINISTRATOR`. El script lo lee para crear las `profileMember` correspondientes.
 - **`artifacts/Plataforma RescueSync--1.0.bar`**: paquete exportado desde Bonita Studio con el proceso BPM y su configuración asociada.
+- **`artifacts/sistemaNacionalRestAPIExtension-0.0.1.zip`**: extensión REST de Bonita para la integración con el sistema nacional.
+- **`artifacts/custom-permissions-mapping.properties`**: mapeo de permisos personalizados que se aplica a la plataforma; actualmente asigna `read_sistema_nacional` al perfil `User`.
+- **`artifacts/memberships_profiles.ini`**: archivo INI con las relaciones entre perfiles y membresías para `USER` y `ADMINISTRATOR`. `deploy.sh` lo lee para crear las `profileMember` correspondientes.
 
 ## Requisitos previos
 
 - Docker y Docker Compose instalados.
 - Los servicios definidos en el `docker-compose.yml` del proyecto.
 - La variable `BONITA_PROCESS` configurada en el servicio `bonita-engine` con el nombre exacto del proceso exportado desde Bonita Studio.
+- La extensión REST instalada en Bonita cuando se requiera utilizar la integración con el sistema nacional.
 
 Ejemplo:
 
@@ -61,6 +70,21 @@ Este último comando normalmente sólo es necesario:
 - cuando se modifican las membresías configuradas en `artifacts/memberships_profiles.ini`;
 - o cuando se desea reconstruir la configuración administrada por el script.
 
+## Configuración de la plataforma
+
+Después de instalar o actualizar la extensión REST y cuando se modifique
+`artifacts/custom-permissions-mapping.properties`, aplica la configuración de la
+plataforma con:
+
+```bash
+docker compose exec bonita-engine sh /opt/bonita/configure-platform.sh
+```
+
+El script realiza un `pull` de la configuración vigente, reemplaza el archivo
+`custom-permissions-mapping.properties` del tenant y ejecuta el `push`. Si no
+encuentra el archivo de permisos en `artifacts/` o en la configuración de la
+plataforma, termina con un error.
+
 ## Qué hace el script
 
 El script ejecuta las siguientes acciones, en este orden:
@@ -77,6 +101,11 @@ El script ejecuta las siguientes acciones, en este orden:
 10. Elimina las membresías `roleAndGroup` existentes de los perfiles administrados por el script.
 11. Lee `artifacts/memberships_profiles.ini` y recrea las membresías para los perfiles `USER` y `ADMINISTRATOR` usando las combinaciones `grupo:rol` definidas en el archivo.
 
+`deploy.sh` no instala la extensión REST ni aplica el mapeo de permisos de la
+plataforma. Esas tareas se gestionan con el artefacto
+`sistemaNacionalRestAPIExtension-0.0.1.zip` y `configure-platform.sh`,
+respectivamente.
+
 ## Resultado esperado
 
 Al finalizar correctamente, el script muestra un resumen similar al siguiente:
@@ -89,6 +118,7 @@ Proceso: Plataforma RescueSync
 ProcessId: <identificador>
 User profile configurado
 Administrator profile configurado
+...
 ```
 
 Bonita quedará con:
@@ -113,8 +143,10 @@ El script reconstruye el proceso y las membresías que administra. Por tanto, el
 ## Notas sobre los artefactos
 
 - `RESCUE.xml` prepara la estructura organizacional, pero no despliega el proceso BPM.
-- `memberships_profiles.ini` define la correspondencia entre cada perfil Bonita y sus membresias, cada membresia se define como `grupo:rol`.
+- `memberships_profiles.ini` define la correspondencia entre cada perfil Bonita y sus membresías; cada membresía se define como `grupo:rol`.
 - El archivo `.bar` contiene el proceso que se instala y activa en Bonita.
+- `sistemaNacionalRestAPIExtension-0.0.1.zip` contiene la extensión REST requerida para la integración con el sistema nacional.
+- `custom-permissions-mapping.properties` define los permisos personalizados que se publican en la configuración del tenant.
 - Las membresías vinculan un perfil con una combinación de grupo y rol.
 - Los perfiles y sus membresías se almacenan en la base de datos de Bonita.
 - El script no depende de la importación XML de perfiles.
