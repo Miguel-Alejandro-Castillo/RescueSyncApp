@@ -7,34 +7,24 @@ const usuariosBase = [
 
 const categoriasBase = [
   {
-    codigo: 'ALI',
-    nombre: 'Alimentos',
-    descripcion: 'Recursos alimenticios y bebidas',
+    codigo: 'INS',
+    nombre: 'Insumos',
+    descripcion: 'Comida, Agua y Medicamentos',
   },
   {
-    codigo: 'MED',
-    nombre: 'Medicinas',
-    descripcion: 'Medicamentos y suministros médicos',
+    codigo: 'PER',
+    nombre: 'Personal',
+    descripcion: 'Policias, Medicos y Bomberos',
   },
   {
-    codigo: 'ROP',
-    nombre: 'Ropa',
-    descripcion: 'Prendas de vestir y accesorios',
-  },
-  {
-    codigo: 'EQU',
-    nombre: 'Equipamiento',
-    descripcion: 'Herramientas y equipos especializados',
+    codigo: 'MAT',
+    nombre: 'Materiales',
+    descripcion: 'Arena, Ladrillos, Tierra y Cemento',
   },
   {
     codigo: 'TRA',
     nombre: 'Transporte',
     descripcion: 'Vehículos y combustibles',
-  },
-  {
-    codigo: 'INF',
-    nombre: 'Infraestructura',
-    descripcion: 'Materiales de construcción y mantenimiento',
   },
 ];
 
@@ -96,6 +86,13 @@ const ongsBase = [
     descripcion: 'Organización sin fines de lucro que rescata alimentos aptos para el consumo que salieron del circuito comercial y los distribuye entre comedores y organizaciones sociales que asisten a personas con inseguridad alimentaria.',
   }
 ];
+
+const recursosPorCategoria = {
+  Insumos: ["Raciones de comida", "Agua", "Medicamentos"],
+  Personal: ["Policias", "Medicos", "Bomberos"],
+  Materiales: ["Arena", "Ladrillos", "Tierra", "Cemento"],
+  Transporte: ["Vehículos", "Combustible"],
+};
 
 async function ensureUser({ username, password }) {
   return prisma.user.upsert({
@@ -187,12 +184,15 @@ async function main() {
   for (const [ongIndex, ongData] of ongsBase.entries()) {
     const ong = await ensureOng(ongData);
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < categoriasCreadas.length; i++) {
       const categoria = categoriasCreadas[i % categoriasCreadas.length];
+      const claveCategoria = Object.keys(recursosPorCategoria).find((key) => key.toLowerCase() === (categoria.nombre || "").toLowerCase());
+      const opciones = recursosPorCategoria[claveCategoria] || ["RecursosGeneral"];
+      const nombreTipoRecurso = opciones[(ongIndex + i) % opciones.length];
       const recurso = await ensureRecurso({
-        codigo: buildRecursoCodigo(ongIndex * 3 + i),
-        nombre: `${ong.sigla} - Recurso ${i + 1}`,
-        descripcion: `Recurso ${i + 1} de ${ong.razonSocial}`,
+        codigo: buildRecursoCodigo(ongIndex * 4 + i),
+        nombre: nombreTipoRecurso,
+        descripcion: "",
         categoriaId: categoria.id,
       });
 

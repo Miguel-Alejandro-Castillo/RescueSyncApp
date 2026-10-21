@@ -3,11 +3,10 @@ import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import SeleccionarEmergencia from './SeleccionarEmergencia';
-import {  obtenerEmergenciaPorId,crearLotes,reformularLotes } from '../../services/lotesService';
-import { authenticatedFetch } from '../../services/authService';
-import { API_RESCUE } from '../../config/api';
+import { obtenerEmergenciaPorId, crearLotes, reformularLotes } from '../../services/lotesService';
 import { EMERGENCIA_ESTADOS } from '../../constants/emergencia';
 import { NIVELES_GRAVEDAD, getNivelGravedadLabel, normalizeNivelGravedad } from '../../constants/gravedad';
+import { RECURSOS_POR_TIPO, TIPOS_RECURSOS } from '../../constants/lote';
 
 export default function AltaLotes() {
     const [params] = useSearchParams();
@@ -26,31 +25,24 @@ const FormularioLotes = () => {
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [submitError, setSubmitError] = useState('');
-    const [catalogo, setCatalogo] = useState([]);
-    const [errorCatalogo, setErrorCatalogo] = useState('');
-
-    useEffect(() => {
-        let active = true;
-        authenticatedFetch(`${API_RESCUE}/recursos-nacionales`)
-            .then(async response => {
-                if (!response.ok) throw new Error('No se pudo cargar el catálogo nacional de recursos.');
-                const data = await response.json();
-                if (!data.length) throw new Error('El catálogo nacional está vacío. Cargá los recursos antes de publicar lotes.');
-                if (active) setCatalogo(data);
-            }).catch(e => { if (active) setErrorCatalogo(e.message); });
-        return () => { active = false; };
-    }, []);
 
     const [lotes, setLotes] = useState([
-        { tipoRecurso: 'Insumos', descripcion: 'Agua', cantidad: 1 }
+        { 
+            tipoRecurso: 'Insumos', 
+            descripcion: RECURSOS_POR_TIPO['Insumos']?.[0] || 'Raciones de comida', 
+            cantidad: 1 
+        }
     ]);
 
     const handleTipoRecursoChange = (index, e) => {
-      const tipo = e.target.value;
-      const nuevosLotes = [...lotes];
+        const tipo = e.target.value;
+        const nuevosLotes = [...lotes];
 
-      nuevosLotes[index].tipoRecurso = tipo;
-      setLotes(nuevosLotes);
+        nuevosLotes[index].tipoRecurso = tipo;
+        const opciones = RECURSOS_POR_TIPO[tipo] || [];
+        nuevosLotes[index].descripcion = opciones[0] || '';
+
+        setLotes(nuevosLotes);
     };
 
     useEffect(() => {
@@ -75,14 +67,14 @@ const FormularioLotes = () => {
             .finally(() => {
                 setLoadingEmergencia(false);
             });
-    }, [emergenciaId]);
+    }, [emergenciaId, ofertaId]);
 
     const handleAddLote = () => {
         setLotes([
             ...lotes,
             {
                 tipoRecurso: 'Insumos',
-                descripcion: 'Agua',
+                descripcion: RECURSOS_POR_TIPO['Insumos']?.[0] || 'Raciones de comida',
                 cantidad: 1
             }
         ]);
@@ -90,13 +82,7 @@ const FormularioLotes = () => {
 
     const handleLoteChange = (index, e) => {
         const nuevosLotes = [...lotes];
-
         nuevosLotes[index][e.target.name] = e.target.value;
-        if (e.target.name === 'recurso_codigo') {
-            const recurso = catalogo.find(r => r.codigo === e.target.value);
-            if (recurso) nuevosLotes[index].descripcion = recurso.nombre;
-        }
-
         setLotes(nuevosLotes);
     };
 
@@ -126,10 +112,10 @@ const FormularioLotes = () => {
 
         setSubmitError('');
 
+        // Validamos únicamente que la descripción no esté vacía y la cantidad sea válida
         if (
             lotes.some(
                 lote =>
-                    !lote.recurso_codigo ||
                     !lote.descripcion?.trim() ||
                     !Number.isSafeInteger(Number(lote.cantidad)) ||
                     Number(lote.cantidad) < 1
@@ -157,8 +143,7 @@ const FormularioLotes = () => {
             } else {
                 await crearLotes(payload);
             }
-            // alert('Lotes publicados y convocatoria abierta con éxito.');
-            navigate('/dashboard', {state: { mensajeExito: 'Lotes publicados y convocatoria abierta con éxito.' } });
+            navigate('/dashboard', { state: { mensajeExito: 'Lotes publicados y convocatoria abierta con éxito.' } });
         } catch (err) {
             setSubmitError(err.message);
         } finally {
@@ -186,7 +171,6 @@ const FormularioLotes = () => {
 
                             <ValidatedForm key={lotes.length} onSubmit={handleSubmit} aria-busy={saving}>
                                 <fieldset disabled={saving}>
-                                {/* RESUMEN DE LA EMERGENCIA */}
                                 <div className={styles.summary}>
                                     <div className={styles.row}>
                                         <h5 className="mb-0 fw-bold">
@@ -201,9 +185,7 @@ const FormularioLotes = () => {
                                 </div>
 
                                 <hr className="my-4" />
-                                {errorCatalogo && <p className="notice notice-error" role="alert">{errorCatalogo}</p>}
 
-                                {/* DESGLOSE DE LOTES */}
                                 <div className={styles.row}>
                                     <h5 className="mb-0 fw-bold">Lotes de recursos requeridos</h5>
                                     <button
@@ -232,17 +214,6 @@ const FormularioLotes = () => {
 
                                         <div className="row g-3">
                                             <div className="col-md-3">
-                                                <label htmlFor={`codigo-${index}`} className="form-label">Recurso del Sistema Nacional</label>
-                                                <select id={`codigo-${index}`} name="recurso_codigo" className="form-select"
-                                                    value={lote.recurso_codigo || ''} required onChange={e => handleLoteChange(index, e)}>
-                                                    <option value="">Seleccionar recurso</option>
-                                                    {catalogo.map(recurso => <option key={recurso.codigo} value={recurso.codigo}>
-                                                        {recurso.nombre} ({recurso.codigo})
-                                                    </option>)}
-                                                </select>
-                                                <FieldError name="recurso_codigo" />
-                                            </div>
-                                            <div className="col-md-3">
                                                 <label htmlFor={`tipo-${index}`} className="form-label small fw-bold">Tipo de recurso</label>
                                                 <select
                                                     className="form-select form-select-sm"
@@ -253,25 +224,28 @@ const FormularioLotes = () => {
                                                     onChange={(e) => handleTipoRecursoChange(index, e)}
                                                     required
                                                 >
-                                                    <option value="Insumos">Insumos</option>
-                                                    <option value="Personal">Personal</option>
-                                                    <option value="Materiales">Materiales</option>
+                                                    {TIPOS_RECURSOS.map((tipo) => (
+                                                        <option key={tipo} value={tipo}>{tipo}</option>
+                                                    ))}
                                                 </select>
                                                 <FieldError name={`tipo-${index}`} />
                                             </div>
 
                                             <div className="col-md-6">
-                                                <label htmlFor={`descripcion-${index}`} className="form-label small fw-bold">Descripción del recurso</label>
-                                                <input
-                                                    className="form-control form-control-sm"
+                                                <label htmlFor={`descripcion-${index}`} className="form-label small fw-bold">Recurso específico</label>
+                                                <select
+                                                    className="form-select form-select-sm"
                                                     name="descripcion"
                                                     id={`descripcion-${index}`}
                                                     data-validation-key={`descripcion-${index}`}
                                                     value={lote.descripcion}
                                                     onChange={(e) => handleLoteChange(index, e)}
                                                     required
-                                                    maxLength={255}
-                                                />
+                                                 >
+                                                    {(RECURSOS_POR_TIPO[lote.tipoRecurso] || []).map((recurso) => (
+                                                        <option key={recurso} value={recurso}>{recurso}</option>
+                                                    ))}
+                                                 </select>
                                                 <FieldError name={`descripcion-${index}`} />
                                             </div>
 
