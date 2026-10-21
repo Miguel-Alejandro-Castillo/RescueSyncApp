@@ -48,7 +48,7 @@ class NacionalService:
             return None
         if len(ongs) != 1:
             raise ValueError('El CUIT no identifica una única ONG nacional')
-        return await self.get('inventario', params={'ongId': ongs[0]['id']})
+        return await self.get(f"ongs/{ongs[0]['id']}/recursos")
 
     async def close(self):
         await self.client.aclose()

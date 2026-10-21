@@ -188,7 +188,6 @@ class BonitaService:
             headers=self._auth_headers(),
             params = {
                 "p": 0, # (Required) index of the page to display
-                "c": 100,
                 "f": f"name={process_name}"
             }
         )
@@ -196,10 +195,7 @@ class BonitaService:
 
     async def obtener_proceso_por_nombre(self, process_name: str):
         procesos = await self.obtener_procesos_por_nombre(process_name)
-        version = os.getenv("BONITA_PROCESS_VERSION")
-        return next((p for p in procesos
-                     if p.get("activationState") == "ENABLED"
-                     and (not version or p.get("version") == version)), None)
+        return procesos[0] if procesos else None
 
     # Devuelve un proceso específico por su ID
     async def obtener_proceso_por_id(self, process_id: str):
