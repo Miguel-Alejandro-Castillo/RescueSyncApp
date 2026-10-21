@@ -496,5 +496,3 @@ echo "ProcessId: $PROCESS_ID"
 echo "User profile configurado"
 echo "Administrator profile configurado"
 echo "Membresias de perfiles configuradas"
-
-sh "$ARTIFACTS_DIR/configure-integration-permissions.sh"
