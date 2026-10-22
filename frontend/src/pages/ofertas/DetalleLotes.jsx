@@ -24,6 +24,9 @@ export default function DetalleLotes() {
 
   const fechaLimite = lotes[0]?.fechaLimiteConvocatoria;
 
+  const [hacerConsorcio, setHacerConsorcio] = useState(false);
+
+
   // Cargar lotes de la emergencia y la lista de ONGs de Bonita
   useEffect(() => {
     const fetchData = async () => {
@@ -60,6 +63,8 @@ export default function DetalleLotes() {
       setLoteSeleccionadoId(loteId);
       setCantRecurso('');
       setOngsInvitadas({});
+
+      setHacerConsorcio(false);
     }
   };
 
@@ -134,6 +139,11 @@ export default function DetalleLotes() {
         throw new Error(data.detail || 'Error al procesar la oferta en consorcio');
       }
 
+
+     const mensajeExitoFinal = hacerConsorcio 
+        ? '¡Oferta en consorcio creada con éxito!' 
+        : '¡Oferta creada con éxito!';
+
       navigate('/ofertas', { 
         state: { mensajeExito: '¡Oferta en consorcio creada con éxito!' } 
       });
@@ -195,7 +205,7 @@ export default function DetalleLotes() {
                       onClick={() => toggleFormulario(lote.id)}
                       style={{ padding: '0.5rem 1rem', cursor: 'pointer', borderRadius: '6px', backgroundColor: estaDesplegado ? 'var(--surface-raised)' : 'var(--primary)', color: estaDesplegado ? 'var(--ink)' : 'var(--on-primary)', fontWeight: 'bold' }}
                     >
-                      {estaDesplegado ? 'Cancelar' : 'Crear oferta en consorcio'}
+                      {estaDesplegado ? 'Cancelar' : 'Crear Oferta'}
                     </button>
                   )}
                 </div>
@@ -226,6 +236,24 @@ export default function DetalleLotes() {
                       <FieldError name="cantidadOferta" />
                     </div>
 
+
+
+                    {/* Checkbox para activar la opción de consorcio */}
+                    <div style={{ marginTop: '0.2rem' }}>
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem', fontWeight: '600', cursor: 'pointer' }}>
+                        <input 
+                          type="checkbox"
+                          checked={hacerConsorcio}
+                          onChange={(e) => setHacerConsorcio(e.target.checked)}
+                          style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
+                        />
+                        Hacer Consorcio
+                      </label>
+                    </div>
+
+
+
+                    {hacerConsorcio && (
                     <div style={{ marginTop: '0.5rem' }}>
                       <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
                         Invitar a otras ONGs a este consorcio (opcional):
@@ -247,13 +275,15 @@ export default function DetalleLotes() {
                         )}
                       </div>
                     </div>
-
+                    )}
                     <button
                       type="submit"
                       disabled={submitting}
                       style={{ alignSelf: 'flex-start', padding: '0.6rem 1.2rem', backgroundColor: 'var(--primary)', color: 'var(--on-primary)', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: submitting ? 'not-allowed' : 'pointer' }}
                     >
-                      {submitting ? 'Creando consorcio…' : 'Confirmar y Enviar Invitaciones'}
+                      {submitting 
+                        ? (hacerConsorcio ? 'Creando consorcio…' : 'Creando oferta…') 
+                        : (hacerConsorcio ? 'Confirmar consorcio' : 'Confirmar')}
                     </button>
                   </ValidatedForm>
                 )}

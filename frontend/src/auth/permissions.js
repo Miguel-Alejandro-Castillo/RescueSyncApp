@@ -16,6 +16,7 @@ const PERMISSION_PROFILES = {
   'ofertas.crear': ['ong'],
   'ofertas.ver_invalidas': ['coordinador'],
   'monitoreo.ver': ['coordinador'],
+  'ofertas.consorcio': ['ong'],
 };
 
 const ROUTE_PERMISSIONS = [
@@ -26,7 +27,7 @@ const ROUTE_PERMISSIONS = [
   { path: '/ofertas', permission: 'ofertas.crear' },
   { path: '/ofertas-invalidas', permission: 'ofertas.ver_invalidas' },
   { path: '/monitoreo', permission: 'monitoreo.ver' },
-  { path: '/ofertas-consorcio', permission: 'ofertas.ver_propias' },
+  { path: '/ofertas-consorcio', permission: 'ofertas.consorcio' },
 ];
 
 const ROUTE_PERMISSION_PATTERNS = [
@@ -43,7 +44,9 @@ export const ACTIONS = [
   { permission: 'lotes.crear', profiles: ['coordinador'], path: '/lotes/nuevo', label: 'Lotes y convocatorias', title: 'Organizar lotes de ayuda', description: 'Elegí una emergencia pendiente, definí los recursos y publicá la convocatoria.' },
   { permission: 'ofertas.crear', profiles: ['ong'], path: '/ofertas', label: 'Ofertas', title: 'Ofrecer ayuda', description: 'Consultá las convocatorias y cargá ofertas para los lotes disponibles.' },
   { permission: 'ofertas.ver_invalidas', profiles: ['coordinador'], path: '/ofertas-invalidas', label: 'Ofertas inválidas', title: 'Ofertas inválidas', description: 'Revisá las ofertas inválidas y elegí qué acción tomar.' },
+  { permission: 'ofertas.consorcio', profiles: ['ong'], path: '/ofertas-consorcio', label: 'Ofertas consórcio', title: 'Ofertas consórcio', description: 'Consultá las convocatorias y cargá ofertas para los lotes disponibles.' },
   { permission: 'monitoreo.ver', profiles: ['coordinador'], path: '/monitoreo', label: 'Monitoreo', title: 'Monitoreo de la ejecución', description: 'Registrá los eventos posteriores a la adjudicación y finalizá el monitoreo.' },
+  
 ];
 
 export function getProfiles(memberships) {
