@@ -1,10 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Header
-import os
-import secrets
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from sqlalchemy.exc import OperationalError
 from database import get_session
-from dependencies.rbac import require_roles, CENTRO_COORDINADOR, OPERADOR_MUNICIPAL, AUDITORES
+from dependencies.rbac import require_roles, CENTRO_COORDINADOR, OPERADOR_MUNICIPAL, AUDITORES, USUARIO_BONITA
 from models.oferta import Oferta
 from models.lote import Lote
 from models.emergencia import Emergencia
@@ -13,22 +11,17 @@ from services.validacion_ofertas import preparar_solicitud, guardar_resultado, C
 router = APIRouter(tags=['Validación de ofertas'])
 
 
-def caso_integracion(caso_id, token, session):
-    expected = os.getenv('BONITA_VALIDACION_TOKEN', '')
-    if not expected:
-        raise HTTPException(503, 'La integración de validación con Bonita no está configurada')
-    if not token or not secrets.compare_digest(token, expected):
-        raise HTTPException(401, 'Credencial de integración inválida')
+def caso_integracion(caso_id, session):
     emergencia = session.exec(select(Emergencia).where(Emergencia.bonitaCaseId == caso_id)).first()
     if not emergencia:
         raise HTTPException(404, 'El caso no tiene una emergencia asociada')
     return emergencia
 
 
-@router.get('/integraciones/bonita/casos/{caso_id}/solicitud-validacion')
-def solicitud_validacion(caso_id: str, x_validacion_token: str | None = Header(default=None),
+@router.get('/integraciones/bonita/casos/{caso_id}/solicitud-validacion', dependencies=[Depends(require_roles(USUARIO_BONITA))])
+def solicitud_validacion(caso_id: str,
                          session: Session = Depends(get_session)):
-    emergencia = caso_integracion(caso_id, x_validacion_token, session)
+    emergencia = caso_integracion(caso_id, session)
     try:
         return preparar_solicitud(session, emergencia.id)
     except (ConvocatoriaAbierta, OperationalError) as error:
@@ -36,10 +29,10 @@ def solicitud_validacion(caso_id: str, x_validacion_token: str | None = Header(d
         raise HTTPException(409, str(error)) from error
 
 
-@router.post('/integraciones/bonita/casos/{caso_id}/resultado-validacion')
-def resultado_validacion(caso_id: str, data: dict, x_validacion_token: str | None = Header(default=None),
+@router.post('/integraciones/bonita/casos/{caso_id}/resultado-validacion', dependencies=[Depends(require_roles(USUARIO_BONITA))])
+def resultado_validacion(caso_id: str, data: dict,
                          session: Session = Depends(get_session)):
-    emergencia = caso_integracion(caso_id, x_validacion_token, session)
+    emergencia = caso_integracion(caso_id, session)
     try:
         return guardar_resultado(session, emergencia.id, data)
     except (ValueError, KeyError, TypeError, OperationalError) as error:
@@ -47,10 +40,10 @@ def resultado_validacion(caso_id: str, data: dict, x_validacion_token: str | Non
         raise HTTPException(409, str(error)) from error
 
 
-@router.get('/integraciones/bonita/casos/{caso_id}/lotes/{lote_id}/reservas')
-def reservas_caso(caso_id: str, lote_id: int, x_validacion_token: str | None = Header(default=None),
+@router.get('/integraciones/bonita/casos/{caso_id}/lotes/{lote_id}/reservas', dependencies=[Depends(require_roles(USUARIO_BONITA))])
+def reservas_caso(caso_id: str, lote_id: int,
                   session: Session = Depends(get_session)):
-    emergencia = caso_integracion(caso_id, x_validacion_token, session)
+    emergencia = caso_integracion(caso_id, session)
     lote = session.get(Lote, lote_id)
     if not lote or lote.emergenciaId != emergencia.id:
         raise HTTPException(404, 'El lote no pertenece al caso')
