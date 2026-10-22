@@ -188,14 +188,16 @@ class BonitaService:
             headers=self._auth_headers(),
             params = {
                 "p": 0, # (Required) index of the page to display
-                "f": f"name={process_name}"
+                "f": f"name={process_name}",
+                "o": "deploymentDate DESC",
+                "c": 100
             }
         )
         return response.json()
 
     async def obtener_proceso_por_nombre(self, process_name: str):
         procesos = await self.obtener_procesos_por_nombre(process_name)
-        return procesos[0] if procesos else None
+        return next((proceso for proceso in procesos if proceso.get("activationState") == "ENABLED"), None)
 
     # Devuelve un proceso específico por su ID
     async def obtener_proceso_por_id(self, process_id: str):
@@ -271,14 +273,14 @@ class BonitaService:
         return tareas[0] if tareas else None
 
     # Completa una tarea humana específica por su ID
-    async def resolver_accion_coordinador(self, case_id: str, accion: str):
+    async def resolver_accion_coordinador(self, case_id: str, accion: str, lote_id: int | None = None):
         if accion not in {"PUBLICAR_CONVOCATORIA", "GENERAR_LOTES", "ACEPTAR_OFERTAS"}:
             raise ValueError("Acción de coordinador desconocida")
         tareas = await self.obtener_tareas_humanas_por_caso(case_id)
         tarea = next((t for t in tareas if t["name"].strip() == "Evaluar acciones a tomar"), None)
         if not tarea:
             raise HTTPException(409, "El caso no está esperando la decisión del coordinador en Bonita.")
-        await self.completar_tarea_humana(tarea["id"], {"accionSeleccionadaInput": accion})
+        await self.completar_tarea_humana(tarea["id"], {"accionSeleccionadaInput": accion, "loteIdInput": str(lote_id) if lote_id is not None else ""})
 
     async def completar_tarea_humana(self, task_id: str, contract: dict | None = None):
         await self.http_client.post(
@@ -327,7 +329,8 @@ class BonitaService:
         self,
         case_id: str,
         timeout_segundos: int = 20,
-        intervalo_ms: int = 200
+        intervalo_ms: int = 200,
+        nombre_esperado: str | None = None
     ):
         inicio = time.monotonic()
 
@@ -335,7 +338,7 @@ class BonitaService:
 
             tareas = await self.obtener_tareas_humanas_por_caso(case_id)
 
-            if tareas:
+            if tareas and (nombre_esperado is None or any(t["name"].strip() == nombre_esperado for t in tareas)):
                 return tareas
 
             transcurrido = time.monotonic() - inicio
