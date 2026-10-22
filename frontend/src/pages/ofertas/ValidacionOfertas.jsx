@@ -25,9 +25,6 @@ export default function ValidacionOfertas({ demo = false }) {
   const [ofertas, setOfertas] = useState(demo ? ejemplosValidacion : []);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(!demo);
-  const [catalogo, setCatalogo] = useState([]);
-  const [selecciones, setSelecciones] = useState({});
-  const [guardando, setGuardando] = useState(null);
   const session = useSession();
   const coordinador = canAccess(getSessionMemberships(session), 'ofertas.ver_invalidas');
   const emergencias = Object.values(ofertas.reduce((grupos, oferta) => {
@@ -36,30 +33,6 @@ export default function ValidacionOfertas({ demo = false }) {
     lote.ofertas.push(oferta);
     return grupos;
   }, {}));
-  useEffect(() => {
-    if (demo || !coordinador) return;
-    let active = true;
-    authenticatedFetch(`${API_RESCUE}/recursos-nacionales`).then(async r => {
-      if (!r.ok) throw new Error('No se pudo cargar el catálogo nacional.');
-      const data = await r.json();
-      if (active) setCatalogo(data);
-    }).catch(e => { if (active) setError(e.message); });
-    return () => { active = false; };
-  }, [coordinador, demo]);
-  async function vincular(loteId) {
-    setGuardando(loteId);
-    try {
-      const r = await authenticatedFetch(`${API_RESCUE}/lotes/${loteId}/recurso-nacional`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ codigo: selecciones[loteId] }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.detail || 'No se pudo vincular el recurso.');
-      setOfertas(lista => lista.map(o => o.lote_id === loteId ? { ...o, recurso_codigo: data.recurso_codigo } : o));
-      setError('');
-    } catch (e) { setError(e.message); }
-    finally { setGuardando(null); }
-  }
   useEffect(() => {
     if (demo) return;
     let active = true;
@@ -113,18 +86,6 @@ export default function ValidacionOfertas({ demo = false }) {
           {lote.ofertas.filter(o => !o.resultado_validacion || o.resultado_validacion.error || o.estado_validacion === 'pendiente').map(o =>
             <ResultadoValidacion key={o.id} resultado={o.resultado_validacion?.error ? o.resultado_validacion : null} />
           )}
-          {lote.ofertas.slice(0, 1).map(o => <div key={o.id}>
-        {!demo && coordinador && !o.recurso_codigo && <div>
-          <label htmlFor={`recurso-oferta-${o.id}`}>Vincular este lote al recurso nacional</label>
-          <select id={`recurso-oferta-${o.id}`} className="form-select" value={selecciones[o.lote_id] || ''}
-            onChange={e => setSelecciones({ ...selecciones, [o.lote_id]: e.target.value })}>
-            <option value="">Seleccionar recurso</option>
-            {catalogo.map(r => <option key={r.codigo} value={r.codigo}>{r.nombre} ({r.codigo})</option>)}
-          </select>
-          <button className="btn btn-primary" disabled={!selecciones[o.lote_id] || guardando !== null}
-            onClick={() => vincular(o.lote_id)}>{guardando === o.lote_id ? 'Guardando…' : 'Vincular recurso'}</button>
-        </div>}
-          </div>)}
           {lote.ofertas.filter(o => o.accion_tomada).map(o => <p key={o.id} className={styles.decision}>
             {(o.resultado_validacion?.participantes || []).map(p => p.ong_nombre).filter(Boolean).join(' + ') || 'Decisión del coordinador'}: {({ reabrir: 'Reabrir convocatoria', reformular: 'Reformular lotes', parcial: 'Continuar con cobertura parcial' })[o.accion_tomada]}
             {o.resultado_validacion?.cantidad_aceptada != null && ` · ${o.resultado_validacion.cantidad_aceptada} unidades aceptadas`}

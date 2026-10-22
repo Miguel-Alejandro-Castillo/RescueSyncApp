@@ -17,8 +17,6 @@ from dependencies.jwt_auth import get_current_user
 from dependencies.bonita import get_bonita_service
 from services.bonita_service import BonitaService
 from services.bonita_service import get_bonita_validacion_service
-from services.nacional_service import get_nacional_service
-from services.validacion_ofertas import validar_emergencia
 from fastapi import Response
 import traceback
 import httpx
@@ -594,7 +592,6 @@ async def confirmar_accion_oferta_invalida(
     data: AccionOfertaInvalida,
     session: Session = Depends(get_session),
     bonita: BonitaService = Depends(get_bonita_service),
-    nacional=Depends(get_nacional_service),
 ):
     if data.accion not in ACCIONES_OFERTA_INVALIDA:
         raise HTTPException(status_code=422, detail="La acción no es válida.")
@@ -618,6 +615,8 @@ async def confirmar_accion_oferta_invalida(
         # Conservar lo prometido y aceptar sólo la cantidad respaldada por inventario.
         resultado = dict(resultado)
         resultado['cantidad_aceptada'] = resultado['cantidad_verificada']
+        resultado['participantes'] = [{**p, 'cantidad_aceptada': p['cantidad_verificada']}
+                                     for p in resultado.get('participantes', [])]
         oferta.resultado_validacion = resultado
 
     oferta.accion_tomada = data.accion
@@ -646,11 +645,6 @@ async def confirmar_accion_oferta_invalida(
             session.rollback()
             raise HTTPException(409, "Esta emergencia no tiene un caso asociado en Bonita.")
         try:
-            respuesta = await validar_emergencia(session, emergencia.id, nacional, commit=False)
-            if not respuesta['completa']:
-                raise HTTPException(409, "Debe completarse la validación nacional antes de continuar con cobertura parcial.")
-            if (oferta.resultado_validacion or {}).get('cantidad_aceptada', 0) <= 0:
-                raise HTTPException(409, "El Sistema Nacional ya no informa recursos disponibles para aceptar.")
             await bonita.resolver_accion_coordinador(emergencia.bonitaCaseId, "ACEPTAR_OFERTAS")
         except Exception:
             session.rollback()

@@ -1,4 +1,4 @@
-/** Validación sin reservas: cada oferta se verifica independientemente. */
+/** Validación sobre el inventario disponible de esta transacción. */
 export function comprobarSolicitud(data) {
   const fail = () => { throw Object.assign(new Error('Lotes, ofertas o participantes inválidos'), { status: 400, code: 'INVALID_VALIDATION_REQUEST' }); };
   const id = value => Number.isSafeInteger(value) && value > 0;
@@ -7,7 +7,9 @@ export function comprobarSolicitud(data) {
   const lotes = new Set(), ofertas = new Set(), participantes = new Set();
   for (const lote of data.lotes) {
     if (!id(lote.lote_id) || lotes.has(lote.lote_id) || !cantidad(lote.cantidad_requerida) || lote.cantidad_requerida === 0 || !Array.isArray(lote.ofertas)) fail();
-    if (lote.recurso_codigo != null && (typeof lote.recurso_codigo !== 'string' || !lote.recurso_codigo.trim())) fail();
+    for (const campo of ['recurso_nombre', 'tipo_recurso']) {
+      if (lote[campo] != null && (typeof lote[campo] !== 'string' || !lote[campo].trim() || lote[campo].length > 255)) fail();
+    }
     lotes.add(lote.lote_id);
     for (const oferta of lote.ofertas) {
       if (!id(oferta.oferta_id) || ofertas.has(oferta.oferta_id) || !Array.isArray(oferta.participantes)) fail();
@@ -22,8 +24,14 @@ export function comprobarSolicitud(data) {
   }
 }
 
+function resolverLote(lote, recursos) {
+  if (!lote.recurso_nombre?.trim()) return { ...lote, error_recurso: 'El lote no identifica el recurso solicitado' };
+  const recurso = recursos.find(r => r.nombre === lote.recurso_nombre && r.categoria.nombre === lote.tipo_recurso);
+  return { ...lote, recurso_codigo: recurso?.codigo ?? null };
+}
+
 function evaluarOferta(oferta, lote, inventarios) {
-  if (!lote.recurso_codigo) return { error: 'El lote no tiene vinculado un código de recurso nacional' };
+  if (lote.error_recurso) return { error: lote.error_recurso };
   if (oferta.participantes.some(p => !p.cuit?.trim())) {
     return { error: 'El aporte no tiene registrada su ONG de origen. Hay que revisar su vinculación histórica.' };
   }
@@ -35,6 +43,7 @@ function evaluarOferta(oferta, lote, inventarios) {
     let disponible = 0, motivo = null;
     if (!ong) motivo = 'ONG no registrada en el Sistema Nacional';
     else if (ong.estado !== 'HABILITADA') motivo = 'ONG no habilitada en el Sistema Nacional';
+    else if (!lote.recurso_codigo) motivo = 'El recurso solicitado no existe en el Sistema Nacional';
     else if (!recurso) motivo = 'La ONG no tiene registrado el recurso solicitado';
     else disponible = Math.max(0, recurso.cantidadTotal - recurso.cantidadReservada);
     const previo = aportes.get(cuit) || 0;
@@ -43,7 +52,7 @@ function evaluarOferta(oferta, lote, inventarios) {
     if (verificada < p.cantidad_ofertada && !motivo) motivo = 'Disponibilidad insuficiente para el aporte comprometido';
     return { participante_id: p.participante_id, ong_id: p.ong_id, cuit,
       ong_nacional_id: ong?.id ?? null, ong_nombre: ong?.razonSocial ?? null,
-      recurso_codigo: lote.recurso_codigo, cantidad_ofertada: p.cantidad_ofertada,
+      recurso_nacional_id: recurso?.recursoId ?? null, recurso_codigo: lote.recurso_codigo, cantidad_ofertada: p.cantidad_ofertada,
       cantidad_disponible: disponible, cantidad_verificada: verificada,
       faltante: p.cantidad_ofertada - verificada, valida: motivo === null, motivo };
   });
@@ -63,14 +72,20 @@ function evaluarOferta(oferta, lote, inventarios) {
   return resultado;
 }
 
-export async function validarEmergencia(data, consultarInventarios) {
+export async function validarEmergencia(data, consultarInventarios, recursos = []) {
   comprobarSolicitud(data);
   const cuits = [...new Set(data.lotes.flatMap(l => l.ofertas.flatMap(o => o.participantes.map(p => p.cuit?.trim()).filter(Boolean))))];
   const inventarios = new Map((cuits.length ? await consultarInventarios(cuits) : []).map(o => [o.cuit, o]));
   const resultados = [], cobertura_por_lote = [];
-  for (const lote of data.lotes) {
+  for (const lote of data.lotes.map(l => resolverLote(l, recursos))) {
     const ofertas = lote.ofertas.map(o => {
       const resultado = evaluarOferta(o, lote, inventarios);
+      if (!resultado.error) {
+        for (const p of resultado.participantes) {
+          const recurso = inventarios.get(p.cuit)?.recursos.find(r => r.recurso.codigo === lote.recurso_codigo);
+          if (recurso) recurso.cantidadReservada += p.cantidad_verificada;
+        }
+      }
       return { oferta_id: o.oferta_id, lote_id: lote.lote_id,
         estado_validacion: resultado.error ? 'pendiente' : resultado.valida ? 'valida' : 'invalida',
         resultado_validacion: resultado };
@@ -80,7 +95,7 @@ export async function validarEmergencia(data, consultarInventarios) {
       const r = o.resultado_validacion;
       return n + (r.error ? 0 : r.cantidad_aceptada ?? (r.inventario_valido ? r.cantidad_verificada : 0));
     }, 0);
-    const cobertura = { lote_id: lote.lote_id, requerido: lote.cantidad_requerida,
+    const cobertura = { lote_id: lote.lote_id, ventana_validada: lote.ventana_validada, recurso_codigo: lote.recurso_codigo ?? null, requerido: lote.cantidad_requerida,
       cantidad_ofertada: lote.ofertas.reduce((n, o) => n + o.participantes.reduce((m, p) => m + p.cantidad_ofertada, 0), 0),
       ofertado_valido, faltante: Math.max(0, lote.cantidad_requerida - ofertado_valido), completa,
       cubierto: completa && ofertado_valido >= lote.cantidad_requerida };

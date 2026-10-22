@@ -1,3 +1,4 @@
+from services.validacion_ofertas import reiniciar_validacion
 import os
 from datetime import datetime, timedelta, timezone
 from dependencies.bonita import get_bonita_service
@@ -268,13 +269,14 @@ async def reformular_lotes(
             ventana_emergencia_ms
         )
 
-        await bonita.resolver_accion_coordinador(caso_id, "GENERAR_LOTES")
+        await bonita.resolver_accion_coordinador(caso_id, "GENERAR_LOTES", lote_anterior.id)
         # Los nuevos lotes ya se cargaron en esta misma solicitud.
-        tareas_generacion = await bonita.esperar_tareas_humanas_por_caso(caso_id)
+        tareas_generacion = await bonita.esperar_tareas_humanas_por_caso(caso_id, nombre_esperado="Generar lotes de necesidades")
         tarea_generacion = next((t for t in tareas_generacion
                                  if t["name"].strip() == "Generar lotes de necesidades"), None)
         if not tarea_generacion:
             raise HTTPException(409, "Bonita no llegó a la tarea de generar los nuevos lotes.")
+        reiniciar_validacion(session, lote_anterior.id)
         await bonita.completar_tarea_humana(tarea_generacion["id"])
         emergencia.estado = "publicada"
         session.add(emergencia)
@@ -328,15 +330,8 @@ async def reabrir_convocatoria(
     ventana_emergencia_ms = calcular_diferencia_ms(fecha_limite, ahora)
 
     try:
-        lotes = session.exec(
-            select(Lote).where(
-                Lote.emergenciaId == emergencia.id,
-                Lote.estado != LoteEstado.REFORMULADO
-            )
-        ).all()
-        for lote in lotes:
-            lote.fechaLimiteConvocatoria = fecha_limite
-            session.add(lote)
+        lote_oferta.fechaLimiteConvocatoria = fecha_limite
+        session.add(lote_oferta)
 
         emergencia.estado = EmergenciaEstado.PUBLICADA
         session.add(emergencia)
@@ -350,7 +345,9 @@ async def reabrir_convocatoria(
             ventana_emergencia_ms
         )
 
-        await bonita.resolver_accion_coordinador(caso_id, "PUBLICAR_CONVOCATORIA")
+        await bonita.resolver_accion_coordinador(caso_id, "PUBLICAR_CONVOCATORIA", lote_oferta.id)
+        await bonita.esperar_tareas_humanas_por_caso(caso_id, nombre_esperado="Cargar ofertas de  ayuda")
+        reiniciar_validacion(session, lote_oferta.id)
 
         session.commit()
     except HTTPException:
