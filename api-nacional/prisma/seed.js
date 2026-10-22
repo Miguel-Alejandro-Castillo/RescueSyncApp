@@ -102,10 +102,6 @@ async function ensureUser({ username, password }) {
   });
 }
 
-function buildRecursoCodigo(index) {
-  return `R${(index + 1).toString(36).toUpperCase().padStart(2, '0')}`;
-}
-
 async function ensureCategoria({ codigo, nombre, descripcion }) {
   return prisma.categoria.upsert({
     where: { codigo },
@@ -134,19 +130,13 @@ async function ensureOng(ongData) {
 }
 
 async function ensureRecurso({ codigo, nombre, descripcion, categoriaId }) {
-  return prisma.recurso.upsert({
-    where: { codigo },
-    update: {
-      nombre,
-      descripcion,
-      categoriaId,
-    },
-    create: {
-      codigo,
-      nombre,
-      descripcion,
-      categoriaId,
-    },
+  const existente = await prisma.recurso.findFirst({
+    where: { nombre, categoriaId },
+    orderBy: { id: 'asc' },
+  });
+  if (existente) return existente;
+  return prisma.recurso.create({
+    data: { codigo, nombre, descripcion, categoriaId },
   });
 }
 
@@ -158,10 +148,7 @@ async function ensureOngRecurso({ ongId, recursoId, cantidadTotal, cantidadReser
         recursoId,
       },
     },
-    update: {
-      cantidadTotal,
-      cantidadReservada,
-    },
+    update: {},
     create: {
       ongId,
       recursoId,
@@ -181,26 +168,30 @@ async function main() {
     categoriasCreadas.push(await ensureCategoria(categoria));
   }
 
-  for (const [ongIndex, ongData] of ongsBase.entries()) {
-    const ong = await ensureOng(ongData);
-
-    for (let i = 0; i < categoriasCreadas.length; i++) {
-      const categoria = categoriasCreadas[i % categoriasCreadas.length];
-      const claveCategoria = Object.keys(recursosPorCategoria).find((key) => key.toLowerCase() === (categoria.nombre || "").toLowerCase());
-      const opciones = recursosPorCategoria[claveCategoria] || ["RecursosGeneral"];
-      const nombreTipoRecurso = opciones[(ongIndex + i) % opciones.length];
+  const recursosPorNombre = new Map();
+  for (const categoria of categoriasCreadas) {
+    for (const [index, nombre] of recursosPorCategoria[categoria.nombre].entries()) {
       const recurso = await ensureRecurso({
-        codigo: buildRecursoCodigo(ongIndex * 4 + i),
-        nombre: nombreTipoRecurso,
-        descripcion: "",
+        codigo: `${categoria.codigo}-${String(index + 1).padStart(2, '0')}`,
+        nombre,
+        descripcion: '',
         categoriaId: categoria.id,
       });
+      recursosPorNombre.set(`${categoria.nombre}:${nombre}`, recurso);
+    }
+  }
 
+  for (const [ongIndex, ongData] of ongsBase.entries()) {
+    const ong = await ensureOng(ongData);
+    for (const [index, categoria] of categoriasCreadas.entries()) {
+      const opciones = recursosPorCategoria[categoria.nombre];
+      const nombre = opciones[(ongIndex + index) % opciones.length];
+      const recurso = recursosPorNombre.get(`${categoria.nombre}:${nombre}`);
       await ensureOngRecurso({
         ongId: ong.id,
         recursoId: recurso.id,
-        cantidadTotal: 100 + i * 50,
-        cantidadReservada: i * 10,
+        cantidadTotal: 100 + index * 50,
+        cantidadReservada: 0,
       });
     }
   }
