@@ -567,8 +567,9 @@
       <displayName>Coordinadores</displayName>
       <description>This group represents the coordinadores of the RESCUE organization</description>
     </group>
-    <group name="bonita_bpm">
-      <displayName>BonitaBPM</displayName>
+    <group name="bonita_bpm" parentPath="/rescue">
+      <displayName>Bonita BPM</displayName>
+      <description>This group represents the user bonita of the RESCUE organization</description>
     </group>
   </groups>
   <memberships>
@@ -636,6 +637,7 @@
       <userName>bonita.bpm</userName>
       <roleName>bonita_user</roleName>
       <groupName>bonita_bpm</groupName>
+      <groupParentPath>/rescue</groupParentPath>
     </membership>
     <membership>
       <userName>walter.white</userName>
