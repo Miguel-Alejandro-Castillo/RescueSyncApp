@@ -1,14 +1,13 @@
 from datetime import datetime, timezone
 from enum import Enum
 from sqlmodel import Field, SQLModel
-
-
 class EmergenciaEstado(str, Enum):
     CREADA = "creada"
     PUBLICADA = "publicada"
     CONVOCATORIA_CERRADA = "convocatoria_cerrada"
+    EN_ADJUDICACION = "en_adjudicacion"
+    ADJUDICADA = "adjudicada"
     MONITOREO_FINALIZADO = "monitoreo_finalizado"
-
 class Emergencia(SQLModel, table=True):
     __tablename__ = "emergencias"
 

@@ -770,12 +770,10 @@ async def adjudicar_ofertas(
         # El lote se actualiza una única vez después de procesar correctamente todas las adjudicaciones.
         lote.estado = LoteEstado.ADJUDICADO
         session.add(lote)
-        # Hacer explícito que el nuevo estado llegue a BD dentro de la transacción 
+        # Hacer explícito que el nuevo estado llegue a BD dentro de la transacción
         # antes de consultar los demás lotes.
-        #session.flush()
-        session.commit()
+        session.flush()
         # buscar todos los lotes de la emergencia y validar que todos estan correctamente en estado ADJUDICADO
-        #lotes = session.exec(select(Lote).where(Lote.emergenciaId == lote.emergenciaId, Lote.estado != LoteEstado.ADJUDICADO)).all()
         lote_no_adjudicado = session.exec(
             select(Lote).where(Lote.emergenciaId == lote.emergenciaId, Lote.estado != LoteEstado.ADJUDICADO)
         ).first()
@@ -784,7 +782,10 @@ async def adjudicar_ofertas(
             emergencia: Emergencia = session.get(Emergencia, lote.emergenciaId)
             if emergencia.bonitaCaseId:
                 await bonita.completar_tarea_humana_por_caso(emergencia.bonitaCaseId)
-    
+            emergencia.estado = EmergenciaEstado.ADJUDICADA
+            session.add(emergencia)
+
+        session.commit()
     except httpx.HTTPStatusError as e:
         session.rollback()
         print(f"HTTP STATUS ERROR: {repr(e)}")
