@@ -40,7 +40,7 @@ model OngRecurso {
   recurso     Recurso @relation(fields: [recursoId], references: [id])
 
   cantidadTotal        Int
-  cantidadComprometida Int @default(0)
+  cantidadReservada Int @default(0)
 
   @@id([ongId, recursoId])
 }

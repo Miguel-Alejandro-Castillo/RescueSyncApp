@@ -54,7 +54,7 @@ router.get('/', getAllOngs);
  *           minimum: 1
  *     responses:
  *       200:
- *         description: Datos de la ONG y recursos con cantidadTotal, cantidadComprometida y cantidadDisponible, dentro de data
+ *         description: Datos de la ONG y recursos con cantidadTotal, cantidadReservada y cantidadDisponible, dentro de data
  *       400:
  *         description: Identificador inválido
  *       404:

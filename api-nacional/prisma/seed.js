@@ -153,7 +153,7 @@ async function ensureRecurso({ codigo, nombre, descripcion, categoriaId }) {
   });
 }
 
-async function ensureOngRecurso({ ongId, recursoId, cantidadTotal, cantidadComprometida }) {
+async function ensureOngRecurso({ ongId, recursoId, cantidadTotal, cantidadReservada }) {
   return prisma.ongRecurso.upsert({
     where: {
       ongId_recursoId: {
@@ -163,13 +163,13 @@ async function ensureOngRecurso({ ongId, recursoId, cantidadTotal, cantidadCompr
     },
     update: {
       cantidadTotal,
-      cantidadComprometida,
+      cantidadReservada,
     },
     create: {
       ongId,
       recursoId,
       cantidadTotal,
-      cantidadComprometida,
+      cantidadReservada,
     },
   });
 }
@@ -200,7 +200,7 @@ async function main() {
         ongId: ong.id,
         recursoId: recurso.id,
         cantidadTotal: 100 + i * 50,
-        cantidadComprometida: i * 10,
+        cantidadReservada: i * 10,
       });
     }
   }

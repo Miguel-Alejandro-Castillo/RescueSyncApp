@@ -36,7 +36,7 @@ function evaluarOferta(oferta, lote, inventarios) {
     if (!ong) motivo = 'ONG no registrada en el Sistema Nacional';
     else if (ong.estado !== 'HABILITADA') motivo = 'ONG no habilitada en el Sistema Nacional';
     else if (!recurso) motivo = 'La ONG no tiene registrado el recurso solicitado';
-    else disponible = Math.max(0, recurso.cantidadTotal - recurso.cantidadComprometida);
+    else disponible = Math.max(0, recurso.cantidadTotal - recurso.cantidadReservada);
     const previo = aportes.get(cuit) || 0;
     const verificada = Math.min(p.cantidad_ofertada, Math.max(0, disponible - previo));
     aportes.set(cuit, previo + p.cantidad_ofertada);

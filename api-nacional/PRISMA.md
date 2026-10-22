@@ -44,6 +44,13 @@ Se ejecuta automáticamente cuando se crea la imagen Docker:
 docker compose exec nacional npx prisma generate
 ```
 
+Si la API ya está ejecutándose, reiniciá el contenedor después de regenerar el cliente para que Node.js cargue la versión actualizada:
+
+```bash
+docker compose exec nacional npx prisma generate
+docker compose restart nacional
+```
+
 ### Crear una Nueva Migración
 
 Después de modificar `prisma/schema.prisma`:

@@ -28,8 +28,8 @@ export const getRecursosOng = async (req, res) => {
     recursos: ong.recursos.map(item => ({
       ...item.recurso,
       cantidadTotal: item.cantidadTotal,
-      cantidadComprometida: item.cantidadComprometida,
-      cantidadDisponible: Math.max(0, item.cantidadTotal - item.cantidadComprometida),
+      cantidadReservada: item.cantidadReservada,
+      cantidadDisponible: Math.max(0, item.cantidadTotal - item.cantidadReservada),
     })),
   });
 };
