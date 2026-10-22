@@ -84,10 +84,20 @@ export default function Monitoreo() {
                   type="button"
                   className="btn btn-primary"
                   onClick={() => handleFinalizar(emergencia.id)}
+                  disabled={!emergencia.todas_finalizadas}
                 >
                   Finalizar monitoreo
                 </button>
               </div>
+
+              <p>ONGs adjudicadas:</p>
+              <ul>
+                {emergencia.ongs.map(ong => (
+                  <li key={ong.ong_id}>
+                    {ong.nombre}: {ong.finalizada ? 'finalizó sus tareas' : 'tareas pendientes'}
+                  </li>
+                ))}
+              </ul>
 
               {emergencia.lotes.map(lote => (
                 <div key={lote.id} className={styles.lote}>

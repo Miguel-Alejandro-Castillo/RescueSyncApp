@@ -29,3 +29,8 @@ class ParticipanteOferta(SQLModel, table=True):
         gt=0,
         description="Cantidad comprometida por la ONG. NULL indica que fue invitada pero aún no confirmó."
     )
+
+    tareas_finalizadas: bool = Field(
+        default=False,
+        description="Indica si la ONG finalizó sus tareas adjudicadas"
+    )
