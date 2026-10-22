@@ -25,6 +25,7 @@ import RequirePermission from "../auth/RequirePermission";
 import OfertasConsorcio from '../pages/ofertas/OfertasConsorcio';
 import OfertasInvalidas from '../pages/ofertas/OfertasInvalidas';
 import ValidacionOfertas from '../pages/ofertas/ValidacionOfertas';
+import Monitoreo from '../pages/monitoreo/Monitoreo';
 function RequireSession() {
   const session = useSession();
   const location = useLocation();
@@ -71,6 +72,7 @@ export default function AppRouter() {
             <Route path="/ofertas-consorcio" element={<RequirePermission permission="ofertas.ver_propias"><OfertasConsorcio /></RequirePermission>} />
             <Route path="/ofertas-invalidas" element={<RequirePermission permission="ofertas.ver_invalidas"><OfertasInvalidas /></RequirePermission>} />
             <Route path="/validacion-ofertas" element={<RequirePermission permission="ofertas.ver_validacion"><ValidacionOfertas /></RequirePermission>} />
+            <Route path="/monitoreo" element={<RequirePermission permission="monitoreo.ver"><Monitoreo /></RequirePermission>} />
             <Route
               path="*"
               element={

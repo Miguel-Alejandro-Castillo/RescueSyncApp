@@ -7,6 +7,7 @@ class EmergenciaEstado(str, Enum):
     CREADA = "creada"
     PUBLICADA = "publicada"
     CONVOCATORIA_CERRADA = "convocatoria_cerrada"
+    MONITOREO_FINALIZADO = "monitoreo_finalizado"
 
 class Emergencia(SQLModel, table=True):
     __tablename__ = "emergencias"

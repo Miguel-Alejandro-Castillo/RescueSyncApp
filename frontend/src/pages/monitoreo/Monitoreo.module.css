@@ -1,0 +1,10 @@
+.page { color: var(--ink); }
+.page h1 { font-size: clamp(1.5rem, 4vw, 2rem); }
+.lista { display: flex; flex-direction: column; gap: 1.5rem; }
+.item { border: 1px solid var(--border, #ccc); border-radius: 8px; padding: 1rem; background: var(--surface, #fff); }
+.encabezado { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+.encabezado h2 { font-size: 1.3rem; margin: 0; }
+.lote { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border, #ccc); }
+.lote h3 { font-size: 1.1rem; }
+.formulario { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.formulario input { flex: 1; min-width: 200px; }
