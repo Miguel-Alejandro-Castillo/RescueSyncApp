@@ -7,13 +7,6 @@ export default function verifyJWT(
   next
 ) {
 
-  const apiPath = (process.env.API_PATH || "/api/v1").replace(/\/+$/, "");
-  const loginPath = `${apiPath}/auth/login`;
-  const requestPath = req.path.replace(/\/+$/, "");
-  if (req.method === "POST" && requestPath === loginPath) {
-    return next();
-  }
-
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {

@@ -19,13 +19,13 @@ const router = express.Router();
  *         description: Mensaje de estado del servicio
  *         content:
  *           text/html:
- *             schema: { type: string, example: La API Nacional de RescueSync está en funcionamiento. Recarga automática habilitada 1.0. }
+ *             schema: { type: string, example: API REST del Sistema Nacional de Gestión de Recursos y Riesgos en funcionamiento }
  *       401:
  *         description: Token ausente, inválido o vencido
  */
 router.get("/", (req, res) => {
   console.log("Received request for /");
-  res.send("La API Nacional de RescueSync está en funcionamiento. Recarga automática habilitada 1.0.");
+  res.send("API REST del Sistema Nacional de Gestión de Recursos y Riesgos en funcionamiento");
 });
 
 /**
