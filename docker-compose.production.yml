@@ -1,0 +1,54 @@
+services:
+  redis-db:
+    container_name: redis-db
+    image: redis:7.0
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  nacional-db:
+    container_name: api-nacional-db
+    image: postgres:15.4
+    environment:
+      POSTGRES_DB: ${NACIONAL_POSTGRES_DB}
+      POSTGRES_USER: ${NACIONAL_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - nacional_pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${NACIONAL_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  nacional:
+    container_name: api-nacional
+    build:
+      context: ./api-nacional
+      dockerfile: Dockerfile.production
+    ports:
+      - "${NACIONAL_PORT}:${NACIONAL_PORT}"
+    environment:
+      PORT: ${NACIONAL_PORT}
+      REDIS_URL: ${NACIONAL_REDIS_URL}
+      DATABASE_URL: ${NACIONAL_DATABASE_URL}
+      API_PATH: ${NACIONAL_API_PATH}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${NACIONAL_JWT_EXPIRES_IN}
+      SWAGGER_URL: ${SWAGGER_URL}
+    depends_on:
+      redis-db:
+        condition: service_healthy
+      nacional-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  nacional_pgdata:

@@ -1,0 +1,50 @@
+# =========================
+# Stage 1: Build
+# =========================
+FROM node:22-alpine AS build
+
+WORKDIR /app
+
+# Necesario para Prisma
+RUN apk add --no-cache openssl
+
+# Instalar dependencias de forma reproducible
+COPY package*.json ./
+RUN npm ci
+
+# Copiar código fuente
+COPY . .
+
+# Generar Prisma Client
+RUN npx prisma generate
+
+# Si tu proyecto compila TypeScript, Nest, etc.:
+# RUN npm run build
+
+# Eliminar dependencias de desarrollo
+RUN npm prune --omit=dev
+
+
+# =========================
+# Stage 2: Production
+# =========================
+FROM node:22-alpine AS production
+
+ENV NODE_ENV=production
+
+WORKDIR /app
+
+RUN apk add --no-cache openssl
+
+COPY --from=build --chown=node:node /app /app
+
+# Normalizar el script por si viene de Windows
+RUN sed -i 's/\r$//' start.production.sh \
+    && chmod +x start.production.sh \
+    && chown node:node start.production.sh
+
+USER node
+
+EXPOSE ${NACIONAL_PORT}
+
+CMD ["sh", "./start.production.sh"]

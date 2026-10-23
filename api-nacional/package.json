@@ -12,10 +12,10 @@
     "seed": "node prisma/seed.js"
   },
   "devDependencies": {
-    "nodemon": "^3.x",
-    "prisma": "^5.x"
+    "nodemon": "^3.x"
   },
   "dependencies": {
+    "prisma": "^5.x",
     "@prisma/client": "^5.x",
     "axios": "^1.11.0",
     "cors": "^2.8.5",
