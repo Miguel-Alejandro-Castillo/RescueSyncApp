@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAllOngs, getOngById, getRecursosOng, createOng } from '../controllers/ong.controller.js';
+import { getAllOngs, createOng, getOngById, addRecurso, getRecursosOng } from '../controllers/ong.controller.js';
 
 const router = express.Router();
 
@@ -131,6 +131,8 @@ router.get('/:id', getOngById);
  * @swagger
  * /api/v1/ongs:
  *   post:
+ *     security:
+ *       - BearerAuth: []
  *     summary: Crear una ONG
  *     description: Registra una ONG y devuelve sus datos.
  *     tags: [ONGs]
@@ -175,5 +177,61 @@ router.get('/:id', getOngById);
  *         description: Token ausente, inválido o vencido
  */
 router.post('/', createOng);
+
+/**
+ * @swagger
+ * /api/v1/ongs/{id}/recursos:
+ *   put:
+ *     security:
+ *       - BearerAuth: []
+ *     summary: Agregar un recurso a una ONG
+ *     description: Asocia un recurso existente a una ONG.
+ *     tags: [ONGs]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         example: 1
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [recursoId, cantidadTotal]
+ *             properties:
+ *               recursoId:
+ *                 type: integer
+ *                 example: 1
+ *               cantidadTotal:
+ *                 type: integer
+ *                 example: 10
+ *     responses:
+ *       200:
+ *         description: Recurso agregado correctamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     ongId: { type: integer, example: 1 }
+ *                     recursoId: { type: integer, example: 1 }
+ *                     cantidadTotal: { type: integer, example: 10 }
+ *                     cantidadReservada: { type: integer, example: 0 }
+ *       404:
+ *         description: Recurso no encontrado
+ *       400:
+ *         description: Solicitud incorrecta
+ *       401:
+ *         description: Token ausente, inválido o vencido
+ *       500:
+ *         description: Error interno del servidor
+ */
+router.put('/:id/recursos', addRecurso);
 
 export default router;

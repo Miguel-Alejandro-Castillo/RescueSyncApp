@@ -1,5 +1,5 @@
 import express from 'express';
-import { getAllCategorias } from '../controllers/categoria.controller.js';
+import { getAllCategorias, createCategoria, getCategoriaById } from '../controllers/categoria.controller.js';
 
 const router = express.Router();
 
@@ -40,5 +40,60 @@ const router = express.Router();
  *         description: Error interno del servidor
  */
 router.get('/', getAllCategorias);
+
+/**
+ * @swagger
+ * /api/v1/categorias:
+ *   post:
+ *     summary: Crear una nueva categoría
+ *     description: Crea una nueva categoría en el catálogo de categorías.
+ *     tags: [Categorias]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               codigo: { type: string, example: RES }
+ *               nombre: { type: string, example: Rescate }
+ *     responses:
+ *       201:
+ *         description: Categoría creada correctamente
+ *       400:
+ *         description: Solicitud inválida
+ *       401:
+ *         description: Token ausente, inválido o vencido
+ *       500:
+ *         description: Error interno del servidor
+ */
+router.post('/', createCategoria);
+
+
+/**
+ * @swagger
+ * /api/v1/categorias/{id}:
+ *   get:
+ *     summary: Obtener una categoría por ID
+ *     description: Devuelve una categoría específica según su ID.
+ *     tags: [Categorias]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID de la categoría
+ *     responses:
+ *       200:
+ *         description: Categoría obtenida correctamente
+ *       401:
+ *         description: Token ausente, inválido o vencido
+ *       404:
+ *         description: Categoría no encontrada
+ *       500:
+ *         description: Error interno del servidor
+ */
+router.get('/:id', getCategoriaById);
 
 export default router;

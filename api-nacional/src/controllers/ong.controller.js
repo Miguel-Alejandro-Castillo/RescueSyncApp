@@ -55,6 +55,13 @@ export const createOng = async (req, res) => {
 
   const { razonSocial, descripcion, sigla, cuit } = req.body;
 
+  if (!razonSocial)
+    return ApiResponse.badRequest(res, 'RAZON_SOCIAL_REQUIRED', 'Razon social es requerida');
+  if (!cuit)
+    return ApiResponse.badRequest(res, 'CUIT_REQUIRED', 'CUIT es requerido');
+  if (!sigla)
+    return ApiResponse.badRequest(res, 'SIGLA_REQUIRED', 'Sigla es requerida');
+
   const ong = await prisma.ong.create({
     data: {
       razonSocial,
@@ -65,4 +72,42 @@ export const createOng = async (req, res) => {
   });
 
   return ApiResponse.created(res, ong);
+};
+
+export const addRecurso = async (req, res) => { 
+
+  const { id } = req.params;
+
+  const { recursoId, cantidadTotal } = req.body;
+
+  if (!id)
+    return ApiResponse.badRequest(res, 'ONG_ID_REQUIRED', 'El ID de la ONG es requerido');
+
+  if (!recursoId)
+    return ApiResponse.badRequest(res, 'RECURSO_ID_REQUIRED', 'El ID del recurso es requerido');
+
+  if (!cantidadTotal)
+    return ApiResponse.badRequest(res, 'CANTIDAD_TOTAL_REQUIRED', 'La cantidad total es requerida');
+
+  // BUSCAR LA ONG
+  const ong = await prisma.ong.findUnique({
+    where: { id: Number(id) }
+  });
+  if (!ong) return ApiResponse.notFound(res, 'ONG_NOT_FOUND', 'ONG no encontrada');
+
+  // BUSCAR EL RECURSO
+  const recurso = await prisma.recurso.findUnique({
+    where: { id: Number(recursoId) }
+  });
+  if (!recurso) return ApiResponse.notFound(res, 'RECURSO_NOT_FOUND', 'Recurso no encontrado');
+
+  const ongRecurso = await prisma.ongRecurso.create({
+    data: {
+      ongId: Number(id),
+      recursoId: Number(recursoId),
+      cantidadTotal: Number(cantidadTotal)
+    }
+  });
+
+  return ApiResponse.ok(res, ongRecurso);
 };
