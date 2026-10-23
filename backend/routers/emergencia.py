@@ -32,6 +32,7 @@ def read_emergencias(
     fechaDesde: datetime | None = None,
     fechaHasta: datetime | None = None,
     usuarioCreador: str | None = None,
+    bonitaCaseId: str | None = None,
     session: Session = Depends(get_session)
 ):
     query = select(Emergencia)
@@ -52,6 +53,8 @@ def read_emergencias(
         query = query.where(Emergencia.fechaCreacion <= fechaHasta)
     if usuarioCreador:
         query = query.where(Emergencia.usuarioCreador == usuarioCreador)
+    if bonitaCaseId:
+        query = query.where(Emergencia.bonitaCaseId == bonitaCaseId)
 
     return session.exec(query.order_by(Emergencia.fechaCreacion.desc(), Emergencia.id.desc())).all()
 
