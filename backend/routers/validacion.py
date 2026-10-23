@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from sqlalchemy.exc import OperationalError
 from database import get_session
-from dependencies.rbac import require_roles, CENTRO_COORDINADOR, OPERADOR_MUNICIPAL, AUDITORES, USUARIO_BONITA
+from dependencies.rbac import require_roles, USUARIO_BONITA
 from models.oferta import Oferta
 from models.lote import Lote
 from models.emergencia import Emergencia
@@ -50,22 +50,3 @@ def reservas_caso(caso_id: str, lote_id: int,
     ofertas = session.exec(select(Oferta).where(Oferta.lote_id == lote_id)).all()
     return {'resultados': [dict(oferta_id=o.id, resultado_validacion=o.resultado_validacion)
                            for o in ofertas if o.validada_en is not None and o.resultado_validacion]}
-
-
-
-@router.get('/ofertas-validacion', dependencies=[Depends(require_roles(
-    CENTRO_COORDINADOR, OPERADOR_MUNICIPAL, *AUDITORES))])
-def resultados_validacion(emergencia_id: int | None = None, session: Session = Depends(get_session)):
-    query = select(Oferta, Lote, Emergencia).join(Lote, Oferta.lote_id == Lote.id).join(
-        Emergencia, Lote.emergenciaId == Emergencia.id)
-    if emergencia_id is not None:
-        query = query.where(Lote.emergenciaId == emergencia_id)
-    return [{
-        'id': oferta.id, 'emergencia_id': lote.emergenciaId,
-        'lote_id': lote.id, 'lote_descripcion': lote.descripcion,
-        'lote_cantidad': lote.cantidad, 'emergencia_zona': emergencia.zonaAfectada,
-        'emergencia_gravedad': emergencia.nivelGravedad,
-        'recurso_codigo': lote.recurso_codigo, 'estado_validacion': oferta.estado_validacion,
-        'validada_en': oferta.validada_en, 'resultado_validacion': oferta.resultado_validacion,
-        'accion_tomada': oferta.accion_tomada,
-    } for oferta, lote, emergencia in session.exec(query.order_by(Oferta.id)).all()]

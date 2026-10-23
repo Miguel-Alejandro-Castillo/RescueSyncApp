@@ -36,7 +36,6 @@ const ROUTE_PERMISSION_PATTERNS = [
 ];
 
 export const ACTIONS = [
-  { permission: 'ofertas.ver_validacion', profiles: ['municipal', 'coordinador', 'auditor'], path: '/validacion-ofertas', label: 'Validación de ofertas', title: 'Validación de ofertas', description: 'Consultá el resultado del chequeo de recursos al cierre de la convocatoria.' },
   { permission: 'ofertas.ver_propias', profiles: ['ong'], path: '/ofertas/misofertas', label: 'Mis ofertas', title: 'Mis ofertas', description: 'Consulte y edite las ofertas registradas.' },
   { permission: 'emergencias.crear', profiles: ['municipal'], path: '/emergencias/nueva', label: 'Nueva emergencia', title: 'Registrar una emergencia', description: 'Indicá la zona afectada, la gravedad y la situación inicial.' },
   { permission: 'emergencias.ver_propias', profiles: ['municipal'], path: '/emergencias/propias', label: 'Mis emergencias', title: 'Ver mis emergencias', description: 'Consultá las emergencias que registraste previamente.' },
