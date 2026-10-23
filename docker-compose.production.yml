@@ -22,7 +22,7 @@ services:
       - nacional_pgdata:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d ${NACIONAL_POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${NACIONAL_POSTGRES_USER} -d ${NACIONAL_POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 10

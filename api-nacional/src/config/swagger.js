@@ -13,7 +13,32 @@ const options = {
       {
         url: SWAGGER_URL
       }
-    ]
+    ],
+    components: {
+      securitySchemes: {
+        BearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: "Ingresá el access_token obtenido en /api/v1/auth/login."
+        }
+      },
+      schemas: {
+        Error: {
+          type: "object",
+          properties: {
+            error: {
+              type: "object",
+              properties: {
+                code: { type: "string", example: "NO_TOKEN_PROVIDED" },
+                message: { type: "string", example: "No se proporcionó el token" }
+              }
+            }
+          }
+        }
+      }
+    },
+    security: [{ BearerAuth: [] }]
   },
   apis: ["./src/routes/*.js"]
 };

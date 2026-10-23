@@ -7,6 +7,13 @@ export default function verifyJWT(
   next
 ) {
 
+  const apiPath = (process.env.API_PATH || "/api/v1").replace(/\/+$/, "");
+  const loginPath = `${apiPath}/auth/login`;
+  const requestPath = req.path.replace(/\/+$/, "");
+  if (req.method === "POST" && requestPath === loginPath) {
+    return next();
+  }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -14,7 +21,7 @@ export default function verifyJWT(
     return ApiResponse.unauthorized(
       res,
       "NO_TOKEN_PROVIDED",
-      "No token provided"
+      "No se proporcionó el token"
     );
 
   }
@@ -25,7 +32,7 @@ export default function verifyJWT(
     return ApiResponse.unauthorized(
       res,
       "INVALID_AUTHORIZATION_HEADER",
-      "Authorization header must use Bearer scheme"
+      "El encabezado Authorization debe usar el esquema Bearer"
     );
   }
 
@@ -46,7 +53,7 @@ export default function verifyJWT(
     return ApiResponse.unauthorized(
       res,
       "FAILED_TO_AUTHENTICATE_TOKEN",
-      "Failed to authenticate token"
+      "No se pudo validar el token"
     );
 
   }

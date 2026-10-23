@@ -17,8 +17,15 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// uncomment if JWT validation should be enforced globally
-//app.use(jwt);
+app.use(
+  "/api-docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec)
+);
+
+// Swagger queda público; el resto de las rutas requiere un JWT válido.
+// El login es la única ruta pública dentro de la API.
+app.use(jwt);
 
 // Definición del API path global en un solo lugar
 const apiPath = process.env.API_PATH;
@@ -26,12 +33,6 @@ app.use(apiPath, apiRouter);
 
 /* Rutas del sistema / & /health */
 app.use(systemRouter);
-
-app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec)
-);
 
 app.use(express.json({
   limit: "10mb"
