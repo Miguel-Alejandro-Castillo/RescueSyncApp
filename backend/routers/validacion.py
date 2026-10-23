@@ -40,6 +40,14 @@ def resultado_validacion(caso_id: str, data: dict,
         raise HTTPException(409, str(error)) from error
 
 
+def lotes_a_liberar(emergencia, lote_id):
+    """Bonita envía un solo lote por decisión; si el coordinador eligió varios, se liberan todos."""
+    ultima = (emergencia.decisionesCoordinador or [])[-1:]
+    if ultima and lote_id in ultima[0].get('lotes', []):
+        return ultima[0]['lotes']
+    return [lote_id]
+
+
 @router.get('/integraciones/bonita/casos/{caso_id}/lotes/{lote_id}/reservas', dependencies=[Depends(require_roles(USUARIO_BONITA))])
 def reservas_caso(caso_id: str, lote_id: int,
                   session: Session = Depends(get_session)):
@@ -47,7 +55,7 @@ def reservas_caso(caso_id: str, lote_id: int,
     lote = session.get(Lote, lote_id)
     if not lote or lote.emergenciaId != emergencia.id:
         raise HTTPException(404, 'El lote no pertenece al caso')
-    ofertas = session.exec(select(Oferta).where(Oferta.lote_id == lote_id)).all()
+    ofertas = session.exec(select(Oferta).where(Oferta.lote_id.in_(lotes_a_liberar(emergencia, lote_id)))).all()
     return {'resultados': [dict(oferta_id=o.id, resultado_validacion=o.resultado_validacion)
                            for o in ofertas if o.validada_en is not None and o.resultado_validacion]}
 
@@ -67,5 +75,5 @@ def resultados_validacion(emergencia_id: int | None = None, session: Session = D
         'emergencia_gravedad': emergencia.nivelGravedad,
         'recurso_codigo': lote.recurso_codigo, 'estado_validacion': oferta.estado_validacion,
         'validada_en': oferta.validada_en, 'resultado_validacion': oferta.resultado_validacion,
-        'accion_tomada': oferta.accion_tomada,
+        'decisiones_coordinador': emergencia.decisionesCoordinador,
     } for oferta, lote, emergencia in session.exec(query.order_by(Oferta.id)).all()]

@@ -23,7 +23,7 @@ import MisOfertas from '../pages/ofertas/MisOfertas';
 import { useSession } from "../auth/AuthContext";
 import RequirePermission from "../auth/RequirePermission";
 import OfertasConsorcio from '../pages/ofertas/OfertasConsorcio';
-import OfertasInvalidas from '../pages/ofertas/OfertasInvalidas';
+import EvaluarEmergencias from '../pages/emergencias/EvaluarEmergencias';
 import ValidacionOfertas from '../pages/ofertas/ValidacionOfertas';
 import Monitoreo from '../pages/monitoreo/Monitoreo';
 function RequireSession() {
@@ -70,7 +70,7 @@ export default function AppRouter() {
             <Route path="/emergencias/:id/lotes" element={<RequirePermission permission="ofertas.crear"><DetalleLotes /></RequirePermission>} />
             <Route path="/ofertas/misofertas" element={<RequirePermission permission="ofertas.ver_propias"><MisOfertas /></RequirePermission>} />
             <Route path="/ofertas-consorcio" element={<RequirePermission permission="ofertas.ver_propias"><OfertasConsorcio /></RequirePermission>} />
-            <Route path="/ofertas-invalidas" element={<RequirePermission permission="ofertas.ver_invalidas"><OfertasInvalidas /></RequirePermission>} />
+            <Route path="/emergencias/evaluar" element={<RequirePermission permission="emergencias.evaluar"><EvaluarEmergencias /></RequirePermission>} />
             <Route path="/validacion-ofertas" element={<RequirePermission permission="ofertas.ver_validacion"><ValidacionOfertas /></RequirePermission>} />
             <Route path="/monitoreo" element={<RequirePermission permission="monitoreo.ver"><Monitoreo /></RequirePermission>} />
             <Route

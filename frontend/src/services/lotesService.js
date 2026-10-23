@@ -27,16 +27,13 @@ export const crearLotes = payload => request('/lotes', {
   body: JSON.stringify(payload),
 });
 
-export const reformularLotes = payload => request('/lotes/reformular', {
+export const obtenerEmergenciasPendientesDecision = () => request('/emergencias/pendientes-decision');
+
+// payload: { accion: 'parcial' | 'reabrir' | 'reformular', lotes: [ids], nuevosLotes: [...] }
+export const decidirEmergencia = (emergenciaId, payload) => request(`/emergencias/${encodeURIComponent(emergenciaId)}/decision`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(payload),
-});
-
-export const reabrirConvocatoria = ofertaId => request('/lotes/reabrir', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ ofertaId }),
 });
 
 export const obtenerLote = loteId => request(`/lotes/${encodeURIComponent(loteId)}`);

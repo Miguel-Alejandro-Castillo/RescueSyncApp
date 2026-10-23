@@ -1,0 +1,39 @@
+.intro { color: var(--muted); }
+.list { display: grid; gap: 2rem; margin-top: 1.5rem; }
+.emergency { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: #151e2a; box-shadow: 0 5px 18px #00000018; }
+.heading { padding: 1.4rem 1.5rem; border-bottom: 1px solid var(--border); }
+.heading h2 { margin: 0 0 .45rem; font-size: 1.3rem; }
+.heading p { margin: .5rem 0 0; }
+.context { color: var(--muted); font-size: .85rem; }
+.lote { margin: 1rem; border: 1px solid var(--border); border-radius: .75rem; background: #0e1824; overflow: hidden; }
+.loteHeading { display: flex; align-items: center; gap: 1rem; padding: 1.25rem; cursor: pointer; list-style: none; }
+.loteHeading::-webkit-details-marker { display: none; }
+.loteHeading:focus-visible { outline: 2px solid var(--primary); outline-offset: -3px; }
+.loteHeading::after { content: '+'; color: var(--muted); font-size: 1.4rem; width: 1rem; text-align: center; }
+.lote[open] > .loteHeading::after { content: '−'; }
+.loteTitle { flex: 1; min-width: 0; }
+.loteTitle h3 { margin: 0 0 .6rem; font-size: 1.1rem; }
+.quantities { display: flex; flex-wrap: wrap; gap: .4rem 1.5rem; color: var(--muted); font-size: .85rem; }
+.quantities strong { color: var(--ink); font-weight: 500; }
+.loteBody { padding: 0 1.25rem 1rem; display: grid; gap: 1rem; }
+.oferta { border-top: 1px solid var(--border); padding-top: .85rem; }
+.oferta p { margin: 0 0 .5rem; }
+.valida { color: #78dba9; }
+.invalida { color: #f497a1; }
+.badge { font-size: .8rem; font-weight: 600; padding: .4rem .75rem; border-radius: 2rem; white-space: nowrap; }
+.badge[data-state="cubierto"] { color: #78dba9; background: #203c37; }
+.badge[data-state="faltante"] { color: #f497a1; background: #382a32; }
+.decision { margin: 1rem; padding: 1.25rem; border: 1px solid var(--border); border-radius: .75rem; display: grid; gap: .75rem; }
+.decision legend { float: left; width: 100%; margin-bottom: .25rem; font-size: 1.05rem; font-weight: 600; }
+.opcion { display: flex; gap: .6rem; align-items: flex-start; cursor: pointer; }
+.opcion input { margin-top: .3rem; }
+.opcion small { display: block; color: var(--muted); }
+.lotesElegidos { padding-left: 1.5rem; display: grid; gap: .5rem; }
+.lotesElegidos p { margin: 0; color: var(--muted); }
+@media (max-width: 600px) {
+  .heading { padding: 1.1rem; }
+  .lote, .decision { margin: .65rem; }
+  .loteHeading { padding: 1rem; gap: .6rem; }
+  .loteBody { padding: 0 1rem 1rem; }
+  .badge { font-size: .7rem; }
+}

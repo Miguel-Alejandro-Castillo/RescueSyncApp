@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
+from sqlalchemy import Column, JSON
 from sqlmodel import Field, SQLModel
 class EmergenciaEstado(str, Enum):
     CREADA = "creada"
@@ -56,4 +57,10 @@ class Emergencia(SQLModel, table=True):
     bonitaCaseId: str | None = Field(
         default=None,
         description="ID del caso en Bonita asociado a la emergencia"
+    )
+
+    decisionesCoordinador: list = Field(
+        default_factory=list,
+        sa_column=Column(JSON, nullable=False, server_default="[]"),
+        description="Historial de decisiones del Centro Coordinador cuando la convocatoria cerró sin cobertura suficiente"
     )

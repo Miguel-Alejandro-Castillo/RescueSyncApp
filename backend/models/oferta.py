@@ -35,10 +35,4 @@ class Oferta(SQLModel, table=True):
         description="Indica si la oferta es válida"
     )
 
-    accion_tomada: str | None = Field(
-        default=None,
-        max_length=20,
-        description="Acción tomada para una oferta inválida"
-    )
-
 

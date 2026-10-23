@@ -14,7 +14,7 @@ const PERMISSION_PROFILES = {
   'emergencias.adjudicar_ofertas': ['municipal'],
   'lotes.crear': ['coordinador'],
   'ofertas.crear': ['ong'],
-  'ofertas.ver_invalidas': ['coordinador'],
+  'emergencias.evaluar': ['coordinador'],
   'monitoreo.ver': ['coordinador'],
 };
 
@@ -24,7 +24,7 @@ const ROUTE_PERMISSIONS = [
   { path: '/emergencias/propias', permission: 'emergencias.ver_propias' },
   { path: '/lotes/nuevo', permission: 'lotes.crear' },
   { path: '/ofertas', permission: 'ofertas.crear' },
-  { path: '/ofertas-invalidas', permission: 'ofertas.ver_invalidas' },
+  { path: '/emergencias/evaluar', permission: 'emergencias.evaluar' },
   { path: '/monitoreo', permission: 'monitoreo.ver' },
   { path: '/ofertas-consorcio', permission: 'ofertas.ver_propias' },
 ];
@@ -42,7 +42,7 @@ export const ACTIONS = [
   { permission: 'emergencias.ver_propias', profiles: ['municipal'], path: '/emergencias/propias', label: 'Mis emergencias', title: 'Ver mis emergencias', description: 'Consultá las emergencias que registraste previamente.' },
   { permission: 'lotes.crear', profiles: ['coordinador'], path: '/lotes/nuevo', label: 'Lotes y convocatorias', title: 'Organizar lotes de ayuda', description: 'Elegí una emergencia pendiente, definí los recursos y publicá la convocatoria.' },
   { permission: 'ofertas.crear', profiles: ['ong'], path: '/ofertas', label: 'Ofertas', title: 'Ofrecer ayuda', description: 'Consultá las convocatorias y cargá ofertas para los lotes disponibles.' },
-  { permission: 'ofertas.ver_invalidas', profiles: ['coordinador'], path: '/ofertas-invalidas', label: 'Ofertas inválidas', title: 'Ofertas inválidas', description: 'Revisá las ofertas inválidas y elegí qué acción tomar.' },
+  { permission: 'emergencias.evaluar', profiles: ['coordinador'], path: '/emergencias/evaluar', label: 'Evaluar emergencias', title: 'Evaluar emergencias', description: 'Emergencias cuya convocatoria terminó sin cobertura suficiente: revisá sus ofertas y decidí cómo seguir.' },
   { permission: 'monitoreo.ver', profiles: ['coordinador'], path: '/monitoreo', label: 'Monitoreo', title: 'Monitoreo de la ejecución', description: 'Registrá los eventos posteriores a la adjudicación y finalizá el monitoreo.' },
 ];
 

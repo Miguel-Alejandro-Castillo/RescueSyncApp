@@ -6,7 +6,17 @@ import ResultadoValidacion from '../../components/ResultadoValidacion';
 import { useSession } from '../../auth/AuthContext';
 import { canAccess } from '../../auth/permissions';
 import { ejemplosValidacion } from './ejemplosValidacion';
+import { ACCIONES_COORDINADOR } from '../../constants/emergencia';
 import styles from './ValidacionOfertas.module.css';
+
+function DecisionCoordinador({ decisiones }) {
+  const ultima = decisiones?.at(-1);
+  if (!ultima) return null;
+  const label = ACCIONES_COORDINADOR.find(a => a.value === ultima.accion)?.label || ultima.accion;
+  return <p className={styles.decision}>
+    Decisión del coordinador: {label}{ultima.fecha && ` · ${new Date(ultima.fecha).toLocaleString('es-AR')}`}
+  </p>;
+}
 
 function CoberturaRecurso({ lote }) {
   if (lote.cantidad == null) return null;
@@ -26,9 +36,9 @@ export default function ValidacionOfertas({ demo = false }) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(!demo);
   const session = useSession();
-  const coordinador = canAccess(getSessionMemberships(session), 'ofertas.ver_invalidas');
+  const coordinador = canAccess(getSessionMemberships(session), 'emergencias.evaluar');
   const emergencias = Object.values(ofertas.reduce((grupos, oferta) => {
-    const emergencia = grupos[oferta.emergencia_id] ||= { id: oferta.emergencia_id, zona: oferta.emergencia_zona, gravedad: oferta.emergencia_gravedad, lotes: {} };
+    const emergencia = grupos[oferta.emergencia_id] ||= { id: oferta.emergencia_id, zona: oferta.emergencia_zona, gravedad: oferta.emergencia_gravedad, decisiones: oferta.decisiones_coordinador, lotes: {} };
     const lote = emergencia.lotes[oferta.lote_id] ||= { id: oferta.lote_id, descripcion: oferta.lote_descripcion, cantidad: oferta.lote_cantidad, ofertas: [] };
     lote.ofertas.push(oferta);
     return grupos;
@@ -52,7 +62,7 @@ export default function ValidacionOfertas({ demo = false }) {
   return <div className="panel">
     <h1>Validación de ofertas</h1>
     {demo && <p className={styles.demo} role="status">Datos de ejemplo para explorar la pantalla. No se ejecutan consultas ni se modifican ofertas reales.</p>}
-    {!demo && coordinador && <Link to="/ofertas-invalidas">Resolver ofertas inválidas</Link>}
+    {!demo && coordinador && <Link to="/emergencias/evaluar">Evaluar emergencias sin cobertura suficiente</Link>}
     {error && <p className="notice notice-error" role="alert">{error}</p>}
     <div className={styles.list}>
     {loading ? <p>Cargando ofertas…</p> : ofertas.length === 0 ? <p>No hay ofertas registradas.</p> : emergencias.map(emergencia =>
@@ -60,6 +70,7 @@ export default function ValidacionOfertas({ demo = false }) {
         <header className={styles.emergencyHeading}>
           <h2>{emergencia.zona || 'Emergencia sin ubicación registrada'}</h2>
           {emergencia.gravedad && <span className={styles.context}>Urgencia: {emergencia.gravedad}</span>}
+          <DecisionCoordinador decisiones={emergencia.decisiones} />
         </header>
         {Object.values(emergencia.lotes).map(lote => {
           const cobertura = lote.ofertas[0]?.resultado_validacion?.cobertura_lote;
@@ -86,9 +97,8 @@ export default function ValidacionOfertas({ demo = false }) {
           {lote.ofertas.filter(o => !o.resultado_validacion || o.resultado_validacion.error || o.estado_validacion === 'pendiente').map(o =>
             <ResultadoValidacion key={o.id} resultado={o.resultado_validacion?.error ? o.resultado_validacion : null} />
           )}
-          {lote.ofertas.filter(o => o.accion_tomada).map(o => <p key={o.id} className={styles.decision}>
-            {(o.resultado_validacion?.participantes || []).map(p => p.ong_nombre).filter(Boolean).join(' + ') || 'Decisión del coordinador'}: {({ reabrir: 'Reabrir convocatoria', reformular: 'Reformular lotes', parcial: 'Continuar con cobertura parcial' })[o.accion_tomada]}
-            {o.resultado_validacion?.cantidad_aceptada != null && ` · ${o.resultado_validacion.cantidad_aceptada} unidades aceptadas`}
+          {lote.ofertas.filter(o => o.resultado_validacion?.cantidad_aceptada != null).map(o => <p key={o.id} className={styles.decision}>
+            {(o.resultado_validacion.participantes || []).map(p => p.ong_nombre).filter(Boolean).join(' + ') || `Oferta #${o.id}`}: {o.resultado_validacion.cantidad_aceptada} unidades aceptadas con cobertura parcial
           </p>)}
           </div>
         </details>;

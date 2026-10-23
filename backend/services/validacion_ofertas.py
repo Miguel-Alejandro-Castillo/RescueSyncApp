@@ -162,5 +162,4 @@ def reiniciar_validacion(session, lote_id):
         oferta.validada_en = None
         oferta.ventana_validada = None
         oferta.resultado_validacion = None
-        oferta.accion_tomada = None
         session.add(oferta)

@@ -3,7 +3,8 @@ import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import SeleccionarEmergencia from './SeleccionarEmergencia';
-import { obtenerEmergenciaPorId, crearLotes, reformularLotes } from '../../services/lotesService';
+import { obtenerEmergenciaPorId, crearLotes, decidirEmergencia } from '../../services/lotesService';
+import { obtenerLotes } from '../../services/emergenciaService';
 import { EMERGENCIA_ESTADOS } from '../../constants/emergencia';
 import { NIVELES_GRAVEDAD, getNivelGravedadLabel, normalizeNivelGravedad } from '../../constants/gravedad';
 import { RECURSOS_POR_TIPO, TIPOS_RECURSOS } from '../../constants/lote';
@@ -18,9 +19,12 @@ const FormularioLotes = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const emergenciaId = searchParams.get('emergenciaId');
-    const ofertaId = searchParams.get('ofertaId');
+    // Ids de los lotes que el coordinador decidió reformular desde "Evaluar emergencias"
+    const lotesAReformular = (searchParams.get('reformular') || '').split(',').filter(Boolean).map(Number);
+    const reformulando = lotesAReformular.length > 0;
 
     const [emergenciaSeleccionada, setEmergenciaSeleccionada] = useState(null);
+    const [lotesReemplazados, setLotesReemplazados] = useState([]);
     const [loadingEmergencia, setLoadingEmergencia] = useState(false);
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
@@ -53,12 +57,13 @@ const FormularioLotes = () => {
 
         setLoadingEmergencia(true);
 
-        obtenerEmergenciaPorId(emergenciaId)
-            .then((data) => {
-                if (!ofertaId && data.estado !== EMERGENCIA_ESTADOS.CREADA) {
+        Promise.all([obtenerEmergenciaPorId(emergenciaId), reformulando ? obtenerLotes(emergenciaId) : []])
+            .then(([data, lotesEmergencia]) => {
+                if (!reformulando && data.estado !== EMERGENCIA_ESTADOS.CREADA) {
                     setError('La emergencia seleccionada no se encuentra pendiente de desglose.');
                     return;
                 }
+                setLotesReemplazados((lotesEmergencia || []).filter(lote => lotesAReformular.includes(lote.id)));
                 setEmergenciaSeleccionada(data);
             })
             .catch((err) => {
@@ -67,7 +72,7 @@ const FormularioLotes = () => {
             .finally(() => {
                 setLoadingEmergencia(false);
             });
-    }, [emergenciaId, ofertaId]);
+    }, [emergenciaId, searchParams]);
 
     const handleAddLote = () => {
         setLotes([
@@ -138,8 +143,12 @@ const FormularioLotes = () => {
 
         try {
             setSaving(true);
-            if (ofertaId) {
-                await reformularLotes({ ofertaId: Number(ofertaId), lotes: payload.lotes });
+            if (reformulando) {
+                await decidirEmergencia(emergenciaSeleccionada.id, {
+                    accion: 'reformular',
+                    lotes: lotesAReformular,
+                    nuevosLotes: payload.lotes
+                });
             } else {
                 await crearLotes(payload);
             }
@@ -166,7 +175,7 @@ const FormularioLotes = () => {
                     <div className="panel">
                         <div className={styles.content}>
                             <h1 className={styles.title}>
-                                {ofertaId ? 'Reformular lotes y abrir convocatoria' : 'Crear lotes y abrir convocatoria'}
+                                {reformulando ? 'Reformular lotes y abrir convocatoria' : 'Crear lotes y abrir convocatoria'}
                             </h1>
 
                             <ValidatedForm key={lotes.length} onSubmit={handleSubmit} aria-busy={saving}>
@@ -182,6 +191,17 @@ const FormularioLotes = () => {
                                     <p className="text-muted mb-0">
                                         {emergenciaSeleccionada.descripcionInicial}
                                     </p>
+
+                                    {reformulando && (
+                                        <div className="mt-3">
+                                            <p className="mb-1 fw-bold">Estos lotes se reemplazan por los que cargues abajo:</p>
+                                            <ul className="mb-0">
+                                                {lotesReemplazados.map(lote => (
+                                                    <li key={lote.id}>{lote.tipoRecurso} · {lote.descripcion} (pedido: {lote.cantidad})</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <hr className="my-4" />
@@ -271,7 +291,9 @@ const FormularioLotes = () => {
                                 ))}
 
                                 <div className="form-actions">
-                                    <Link className="btn btn-outline-secondary" to="/lotes/nuevo">Elegir otra emergencia</Link>
+                                    {reformulando
+                                        ? <Link className="btn btn-outline-secondary" to="/emergencias/evaluar">Volver a la evaluación</Link>
+                                        : <Link className="btn btn-outline-secondary" to="/lotes/nuevo">Elegir otra emergencia</Link>}
                                     <button
                                         type="submit"
                                         className="btn btn-primary"

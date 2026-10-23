@@ -267,6 +267,20 @@ class BonitaService:
 
         return response.json()
 
+    # Devuelve las tareas humanas de un caso que fallaron (por ejemplo, un script de operación que lanzó una excepción)
+    async def obtener_tareas_humanas_fallidas_por_caso(self, case_id: str):
+        params = [
+            ("p", 0),
+            ("f", f"caseId={case_id}"),
+            ("f", "state=failed")
+        ]
+        response = await self.http_client.get(
+            f"{self.api_path}/humanTask",
+            headers=self._auth_headers(),
+            params = params
+        )
+        return response.json()
+
     # Devuelve la primera tarea humana activa para un caso específico, o None si no hay tareas disponibles.
     async def obtener_tarea_humana_por_caso(self, case_id: str):
         tareas = await self.obtener_tareas_humanas_por_caso(case_id)

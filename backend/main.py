@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from clients.redis_client import close_redis, init_redis
+from routers.decision_coordinador import router as decision_coordinador_router
 from routers.emergencia import router as emergencia_router
 from routers.auth import router as auth_router
 from routers.lote import router as lotes_router
@@ -44,6 +45,8 @@ def health():
     "service": "rescuesync-backend",
 }
 
+# Antes que emergencia_router: /emergencias/pendientes-decision chocaría con /emergencias/{emergencia_id}
+app.include_router(decision_coordinador_router, prefix=API_PREFIX)
 app.include_router(
     emergencia_router,
     prefix=API_PREFIX
