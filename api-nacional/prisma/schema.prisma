@@ -13,6 +13,11 @@ enum EstadoOng {
   BAJA
 }
 
+enum EstadoCompromiso {
+  ACTIVO
+  LIBERADO
+}
+
 model Ong {
   id           Int       @id @default(autoincrement())
   razonSocial  String
@@ -36,13 +41,35 @@ model Recurso {
 model OngRecurso {
   ongId       Int
   ong         Ong     @relation(fields: [ongId], references: [id])
+
   recursoId   Int
   recurso     Recurso @relation(fields: [recursoId], references: [id])
 
   cantidadTotal        Int
   cantidadReservada Int @default(0)
 
+  compromisos Compromiso[]
+
   @@id([ongId, recursoId])
+}
+
+model Compromiso {
+  id                     Int              @id @default(autoincrement())
+
+  detalleAdjudicacionRef Int              @unique
+
+  cantidad               Int
+  estado                 EstadoCompromiso @default(ACTIVO)
+
+  fechaCompromiso        DateTime         @default(now())
+  fechaLiberacion        DateTime?
+
+  ongId                   Int
+  recursoId               Int
+
+  ongRecurso OngRecurso @relation(fields: [ongId, recursoId], references: [ongId, recursoId])
+
+  @@index([ongId, recursoId])
 }
 
 model Categoria {

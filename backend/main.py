@@ -67,6 +67,7 @@ app.include_router(
     monitoreo_router,
     prefix=API_PREFIX
 )
+
 app.include_router(
     adjudicacion_router,
     prefix=API_PREFIX

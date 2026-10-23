@@ -6,6 +6,7 @@ import validacionRoutes from './validacion.routes.js';
 import recursoRoutes from './recurso.routes.js';
 import categoriaRoutes from './categoria.routes.js';
 import verifyJWT from '../middlewares/jwt.middleware.js';
+import compromisoRoutes from './compromiso.routes.js';
 
 const router = Router();
 
@@ -18,5 +19,6 @@ router.use('/ongs', verifyJWT, ongRoutes);
 router.use('/recursos', verifyJWT, recursoRoutes);
 router.use('/categorias', verifyJWT, categoriaRoutes);
 router.use('/validaciones', verifyJWT, validacionRoutes);
+router.use('/compromisos', verifyJWT, compromisoRoutes);
 
 export default router;
