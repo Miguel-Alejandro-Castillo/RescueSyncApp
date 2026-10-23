@@ -191,7 +191,7 @@ async function main() {
         ongId: ong.id,
         recursoId: recurso.id,
         cantidadTotal: 100 + index * 50,
-        cantidadReservada: 0,
+        cantidadReservada: 50 + index * 20,
       });
     }
   }

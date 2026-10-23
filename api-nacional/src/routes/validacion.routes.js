@@ -35,8 +35,8 @@ const router = Router();
  *                   properties:
  *                     lote_id: { type: integer, minimum: 1, example: 31 }
  *                     cantidad_requerida: { type: integer, minimum: 1, example: 30 }
- *                     recurso_nombre: { type: string, example: Médico clínico }
- *                     tipo_recurso: { type: string, example: Salud }
+ *                     recurso_nombre: { type: string, example: Medicos }
+ *                     tipo_recurso: { type: string, example: Personal }
  *                     ofertas:
  *                       type: array
  *                       items:
@@ -60,13 +60,13 @@ const router = Router();
  *             lotes:
  *               - lote_id: 31
  *                 cantidad_requerida: 30
- *                 recurso_nombre: Médico clínico
- *                 tipo_recurso: Salud
+ *                 recurso_nombre: Medicos
+ *                 tipo_recurso: Personal
  *                 ofertas:
  *                   - oferta_id: 81
  *                     participantes:
- *                       - { participante_id: 101, ong_id: 7, cuit: "20-12345678-9", cantidad_ofertada: 10 }
- *                       - { participante_id: 102, ong_id: 8, cuit: "27-12345678-4", cantidad_ofertada: 10 }
+ *                       - { participante_id: 101, ong_id: 7, cuit: "30-54603392-5", cantidad_ofertada: 10 }
+ *                       - { participante_id: 102, ong_id: 8, cuit: "30-63749647-2", cantidad_ofertada: 10 }
  *     responses:
  *       200:
  *         description: Resultado de validación y cobertura por lote
