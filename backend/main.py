@@ -8,6 +8,7 @@ from routers.lote import router as lotes_router
 from routers.oferta import router as oferta_router
 from routers.validacion import router as validacion_router
 from routers.monitoreo import router as monitoreo_router
+from routers.ejecucion import router as ejecucion_router
 API_PREFIX = "/api/rescue"
 
 app = FastAPI(
@@ -68,3 +69,4 @@ app.include_router(
     monitoreo_router,
     prefix=API_PREFIX
 )
+app.include_router(ejecucion_router, prefix=API_PREFIX)

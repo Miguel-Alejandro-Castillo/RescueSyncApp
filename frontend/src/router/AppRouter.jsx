@@ -26,6 +26,7 @@ import OfertasConsorcio from '../pages/ofertas/OfertasConsorcio';
 import EvaluarEmergencias from '../pages/emergencias/EvaluarEmergencias';
 import ValidacionOfertas from '../pages/ofertas/ValidacionOfertas';
 import Monitoreo from '../pages/monitoreo/Monitoreo';
+import TrabajosAdjudicados from '../pages/ejecucion/TrabajosAdjudicados';
 function RequireSession() {
   const session = useSession();
   const location = useLocation();
@@ -73,6 +74,7 @@ export default function AppRouter() {
             <Route path="/emergencias/evaluar" element={<RequirePermission permission="emergencias.evaluar"><EvaluarEmergencias /></RequirePermission>} />
             <Route path="/validacion-ofertas" element={<RequirePermission permission="ofertas.ver_validacion"><ValidacionOfertas /></RequirePermission>} />
             <Route path="/monitoreo" element={<RequirePermission permission="monitoreo.ver"><Monitoreo /></RequirePermission>} />
+            <Route path="/ejecucion" element={<RequirePermission permission="ejecucion.finalizar_trabajo"><TrabajosAdjudicados /></RequirePermission>} />
             <Route
               path="*"
               element={

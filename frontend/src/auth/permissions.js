@@ -16,6 +16,7 @@ const PERMISSION_PROFILES = {
   'ofertas.crear': ['ong'],
   'emergencias.evaluar': ['coordinador'],
   'monitoreo.ver': ['coordinador'],
+  'ejecucion.finalizar_trabajo': ['ong'],
 };
 
 const ROUTE_PERMISSIONS = [
@@ -26,6 +27,7 @@ const ROUTE_PERMISSIONS = [
   { path: '/ofertas', permission: 'ofertas.crear' },
   { path: '/emergencias/evaluar', permission: 'emergencias.evaluar' },
   { path: '/monitoreo', permission: 'monitoreo.ver' },
+  { path: '/ejecucion', permission: 'ejecucion.finalizar_trabajo' },
   { path: '/ofertas-consorcio', permission: 'ofertas.ver_propias' },
 ];
 
@@ -44,6 +46,7 @@ export const ACTIONS = [
   { permission: 'ofertas.crear', profiles: ['ong'], path: '/ofertas', label: 'Ofertas', title: 'Ofrecer ayuda', description: 'Consultá las convocatorias y cargá ofertas para los lotes disponibles.' },
   { permission: 'emergencias.evaluar', profiles: ['coordinador'], path: '/emergencias/evaluar', label: 'Evaluar emergencias', title: 'Evaluar emergencias', description: 'Emergencias cuya convocatoria terminó sin cobertura suficiente: revisá sus ofertas y decidí cómo seguir.' },
   { permission: 'monitoreo.ver', profiles: ['coordinador'], path: '/monitoreo', label: 'Monitoreo', title: 'Monitoreo de la ejecución', description: 'Registrá los eventos posteriores a la adjudicación y finalizá el monitoreo.' },
+  { permission: 'ejecucion.finalizar_trabajo', profiles: ['ong'], path: '/ejecucion', label: 'Trabajos adjudicados', title: 'Trabajos adjudicados', description: 'Consultá los recursos que te adjudicaron e informá cuando tu ONG termine su trabajo.' },
 ];
 
 export function getProfiles(memberships) {

@@ -10,6 +10,10 @@ from models.emergencia import Emergencia, EmergenciaEstado
 from models.evento_ejecucion import EventoEjecucion
 from models.lote import Lote, LoteEstado
 from services.bonita_service import BonitaService
+from services.ejecucion import ongs_adjudicadas
+
+TAREA_MONITOREO = "Monitorear la ejecucion"
+TAREA_ONGS = "Ejecutar y finalizar actividades de ayuda"
 
 router = APIRouter(
     prefix="/monitoreo",
@@ -55,10 +59,13 @@ def get_monitoreo(session: Session = Depends(get_session)):
                 ]
             })
 
+        ongs = ongs_adjudicadas(session, emergencia.id)
         respuesta.append({
             "id": emergencia.id,
             "zona": emergencia.zonaAfectada,
-            "lotes": lista_lotes
+            "lotes": lista_lotes,
+            "ongs": [{"cuit": o["cuit"], "nombre": o["nombre"], "finalizado_en": o["finalizado_en"]} for o in ongs],
+            "todas_finalizaron": all(o["finalizado_en"] for o in ongs),
         })
 
     return respuesta
@@ -107,13 +114,27 @@ async def finalizar_monitoreo(
     if not emergencia.bonitaCaseId:
         raise HTTPException(status_code=409, detail="Esta emergencia no tiene un caso asociado en Bonita.")
 
-    tareas = await bonita.obtener_tareas_humanas_por_caso(emergencia.bonitaCaseId)
-    tarea = next((t for t in tareas if t["name"].strip() == "Monitorear la ejecucion"), None)
-    if not tarea:
+    pendientes = [o["nombre"] for o in ongs_adjudicadas(session, emergencia_id) if not o["finalizado_en"]]
+    if pendientes:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Todavía no terminaron su trabajo: {', '.join(pendientes)}."
+        )
+
+    tareas = {t["name"].strip(): t for t in await bonita.obtener_tareas_humanas_por_caso(emergencia.bonitaCaseId)}
+    if TAREA_MONITOREO not in tareas and TAREA_ONGS not in tareas:
         raise HTTPException(status_code=409, detail="El caso todavía no está en la etapa de monitoreo.")
 
     try:
-        await bonita.completar_tarea_humana(tarea["id"])
+        # Si un intento anterior ya completó el monitoreo, se retoma desde la tarea de las ONGs.
+        if TAREA_MONITOREO in tareas:
+            await bonita.completar_tarea_humana(tareas[TAREA_MONITOREO]["id"])
+            tareas = {t["name"].strip(): t for t in await bonita.esperar_tareas_humanas_por_caso(
+                emergencia.bonitaCaseId, nombre_esperado=TAREA_ONGS
+            )}
+        # Las ONGs ya informaron el fin de su trabajo en la aplicación, así que su tarea del
+        # proceso se completa acá; después Bonita cierra el caso.
+        await bonita.completar_tarea_humana(tareas[TAREA_ONGS]["id"])
         emergencia.estado = EmergenciaEstado.MONITOREO_FINALIZADO
         session.add(emergencia)
         session.commit()

@@ -84,9 +84,35 @@ export default function Monitoreo() {
                   type="button"
                   className="btn btn-primary"
                   onClick={() => handleFinalizar(emergencia.id)}
+                  disabled={!emergencia.todas_finalizaron}
+                  title={emergencia.todas_finalizaron ? undefined : 'Todas las ONGs tienen que informar que terminaron su trabajo'}
                 >
                   Finalizar monitoreo
                 </button>
+              </div>
+
+              <div className={styles.ongs}>
+                <h3>ONGs adjudicadas</h3>
+                {emergencia.ongs.length === 0 ? (
+                  <p>Todavía no hay ONGs adjudicadas.</p>
+                ) : (
+                  <ul>
+                    {emergencia.ongs.map(ong => (
+                      <li key={ong.cuit}>
+                        {ong.nombre}:{' '}
+                        {ong.finalizado_en
+                          ? <span className={styles.finalizado}>terminó su trabajo el {new Date(ong.finalizado_en).toLocaleString()}</span>
+                          : <span className={styles.pendiente}>trabajando</span>}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {!emergencia.todas_finalizaron && (
+                  <p className={styles.aviso}>
+                    El monitoreo se puede finalizar cuando todas las ONGs informen que terminaron
+                    ({emergencia.ongs.filter(o => o.finalizado_en).length} de {emergencia.ongs.length}).
+                  </p>
+                )}
               </div>
 
               {emergencia.lotes.map(lote => (

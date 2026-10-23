@@ -5,6 +5,7 @@ from models.participante_oferta import ParticipanteOferta
 from models.adjudicacion import Adjudicacion
 from models.adjudicacion_detalle import AdjudicacionDetalle
 from models.evento_ejecucion import EventoEjecucion
+from models.trabajo_finalizado import TrabajoFinalizado
 
 __all__ = [
     "Emergencia",
@@ -13,5 +14,6 @@ __all__ = [
     "ParticipanteOferta",
     "Adjudicacion",
     "AdjudicacionDetalle",
-    "EventoEjecucion"
+    "EventoEjecucion",
+    "TrabajoFinalizado"
 ]

@@ -1,0 +1,10 @@
+.page { color: var(--ink); }
+.page h1 { font-size: clamp(1.5rem, 4vw, 2rem); }
+.intro { color: var(--muted); }
+.lista { display: flex; flex-direction: column; gap: 1.5rem; }
+.item { border: 1px solid var(--border, #ccc); border-radius: 8px; padding: 1rem; background: var(--surface, #fff); }
+.item h2 { font-size: 1.3rem; }
+.finalizado { color: #78dba9; margin: 0; }
+.aviso { color: var(--muted); font-size: 0.85rem; margin: 0; }
+.confirmacion { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.confirmacion p { flex-basis: 100%; margin: 0; }

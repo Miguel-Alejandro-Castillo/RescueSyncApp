@@ -8,3 +8,9 @@
 .lote h3 { font-size: 1.1rem; }
 .formulario { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.5rem; }
 .formulario input { flex: 1; min-width: 200px; }
+.ongs { margin-top: 1rem; }
+.ongs h3 { font-size: 1.1rem; }
+.ongs ul { margin-bottom: 0.5rem; }
+.finalizado { color: #78dba9; }
+.pendiente { color: #e5c885; }
+.aviso { color: var(--muted); font-size: 0.85rem; }
