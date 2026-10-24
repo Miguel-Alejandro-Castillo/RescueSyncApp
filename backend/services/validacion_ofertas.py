@@ -66,7 +66,7 @@ def preparar_solicitud(session, emergencia_id, ahora=None):
                            and utc(o.ventana_validada) == utc(lote.fechaLimiteConvocatoria)
                            and o.estado_validacion in ('valida', 'invalida') for o in ofertas):
             continue
-        datos_lote = {'lote_id': lote.id, 'ventana_validada': utc(lote.fechaLimiteConvocatoria).isoformat(),
+        datos_lote = {'lote_id': lote.id,
                       'recurso_nombre': lote.descripcion, 'tipo_recurso': lote.tipoRecurso,
                       'cantidad_requerida': lote.cantidad, 'ofertas': []}
         for oferta in ofertas:
@@ -75,7 +75,7 @@ def preparar_solicitud(session, emergencia_id, ahora=None):
                 ParticipanteOferta.cantidad_aportada != None,
             ).order_by(ParticipanteOferta.id)).all()
             datos_lote['ofertas'].append({'oferta_id': oferta.id, 'participantes': [
-                {'participante_id': p.id, 'ong_id': p.ong_id, 'cuit': p.ong_cuit,
+                {'participante_id': p.id, 'cuit': p.ong_cuit,
                  'cantidad_ofertada': p.cantidad_aportada} for p in participantes]})
         solicitud['lotes'].append(datos_lote)
     if not solicitud['lotes']:
@@ -100,9 +100,6 @@ def guardar_resultado(session, emergencia_id, respuesta):
     if solicitud.get('ya_validada'):
         return solicitud['respuesta_guardada']
     comprobar_respuesta(respuesta, solicitud)
-    ventanas = {l['lote_id']: l['ventana_validada'] for l in solicitud['lotes']}
-    if any(l.get('ventana_validada') != ventanas[l['lote_id']] for l in respuesta['cobertura_por_lote']):
-        raise ValueError('La respuesta no corresponde a la ventana de la convocatoria actual')
     lotes = session.exec(select(Lote).where(Lote.id.in_([l['lote_id'] for l in solicitud['lotes']]))).all()
     ofertas_por_id = {o.id: o for o in session.exec(select(Oferta).where(Oferta.lote_id.in_([l.id for l in lotes]))).all()}
     lotes_por_id = {l.id: l for l in lotes}

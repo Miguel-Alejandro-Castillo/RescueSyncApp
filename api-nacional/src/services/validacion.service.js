@@ -16,7 +16,7 @@ export function comprobarSolicitud(data) {
       if (oferta.cantidad_aceptada != null && !cantidad(oferta.cantidad_aceptada)) fail();
       ofertas.add(oferta.oferta_id);
       for (const p of oferta.participantes) {
-        if (!id(p.participante_id) || !id(p.ong_id) || participantes.has(p.participante_id) || !cantidad(p.cantidad_ofertada)) fail();
+        if (!id(p.participante_id) || participantes.has(p.participante_id) || !cantidad(p.cantidad_ofertada)) fail();
         if (typeof p.cuit !== 'string' || !p.cuit.trim() || p.cuit.length > 32) fail();
         participantes.add(p.participante_id);
       }
@@ -41,7 +41,7 @@ function evaluarOferta(oferta, lote, inventarios) {
     const previo = aportes.get(cuit) || 0;
     const verificada = Math.min(p.cantidad_ofertada, Math.max(0, disponible - previo));
     aportes.set(cuit, previo + p.cantidad_ofertada);
-    return { participante_id: p.participante_id, ong_id: p.ong_id, cuit,
+    return { participante_id: p.participante_id, cuit,
       ong_nacional_id: ong?.id ?? null, ong_nombre: ong?.razonSocial ?? null,
       recurso_nacional_id: recurso?.recursoId ?? null, recurso_codigo: lote.recurso_codigo, cantidad_ofertada: p.cantidad_ofertada,
       cantidad_verificada: verificada };
@@ -83,7 +83,7 @@ export async function validarEmergencia(data, consultarInventarios, recursos = [
       const r = o.resultado_validacion;
       return n + (r.cantidad_aceptada ?? (r.inventario_valido ? r.cantidad_verificada : 0));
     }, 0);
-    const cobertura = { lote_id: lote.lote_id, ventana_validada: lote.ventana_validada, recurso_codigo: lote.recurso_codigo ?? null, requerido: lote.cantidad_requerida,
+    const cobertura = { lote_id: lote.lote_id, recurso_codigo: lote.recurso_codigo ?? null, requerido: lote.cantidad_requerida,
       cantidad_ofertada: lote.ofertas.reduce((n, o) => n + o.participantes.reduce((m, p) => m + p.cantidad_ofertada, 0), 0),
       ofertado_valido, faltante: Math.max(0, lote.cantidad_requerida - ofertado_valido),
       cubierto: ofertado_valido >= lote.cantidad_requerida };
@@ -93,7 +93,6 @@ export async function validarEmergencia(data, consultarInventarios, recursos = [
   return {
     cobertura_por_lote: cobertura_por_lote.map(l => ({
       lote_id: l.lote_id,
-      ventana_validada: l.ventana_validada,
       recurso_codigo: l.recurso_codigo,
       ofertado_valido: l.ofertado_valido,
       cubierto: l.cubierto,
