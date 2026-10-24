@@ -17,10 +17,8 @@ class ConvocatoriaAbierta(ValueError):
 
 def comprobar_respuesta(data, solicitud):
     """Comprobar el contrato remoto antes de guardar; no recalcular sus decisiones."""
-    if not isinstance(data, dict) or data.get('emergencia_id') != solicitud['emergencia_id']:
+    if not isinstance(data, dict):
         raise ValueError('Respuesta de validación nacional inválida')
-    if any(type(data.get(key)) is not bool for key in ('completa', 'cobertura_suficiente')):
-        raise ValueError('La respuesta nacional no contiene los indicadores de cobertura')
     esperadas = {o['oferta_id']: l['lote_id'] for l in solicitud['lotes'] for o in l['ofertas']}
     resultados = data.get('resultados')
     cobertura = data.get('cobertura_por_lote')
@@ -36,22 +34,18 @@ def comprobar_respuesta(data, solicitud):
     for o in resultados:
         r = o.get('resultado_validacion')
         if (o.get('lote_id') != esperadas[o['oferta_id']] or not isinstance(r, dict)
-                or o.get('estado_validacion') not in ('pendiente', 'valida', 'invalida')):
+                or o.get('estado_validacion') not in ('valida', 'invalida')):
             raise ValueError('Resultado de oferta nacional inválido')
-        if o['estado_validacion'] == 'pendiente':
-            if not isinstance(r.get('error'), str):
-                raise ValueError('Resultado pendiente sin motivo')
-        elif type(r.get('valida')) is not bool or not isinstance(r.get('participantes'), list):
+        if not isinstance(r.get('participantes'), list):
             raise ValueError('Resultado nacional sin detalle de los aportes')
+        for participante in r['participantes']:
+            cantidad = participante.get('cantidad_verificada') if isinstance(participante, dict) else None
+            if type(cantidad) is not int or cantidad < 0:
+                raise ValueError('Cantidad verificada de participante inválida')
     for l in cobertura:
         if (type(l.get('ofertado_valido')) is not int or l['ofertado_valido'] < 0
-                or type(l.get('cantidad_ofertada')) is not int or l['cantidad_ofertada'] < 0
-                or type(l.get('faltante')) is not int or l['faltante'] < 0
-                or type(l.get('cubierto')) is not bool or type(l.get('completa')) is not bool):
+                or type(l.get('cubierto')) is not bool):
             raise ValueError('Cobertura nacional inválida')
-    if any(type(data.get(k)) is not int or data[k] < 0
-           for k in ('ofertas_validas', 'ofertas_invalidas', 'ofertas_pendientes')):
-        raise ValueError('La respuesta nacional no contiene los conteos de ofertas')
 
 
 def preparar_solicitud(session, emergencia_id, ahora=None):
@@ -65,7 +59,7 @@ def preparar_solicitud(session, emergencia_id, ahora=None):
     ).order_by(Lote.id)).all()
     if not lotes or any(utc(l.fechaLimiteConvocatoria) >= ahora for l in lotes):
         raise ConvocatoriaAbierta('La ventana de urgencia todavía está abierta')
-    solicitud = {'emergencia_id': emergencia_id, 'lotes': []}
+    solicitud = {'lotes': []}
     for lote in lotes:
         ofertas = session.exec(select(Oferta).where(Oferta.lote_id == lote.id).order_by(Oferta.id)).all()
         if ofertas and all(o.validada_en is not None and o.ventana_validada is not None
@@ -93,21 +87,11 @@ def preparar_solicitud(session, emergencia_id, ahora=None):
 def resultado_guardado(session, emergencia_id):
     lotes = session.exec(select(Lote).where(Lote.emergenciaId == emergencia_id, Lote.estado != 'reformulado')).all()
     ofertas = session.exec(select(Oferta).where(Oferta.lote_id.in_([l.id for l in lotes]))).all()
-    cobertura = []
-    for lote in lotes:
-        ofertas_lote = [o for o in ofertas if o.lote_id == lote.id]
-        guardada = next(((o.resultado_validacion or {}).get('cobertura_lote') for o in ofertas_lote
-                         if (o.resultado_validacion or {}).get('cobertura_lote')), None)
-        cobertura.append(guardada or dict(lote_id=lote.id, requerido=lote.cantidad, cantidad_ofertada=0,
-                                          ofertado_valido=0, faltante=lote.cantidad, completa=not ofertas_lote, cubierto=False))
-    pendientes = sum(o.estado_validacion == 'pendiente' for o in ofertas)
-    return dict(emergencia_id=emergencia_id, completa=pendientes == 0,
-                cobertura_suficiente=pendientes == 0 and all(c['cubierto'] for c in cobertura),
-                cobertura_por_lote=cobertura,
-                ofertas_validas=sum(o.estado_validacion == 'valida' for o in ofertas),
-                ofertas_invalidas=sum(o.estado_validacion == 'invalida' for o in ofertas), ofertas_pendientes=pendientes,
-                resultados=[dict(oferta_id=o.id, lote_id=o.lote_id, estado_validacion=o.estado_validacion,
-                                 resultado_validacion=o.resultado_validacion) for o in ofertas])
+    validacion_completa = all(
+        o.validada_en is not None and o.estado_validacion in ('valida', 'invalida')
+        for o in ofertas
+    )
+    return dict(cobertura_suficiente=validacion_completa and all(l.cantidadCubierta >= l.cantidad for l in lotes))
 
 
 def guardar_resultado(session, emergencia_id, respuesta):
@@ -116,8 +100,6 @@ def guardar_resultado(session, emergencia_id, respuesta):
     if solicitud.get('ya_validada'):
         return solicitud['respuesta_guardada']
     comprobar_respuesta(respuesta, solicitud)
-    if not respuesta['completa']:
-        raise ValueError('La validación está incompleta')
     ventanas = {l['lote_id']: l['ventana_validada'] for l in solicitud['lotes']}
     if any(l.get('ventana_validada') != ventanas[l['lote_id']] for l in respuesta['cobertura_por_lote']):
         raise ValueError('La respuesta no corresponde a la ventana de la convocatoria actual')
@@ -128,17 +110,11 @@ def guardar_resultado(session, emergencia_id, respuesta):
     for item in respuesta['resultados']:
         oferta = ofertas_por_id[item['oferta_id']]
         resultado = dict(item['resultado_validacion'])
-        resultado['origen'] = 'sistema_nacional'
-        resultado['cobertura_lote'] = cobertura_por_id[item['lote_id']]
         oferta.resultado_validacion = resultado
         oferta.estado_validacion = item['estado_validacion']
-        if item['estado_validacion'] == 'pendiente':
-            oferta.validada_en = None
-            oferta.ventana_validada = None
-        else:
-            oferta.valida = resultado['valida']
-            oferta.validada_en = ahora
-            oferta.ventana_validada = lotes_por_id[item['lote_id']].fechaLimiteConvocatoria
+        oferta.valida = item['estado_validacion'] == 'valida'
+        oferta.validada_en = ahora
+        oferta.ventana_validada = lotes_por_id[item['lote_id']].fechaLimiteConvocatoria
         session.add(oferta)
     for lote in lotes:
         lote.cantidadCubierta = cobertura_por_id[lote.id]['ofertado_valido']

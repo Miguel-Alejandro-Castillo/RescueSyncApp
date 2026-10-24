@@ -608,15 +608,17 @@ async def confirmar_accion_oferta_invalida(
 
     if data.accion == "parcial":
         resultado = oferta.resultado_validacion
-        if not resultado or resultado.get('error') or oferta.estado_validacion == 'pendiente':
+        if not resultado or oferta.estado_validacion == 'pendiente':
             raise HTTPException(status_code=409, detail="Primero debe completarse la consulta de recursos para aceptar una cantidad parcial.")
-        if resultado.get('cantidad_verificada', 0) <= 0:
+        participantes_validados = resultado.get('participantes', [])
+        cantidad_verificada = sum(p.get('cantidad_verificada', 0) for p in participantes_validados)
+        if cantidad_verificada <= 0:
             raise HTTPException(status_code=400, detail="No hay recursos disponibles para aceptar una cobertura parcial.")
         # Conservar lo prometido y aceptar sólo la cantidad respaldada por inventario.
         resultado = dict(resultado)
-        resultado['cantidad_aceptada'] = resultado['cantidad_verificada']
+        resultado['cantidad_aceptada'] = cantidad_verificada
         resultado['participantes'] = [{**p, 'cantidad_aceptada': p['cantidad_verificada']}
-                                     for p in resultado.get('participantes', [])]
+                                     for p in participantes_validados]
         oferta.resultado_validacion = resultado
 
     oferta.accion_tomada = data.accion

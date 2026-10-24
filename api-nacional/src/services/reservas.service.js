@@ -14,8 +14,6 @@ export async function reservarOfertas(prisma, solicitud) {
     const resultado = await validarEmergencia(solicitud, cuits => tx.ong.findMany({
       where: { cuit: { in: cuits } }, include: { recursos: { include: { recurso: true } } },
     }), recursos);
-    // Una vinculación pendiente no debe dejar compromisos parciales ocultos.
-    if (!resultado.completa) return resultado;
     for (const [key, cantidad] of compromisos(resultado)) {
       const [ongId, recursoId] = key.split(':').map(Number);
       const updated = await tx.$executeRaw`UPDATE "OngRecurso" SET "cantidadReservada" = "cantidadReservada" + ${cantidad}
