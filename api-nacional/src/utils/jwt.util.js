@@ -9,7 +9,9 @@ export default function generateAccessToken(user) {
     },
     process.env.JWT_SECRET,
     {
-      expiresIn: process.env.JWT_EXPIRES_IN
+      // jsonwebtoken interprets numeric strings as milliseconds (e.g. "3600" = 3.6s).
+      // Convert the configured duration to a number so it is interpreted as seconds.
+      expiresIn: Number(process.env.JWT_EXPIRES_IN)
     }
   );
 }

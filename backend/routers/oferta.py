@@ -17,8 +17,6 @@ from dependencies.jwt_auth import get_current_user
 from dependencies.bonita import get_bonita_service
 from services.bonita_service import BonitaService
 from services.bonita_service import get_bonita_validacion_service
-from services.nacional_service import get_nacional_service
-from services.validacion_ofertas import validar_emergencia
 from fastapi import Response
 import traceback
 import httpx
@@ -594,7 +592,6 @@ async def confirmar_accion_oferta_invalida(
     data: AccionOfertaInvalida,
     session: Session = Depends(get_session),
     bonita: BonitaService = Depends(get_bonita_service),
-    nacional=Depends(get_nacional_service),
 ):
     if data.accion not in ACCIONES_OFERTA_INVALIDA:
         raise HTTPException(status_code=422, detail="La acción no es válida.")
@@ -611,13 +608,17 @@ async def confirmar_accion_oferta_invalida(
 
     if data.accion == "parcial":
         resultado = oferta.resultado_validacion
-        if not resultado or resultado.get('error') or oferta.estado_validacion == 'pendiente':
+        if not resultado or oferta.estado_validacion == 'pendiente':
             raise HTTPException(status_code=409, detail="Primero debe completarse la consulta de recursos para aceptar una cantidad parcial.")
-        if resultado.get('cantidad_verificada', 0) <= 0:
+        participantes_validados = resultado.get('participantes', [])
+        cantidad_verificada = sum(p.get('cantidad_verificada', 0) for p in participantes_validados)
+        if cantidad_verificada <= 0:
             raise HTTPException(status_code=400, detail="No hay recursos disponibles para aceptar una cobertura parcial.")
         # Conservar lo prometido y aceptar sólo la cantidad respaldada por inventario.
         resultado = dict(resultado)
-        resultado['cantidad_aceptada'] = resultado['cantidad_verificada']
+        resultado['cantidad_aceptada'] = cantidad_verificada
+        resultado['participantes'] = [{**p, 'cantidad_aceptada': p['cantidad_verificada']}
+                                     for p in participantes_validados]
         oferta.resultado_validacion = resultado
 
     oferta.accion_tomada = data.accion
@@ -646,11 +647,6 @@ async def confirmar_accion_oferta_invalida(
             session.rollback()
             raise HTTPException(409, "Esta emergencia no tiene un caso asociado en Bonita.")
         try:
-            respuesta = await validar_emergencia(session, emergencia.id, nacional, commit=False)
-            if not respuesta['completa']:
-                raise HTTPException(409, "Debe completarse la validación nacional antes de continuar con cobertura parcial.")
-            if (oferta.resultado_validacion or {}).get('cantidad_aceptada', 0) <= 0:
-                raise HTTPException(409, "El Sistema Nacional ya no informa recursos disponibles para aceptar.")
             await bonita.resolver_accion_coordinador(emergencia.bonitaCaseId, "ACEPTAR_OFERTAS")
         except Exception:
             session.rollback()
@@ -770,12 +766,10 @@ async def adjudicar_ofertas(
         # El lote se actualiza una única vez después de procesar correctamente todas las adjudicaciones.
         lote.estado = LoteEstado.ADJUDICADO
         session.add(lote)
-        # Hacer explícito que el nuevo estado llegue a BD dentro de la transacción 
+        # Hacer explícito que el nuevo estado llegue a BD dentro de la transacción
         # antes de consultar los demás lotes.
-        #session.flush()
-        session.commit()
+        session.flush()
         # buscar todos los lotes de la emergencia y validar que todos estan correctamente en estado ADJUDICADO
-        #lotes = session.exec(select(Lote).where(Lote.emergenciaId == lote.emergenciaId, Lote.estado != LoteEstado.ADJUDICADO)).all()
         lote_no_adjudicado = session.exec(
             select(Lote).where(Lote.emergenciaId == lote.emergenciaId, Lote.estado != LoteEstado.ADJUDICADO)
         ).first()
@@ -784,7 +778,10 @@ async def adjudicar_ofertas(
             emergencia: Emergencia = session.get(Emergencia, lote.emergenciaId)
             if emergencia.bonitaCaseId:
                 await bonita.completar_tarea_humana_por_caso(emergencia.bonitaCaseId)
-    
+            emergencia.estado = EmergenciaEstado.ADJUDICADA
+            session.add(emergencia)
+
+        session.commit()
     except httpx.HTTPStatusError as e:
         session.rollback()
         print(f"HTTP STATUS ERROR: {repr(e)}")

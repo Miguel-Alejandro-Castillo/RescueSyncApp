@@ -10,7 +10,7 @@ export async function login(username, password) {
   });
 
   if (!user || user.password !== password)
-    throw new UnauthorizedError('INVALID_CREDENTIALS', 'Invalid username or password');
+    throw new UnauthorizedError('INVALID_CREDENTIALS', 'Usuario o contraseña incorrectos');
 
   const token = generateAccessToken(user);
   return {

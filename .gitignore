@@ -176,3 +176,5 @@ Desktop.ini
 *.swp
 *.swo
 *~
+
+/bonita/build-validation/

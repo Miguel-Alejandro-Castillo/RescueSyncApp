@@ -1,13 +1,12 @@
 // src/routes/index.js
 import { Router } from 'express';
 import ongRoutes from './ong.routes.js';
-import systemRoutes from './system.routes.js';
 import authRoutes from './auth.routes.js';
 import validacionRoutes from './validacion.routes.js';
 import recursoRoutes from './recurso.routes.js';
 import categoriaRoutes from './categoria.routes.js';
-import prisma from '../config/prisma.js';
-import ApiResponse from '../utils/api-response.js';
+import verifyJWT from '../middlewares/jwt.middleware.js';
+import compromisoRoutes from './compromiso.routes.js';
 
 const router = Router();
 
@@ -16,9 +15,10 @@ const router = Router();
 */
 
 router.use('/auth', authRoutes);
-router.use('/ongs', ongRoutes);
-router.use('/recursos', recursoRoutes);
-router.use('/categorias', categoriaRoutes);
-router.use('/validaciones', validacionRoutes);
+router.use('/ongs', verifyJWT, ongRoutes);
+router.use('/recursos', verifyJWT, recursoRoutes);
+router.use('/categorias', verifyJWT, categoriaRoutes);
+router.use('/validaciones', verifyJWT, validacionRoutes);
+router.use('/compromisos', verifyJWT, compromisoRoutes);
 
 export default router;

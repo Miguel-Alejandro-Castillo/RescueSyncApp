@@ -14,7 +14,7 @@ export default function verifyJWT(
     return ApiResponse.unauthorized(
       res,
       "NO_TOKEN_PROVIDED",
-      "No token provided"
+      "No se proporcionó el token"
     );
 
   }
@@ -25,7 +25,7 @@ export default function verifyJWT(
     return ApiResponse.unauthorized(
       res,
       "INVALID_AUTHORIZATION_HEADER",
-      "Authorization header must use Bearer scheme"
+      "El encabezado Authorization debe usar el esquema Bearer"
     );
   }
 
@@ -46,7 +46,7 @@ export default function verifyJWT(
     return ApiResponse.unauthorized(
       res,
       "FAILED_TO_AUTHENTICATE_TOKEN",
-      "Failed to authenticate token"
+      "No se pudo validar el token"
     );
 
   }
