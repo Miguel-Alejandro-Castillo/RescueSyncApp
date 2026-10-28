@@ -47,7 +47,7 @@ services:
     depends_on:
       bonita-db:
         condition: service_healthy
-    restart: on-failure
+    restart: unless-stopped
 
   redis-db:
     container_name: redis-db
