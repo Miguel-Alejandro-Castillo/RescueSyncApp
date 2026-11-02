@@ -305,7 +305,8 @@ class BonitaService:
             headers=self._auth_headers(),
             params = {
                 "p": 0, # (Required) index of the page to display
-                "f": "enabled=true" # (Optional) filter to only include enabled users
+                "f": "enabled=true", # (Optional) filter to only include enabled users
+                "c": 100
             }
         )
         return response.json()
