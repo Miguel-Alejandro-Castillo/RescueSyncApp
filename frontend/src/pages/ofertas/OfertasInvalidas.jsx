@@ -42,6 +42,26 @@ export default function OfertasInvalidas() {
 
   const handleConfirmar = async (id) => {
     setError('');
+    const accion = acciones[id];
+    if (!accion) return;
+
+    if (accion === 'reabrir') {
+      const confirmacion = window.confirm(
+        '¿Está seguro de que desea reabrir la convocatoria? Se liberarán las reservas actuales y se extenderá la ventana de tiempo para recibir nuevas ofertas.'
+      );
+      if (!confirmacion) return;
+    } else if (accion === 'parcial') {
+      const confirmacion = window.confirm(
+        '¿Está seguro de que desea continuar con cobertura parcial? Se adjudicará únicamente la cantidad verificada y se cerrará la evaluación de esta oferta.'
+      );
+      if (!confirmacion) return;
+    } else if (accion === 'reformular') {
+      const confirmacion = window.confirm(
+        '¿Desea avanzar a la reformulación de lotes para esta emergencia?'
+      );
+      if (!confirmacion) return;
+    }
+
     try {
       const res = await authenticatedFetch(`${API_RESCUE}/ofertas/${id}/accion`, {
         method: 'PATCH',

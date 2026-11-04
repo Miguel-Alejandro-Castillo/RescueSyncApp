@@ -127,6 +127,14 @@ const FormularioLotes = () => {
             return;
         }
 
+        const mensajeConfirmacion = ofertaId
+            ? '¿Confirma la reformulación de los lotes y la apertura de una nueva convocatoria? Esto liberará los recursos previamente reservados.'
+            : '¿Confirma la publicación de estos lotes y la apertura de la convocatoria?';
+
+        if (!window.confirm(mensajeConfirmacion)) {
+            return;
+        }
+
         const payload = {
             emergenciaId: emergenciaSeleccionada.id,
             lotes: lotes.map(lote => ({
