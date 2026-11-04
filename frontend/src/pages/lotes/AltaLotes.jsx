@@ -3,6 +3,7 @@ import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import SeleccionarEmergencia from './SeleccionarEmergencia';
+import ConfirmModal from '../../components/ConfirmModal';
 import { obtenerEmergenciaPorId, crearLotes, reformularLotes } from '../../services/lotesService';
 import { EMERGENCIA_ESTADOS } from '../../constants/emergencia';
 import { NIVELES_GRAVEDAD, getNivelGravedadLabel, normalizeNivelGravedad } from '../../constants/gravedad';
@@ -25,6 +26,7 @@ const FormularioLotes = () => {
     const [error, setError] = useState('');
     const [saving, setSaving] = useState(false);
     const [submitError, setSubmitError] = useState('');
+    const [showModal, setShowModal] = useState(false);
 
     const [lotes, setLotes] = useState([
         { 
@@ -127,14 +129,11 @@ const FormularioLotes = () => {
             return;
         }
 
-        const mensajeConfirmacion = ofertaId
-            ? '¿Confirma la reformulación de los lotes y la apertura de una nueva convocatoria? Esto liberará los recursos previamente reservados.'
-            : '¿Confirma la publicación de estos lotes y la apertura de la convocatoria?';
+        setShowModal(true);
+    };
 
-        if (!window.confirm(mensajeConfirmacion)) {
-            return;
-        }
-
+    const handleConfirmSubmit = async () => {
+        setShowModal(false);
         const payload = {
             emergenciaId: emergenciaSeleccionada.id,
             lotes: lotes.map(lote => ({
@@ -294,6 +293,19 @@ const FormularioLotes = () => {
                     </div>
                 </div>
             </div>
+
+            <ConfirmModal
+                isOpen={showModal}
+                title={ofertaId ? 'Reformular lotes' : 'Publicar convocatoria'}
+                message={
+                    ofertaId
+                        ? '¿Confirma la reformulación de los lotes y la apertura de una nueva convocatoria? Esto liberará los recursos previamente reservados en la API Nacional.'
+                        : '¿Confirma la publicación de estos lotes y la apertura de la convocatoria para recibir ofertas?'
+                }
+                confirmText={ofertaId ? 'Reformular y abrir' : 'Publicar y abrir'}
+                onConfirm={handleConfirmSubmit}
+                onCancel={() => setShowModal(false)}
+            />
         </div>
     );
 };

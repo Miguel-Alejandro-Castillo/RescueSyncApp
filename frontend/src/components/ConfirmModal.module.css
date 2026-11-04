@@ -1,0 +1,114 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(6, 10, 16, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+  padding: 1rem;
+  animation: fadeIn 0.15s ease-out;
+}
+
+.modal {
+  background: var(--surface, #18212d);
+  border: 1px solid var(--border, #3c4e63);
+  border-radius: var(--radius, 12px);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  width: 100%;
+  max-width: 480px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.15s ease-out;
+  color: var(--ink, #f1f5fa);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.15rem 1.4rem;
+  border-bottom: 1px solid var(--border, #3c4e63);
+  background-color: var(--surface-raised, #202d3c);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--ink, #f1f5fa);
+  letter-spacing: -0.01em;
+}
+
+.closeBtn {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--muted, #b0bfd0);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.closeBtn:hover {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.body {
+  padding: 1.4rem;
+  background-color: var(--surface, #18212d);
+}
+
+.message {
+  margin: 0;
+  color: var(--ink, #f1f5fa);
+  font-size: 1rem;
+  line-height: 1.55;
+  opacity: 0.95;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.85rem;
+  padding: 1rem 1.4rem;
+  background-color: var(--surface-raised, #202d3c);
+  border-top: 1px solid var(--border, #3c4e63);
+}
+
+.cancelBtn {
+  background-color: transparent;
+  color: var(--ink, #f1f5fa);
+  border: 1px solid var(--border, #3c4e63);
+  padding: 0.55rem 1.1rem;
+  border-radius: 8px;
+  font-size: 0.925rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cancelBtn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: var(--field-border, #657c94);
+  color: #ffffff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(12px) scale(0.98); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
