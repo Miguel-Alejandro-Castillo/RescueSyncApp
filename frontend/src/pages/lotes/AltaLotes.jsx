@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import SeleccionarEmergencia from './SeleccionarEmergencia';
 import ConfirmModal from '../../components/ConfirmModal';
-import { obtenerEmergenciaPorId, crearLotes, reformularLotes } from '../../services/lotesService';
+import { obtenerEmergenciaPorId, crearLotes, reformularLotes, obtenerOfertaDetalle } from '../../services/lotesService';
 import { EMERGENCIA_ESTADOS } from '../../constants/emergencia';
 import { NIVELES_GRAVEDAD, getNivelGravedadLabel, normalizeNivelGravedad } from '../../constants/gravedad';
 import { RECURSOS_POR_TIPO, TIPOS_RECURSOS } from '../../constants/lote';
@@ -55,13 +55,28 @@ const FormularioLotes = () => {
 
         setLoadingEmergencia(true);
 
-        obtenerEmergenciaPorId(emergenciaId)
-            .then((data) => {
-                if (!ofertaId && data.estado !== EMERGENCIA_ESTADOS.CREADA) {
+        const promesas = [obtenerEmergenciaPorId(emergenciaId)];
+        if (ofertaId) {
+            promesas.push(obtenerOfertaDetalle(ofertaId));
+        }
+
+        Promise.all(promesas)
+            .then(([dataEmergencia, dataOferta]) => {
+                if (!ofertaId && dataEmergencia.estado !== EMERGENCIA_ESTADOS.CREADA) {
                     setError('La emergencia seleccionada no se encuentra pendiente de desglose.');
                     return;
                 }
-                setEmergenciaSeleccionada(data);
+                setEmergenciaSeleccionada(dataEmergencia);
+                if (dataOferta) {
+                    setLotes([
+                        {
+                            tipoRecurso: dataOferta.lote_tipo,
+                            descripcion: dataOferta.lote_descripcion,
+                            cantidad: dataOferta.lote_cantidad,
+                            recurso_codigo: dataOferta.lote_recurso_codigo || null
+                        }
+                    ]);
+                }
             })
             .catch((err) => {
                 setError(err.message);
@@ -194,21 +209,25 @@ const FormularioLotes = () => {
                                 <hr className="my-4" />
 
                                 <div className={styles.row}>
-                                    <h5 className="mb-0 fw-bold">Lotes de recursos requeridos</h5>
-                                    <button
-                                        type="button"
-                                        className="btn btn-outline-secondary"
-                                        onClick={handleAddLote}
-                                    >
-                                        + Agregar otro lote
-                                    </button>
+                                    <h5 className="mb-0 fw-bold">
+                                        {ofertaId ? 'Lote de necesidad a modificar' : 'Lotes de recursos requeridos'}
+                                    </h5>
+                                    {!ofertaId && (
+                                        <button
+                                            type="button"
+                                            className="btn btn-outline-secondary"
+                                            onClick={handleAddLote}
+                                        >
+                                            + Agregar otro lote
+                                        </button>
+                                    )}
                                 </div>
 
                                 {lotes.map((lote, index) => (
                                     <div key={index} className={styles.lote}>
                                         <div className={styles.row}>
                                             <span className="badge bg-secondary">Lote #{index + 1}</span>
-                                            {lotes.length > 1 && (
+                                            {!ofertaId && lotes.length > 1 && (
                                                 <button
                                                     type="button"
                                                     className="btn btn-outline-danger btn-sm border-0"
@@ -229,6 +248,7 @@ const FormularioLotes = () => {
                                                     data-validation-key={`tipo-${index}`}
                                                     value={lote.tipoRecurso}
                                                     onChange={(e) => handleTipoRecursoChange(index, e)}
+                                                    disabled={Boolean(ofertaId)}
                                                     required
                                                 >
                                                     {TIPOS_RECURSOS.map((tipo) => (
@@ -247,6 +267,7 @@ const FormularioLotes = () => {
                                                     data-validation-key={`descripcion-${index}`}
                                                     value={lote.descripcion}
                                                     onChange={(e) => handleLoteChange(index, e)}
+                                                    disabled={Boolean(ofertaId)}
                                                     required
                                                  >
                                                     {(RECURSOS_POR_TIPO[lote.tipoRecurso] || []).map((recurso) => (

@@ -226,8 +226,20 @@ async def reformular_lotes(
     if lote_anterior.estado == LoteEstado.REFORMULADO:
         raise HTTPException(status_code=400, detail="Los lotes de esta oferta ya fueron reformulados.")
 
-    if not payload.lotes:
-        raise HTTPException(status_code=400, detail="Debe incluir al menos un lote")
+    if len(payload.lotes) != 1:
+        raise HTTPException(
+            status_code=400,
+            detail="En la reformulación no se pueden agregar nuevos lotes. Solo se puede editar el lote existente."
+        )
+
+    lote_item = payload.lotes[0]
+    if lote_item.cantidad <= 0:
+        raise HTTPException(422, "La cantidad requerida debe ser mayor a cero.")
+    if lote_item.tipoRecurso != lote_anterior.tipoRecurso or lote_item.descripcion != lote_anterior.descripcion:
+        raise HTTPException(
+            status_code=400,
+            detail="No se permite modificar el tipo de recurso ni la descripción del lote, únicamente la cantidad."
+        )
 
     emergencia = session.get(Emergencia, lote_anterior.emergenciaId)
     if not emergencia.bonitaCaseId:
@@ -250,7 +262,7 @@ async def reformular_lotes(
                 emergenciaId=emergencia.id,
                 tipoRecurso=item.tipoRecurso,
                 descripcion=item.descripcion,
-                recurso_codigo=item.recurso_codigo,
+                recurso_codigo=lote_anterior.recurso_codigo,
                 cantidad=item.cantidad,
                 cantidadCubierta=0,
                 estado=LoteEstado.CREADO,

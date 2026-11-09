@@ -582,6 +582,45 @@ def get_ofertas_invalidas(session: Session = Depends(get_session)):
     return respuesta
 
 
+@router.get(
+    "/{oferta_id}/detalle",
+    response_model=dict,
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, *AUDITORES))]
+)
+def get_oferta_detalle(oferta_id: int, session: Session = Depends(get_session)):
+    oferta = session.get(Oferta, oferta_id)
+    if not oferta:
+        raise HTTPException(status_code=404, detail="Oferta no encontrada")
+
+    lote = session.get(Lote, oferta.lote_id)
+    participantes = session.exec(
+        select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta.id)
+    ).all()
+
+    return {
+        "id": oferta.id,
+        "lote_id": oferta.lote_id,
+        "lote_tipo": lote.tipoRecurso if lote else "",
+        "lote_descripcion": lote.descripcion if lote else "",
+        "lote_cantidad": lote.cantidad if lote else 0,
+        "lote_recurso_codigo": lote.recurso_codigo if lote else None,
+        "emergencia_id": lote.emergenciaId if lote else None,
+        "ong_lider_id": oferta.ong_lider_id,
+        "valida": oferta.valida,
+        "estado_validacion": oferta.estado_validacion,
+        "accion_tomada": oferta.accion_tomada,
+        "participantes": [
+            {
+                "id": p.id,
+                "ong_id": p.ong_id,
+                "cantidad_aportada": p.cantidad_aportada,
+            }
+            for p in participantes
+        ]
+    }
+
+
 @router.patch(
     "/{oferta_id}/accion",
     status_code=status.HTTP_200_OK,
