@@ -155,7 +155,7 @@ export default function OfertasInvalidas() {
                   </ul>
                 </div>
               )}
-              <p>ONG líder: {oferta.ong_lider_id}</p>
+              <p>ONG líder: {oferta.ong_lider_nombre || 'Sin identificar'}</p>
               {oferta.descartada_en ? (
                 <p>
                   Descartada por {oferta.motivo_descarte === 'reapertura' ? 'reapertura' : 'reformulación'}

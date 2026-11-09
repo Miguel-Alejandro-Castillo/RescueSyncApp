@@ -559,7 +559,7 @@ def marcar_oferta_invalida(
 def get_ofertas_invalidas(session: Session = Depends(get_session)):
     ofertas = session.exec(select(Oferta).where(
         (Oferta.valida == False) | Oferta.descartada_en.is_not(None),
-    )).all()
+    ).order_by(Oferta.fecha_creacion.desc(), Oferta.id.desc())).all()
 
     respuesta = []
     for oferta in ofertas:
@@ -568,6 +568,12 @@ def get_ofertas_invalidas(session: Session = Depends(get_session)):
         participantes = session.exec(
             select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta.id)
         ).all()
+        lider = next((p for p in participantes if p.ong_id == oferta.ong_lider_id), None)
+        aportes_validados = (oferta.resultado_validacion or {}).get("participantes") or []
+        nombre_ong_lider = next(
+            (p.get("ong_nombre") for p in aportes_validados if lider and p.get("participante_id") == lider.id),
+            None,
+        )
 
         convocatoria_abierta = False
         if lote:
@@ -601,6 +607,7 @@ def get_ofertas_invalidas(session: Session = Depends(get_session)):
             "emergencia_id": emergencia.id if emergencia else None,
             "emergencia_zona": emergencia.zonaAfectada if emergencia else "",
             "ong_lider_id": oferta.ong_lider_id,
+            "ong_lider_nombre": nombre_ong_lider,
             "cantidad_ofertada": sum(p.cantidad_aportada for p in participantes if p.cantidad_aportada is not None),
             "accion_tomada": oferta.accion_tomada,
             "resultado_validacion": oferta.resultado_validacion,
