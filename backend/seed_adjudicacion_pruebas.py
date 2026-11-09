@@ -9,7 +9,7 @@ import argparse
 import os
 from datetime import datetime, timedelta, timezone
 
-from sqlmodel import Session, create_engine, select
+from sqlmodel import Session, create_engine, delete, select
 
 from models import (
     Adjudicacion,
@@ -190,9 +190,8 @@ def remove_existing_fixture(session: Session, marker: str) -> dict:
         session.delete(offer)
     session.flush()
 
-    for lot in lots:
-        session.delete(lot)
-    session.flush()
+    # Borrar los lotes juntos para incluir las referencias entre lotes del fixture.
+    session.exec(delete(Lote).where(Lote.emergenciaId == existing.id))
 
     session.delete(existing)
     session.flush()
