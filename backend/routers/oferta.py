@@ -74,7 +74,12 @@ def es_lote_vigente(lote: Lote, emergencia: Emergencia) -> bool:
     fecha_limite = lote.fechaLimiteConvocatoria
     if fecha_limite.tzinfo is None:
         fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
-    return datetime.now(timezone.utc) <= fecha_limite
+    return lote.estado != LoteEstado.REFORMULADO and datetime.now(timezone.utc) <= fecha_limite
+
+
+def exigir_oferta_activa(oferta, lote):
+    if oferta.descartada_en or lote.estado == LoteEstado.REFORMULADO:
+        raise HTTPException(409, "La oferta fue descartada.")
 
 
 @router.get(
@@ -135,7 +140,9 @@ async def create_oferta_consorcio(
         raise HTTPException(status_code=400, detail="La convocatoria de este lote ha expirado.")
 
     
-    stmt_ofertas_lote = select(Oferta).where(Oferta.lote_id == data.id_lote, Oferta.valida == True)
+    stmt_ofertas_lote = select(Oferta).where(
+        Oferta.lote_id == data.id_lote, Oferta.valida == True, Oferta.descartada_en.is_(None),
+    )
     ofertas_en_lote = session.exec(stmt_ofertas_lote).all()
     ofertas_ids = [o.id for o in ofertas_en_lote]
 
@@ -204,6 +211,10 @@ def invitar_ong_a_oferta(
     oferta = session.get(Oferta, oferta_id)
     if not oferta:
         raise HTTPException(status_code=404, detail="La oferta no existe.")
+    lote = session.get(Lote, oferta.lote_id)
+    exigir_oferta_activa(oferta, lote)
+    if not es_lote_vigente(lote, session.get(Emergencia, lote.emergenciaId)):
+        raise HTTPException(400, "La convocatoria de este lote ha expirado.")
     
     if oferta.ong_lider_id != int(current_user['user_id']):
         raise HTTPException(status_code=403, detail="Solo la ONG líder puede invitar a otros.")
@@ -239,6 +250,11 @@ async def responder_invitacion(
     bonita: BonitaService = Depends(get_bonita_validacion_service),
 ):
     ong_id_actual = int(current_user['user_id'])
+    oferta = session.get(Oferta, oferta_id)
+    if not oferta:
+        raise HTTPException(404, "La oferta no existe.")
+    lote = session.get(Lote, oferta.lote_id)
+    exigir_oferta_activa(oferta, lote)
 
     stmt = select(ParticipanteOferta).where(
         ParticipanteOferta.oferta_id == oferta_id,
@@ -256,8 +272,6 @@ async def responder_invitacion(
     if not data.cantidad_aportada or data.cantidad_aportada <= 0:
         raise HTTPException(status_code=422, detail="Debes indicar una cantidad mayor a 0.")
 
-    oferta = session.get(Oferta, oferta_id)
-    lote = session.get(Lote, oferta.lote_id)
     emergencia = session.get(Emergencia, lote.emergenciaId)
 
     if not es_lote_vigente(lote, emergencia):
@@ -304,6 +318,7 @@ def get_mis_ofertas_consorcio(
     ofertas_ids = [p.oferta_id for p in participaciones]
 
     stmt_ofertas = select(Oferta).where(
+        Oferta.descartada_en.is_(None),
         (Oferta.ong_lider_id == ong_id_actual) | (Oferta.id.in_(ofertas_ids if ofertas_ids else [0]))
     )
     ofertas = session.exec(stmt_ofertas).all()
@@ -380,7 +395,11 @@ def get_mis_ofertas_compat(
             fecha_limite = lote.fechaLimiteConvocatoria
             if fecha_limite.tzinfo is None:
                 fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
-            vigente = (emergencia and emergencia.estado == EmergenciaEstado.PUBLICADA) and (ahora <= fecha_limite)
+            vigente = (
+                not oferta.descartada_en and oferta.valida and lote.estado != LoteEstado.REFORMULADO
+                and emergencia is not None and emergencia.estado == EmergenciaEstado.PUBLICADA
+                and ahora <= fecha_limite
+            )
         else:
             vigente = False
 
@@ -395,7 +414,9 @@ def get_mis_ofertas_compat(
             "emergencia_titulo": emergencia.zonaAfectada if emergencia else "",
             "emergencia_estado": emergencia.estado if emergencia else "",
             "fecha_limite": lote.fechaLimiteConvocatoria.isoformat() if lote and lote.fechaLimiteConvocatoria else "",
-            "es_editable": vigente
+            "es_editable": vigente,
+            "descartada_en": oferta.descartada_en,
+            "motivo_descarte": oferta.motivo_descarte,
         })
 
     return respuesta
@@ -462,6 +483,7 @@ def editar_aporte_oferta(
     lote = session.get(Lote, oferta.lote_id)
     if not lote:
         raise HTTPException(status_code=404, detail="El lote asociado no existe.")
+    exigir_oferta_activa(oferta, lote)
 
     if not oferta.valida:
         raise HTTPException(status_code=400, detail="La oferta es inválida y no se puede editar.")
@@ -517,6 +539,7 @@ def marcar_oferta_invalida(
     oferta = session.get(Oferta, oferta_id)
     if not oferta:
         raise HTTPException(status_code=404, detail="La oferta no existe.")
+    exigir_oferta_activa(oferta, session.get(Lote, oferta.lote_id))
 
     oferta.valida = False
     session.add(oferta)
@@ -531,7 +554,9 @@ def marcar_oferta_invalida(
     dependencies=[Depends(require_roles(CENTRO_COORDINADOR))]
 )
 def get_ofertas_invalidas(session: Session = Depends(get_session)):
-    ofertas = session.exec(select(Oferta).where(Oferta.valida == False)).all()
+    ofertas = session.exec(select(Oferta).where(
+        (Oferta.valida == False) | Oferta.descartada_en.is_not(None),
+    )).all()
 
     respuesta = []
     for oferta in ofertas:
@@ -577,6 +602,8 @@ def get_ofertas_invalidas(session: Session = Depends(get_session)):
             "accion_tomada": oferta.accion_tomada,
             "resultado_validacion": oferta.resultado_validacion,
             "validada_en": oferta.validada_en,
+            "descartada_en": oferta.descartada_en,
+            "motivo_descarte": oferta.motivo_descarte,
         })
 
     return respuesta
@@ -609,6 +636,10 @@ def get_oferta_detalle(oferta_id: int, session: Session = Depends(get_session)):
         "ong_lider_id": oferta.ong_lider_id,
         "valida": oferta.valida,
         "estado_validacion": oferta.estado_validacion,
+        "descartada_en": oferta.descartada_en,
+        "motivo_descarte": oferta.motivo_descarte,
+        "validada_en": oferta.validada_en,
+        "resultado_validacion": oferta.resultado_validacion,
         "accion_tomada": oferta.accion_tomada,
         "participantes": [
             {
@@ -639,6 +670,9 @@ async def confirmar_accion_oferta_invalida(
     if not oferta:
         raise HTTPException(status_code=404, detail="La oferta no existe.")
 
+    lote_oferta = session.get(Lote, oferta.lote_id)
+    emergencia = session.get(Emergencia, lote_oferta.emergenciaId)
+    exigir_oferta_activa(oferta, lote_oferta)
     if oferta.valida:
         raise HTTPException(status_code=400, detail="La oferta es válida, no requiere acción.")
 
@@ -664,7 +698,6 @@ async def confirmar_accion_oferta_invalida(
     session.add(oferta)
 
     if data.accion == "parcial":
-        lote_oferta = session.get(Lote, oferta.lote_id)
         ahora = datetime.now(timezone.utc)
         lotes = session.exec(
             select(Lote).where(
@@ -681,7 +714,6 @@ async def confirmar_accion_oferta_invalida(
                 session.add(lote)
 
     if data.accion == "parcial":
-        emergencia = session.get(Emergencia, lote_oferta.emergenciaId)
         if not emergencia or not emergencia.bonitaCaseId:
             session.rollback()
             raise HTTPException(409, "Esta emergencia no tiene un caso asociado en Bonita.")
@@ -721,6 +753,8 @@ async def adjudicar_ofertas(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="El lote no existe."
         )
+    if lote.estado == LoteEstado.REFORMULADO:
+        raise HTTPException(409, "El lote ya fue reformulado.")
 
     # Validar cantidades antes de realizar modificaciones
     total_adjudicado = 0
@@ -794,6 +828,7 @@ async def adjudicar_ofertas(
                         )
                     )
 
+                exigir_oferta_activa(oferta, lote)
                 adjudicacion_detalle = AdjudicacionDetalle(
                     adjudicacion_id=adjudicacion_model.id,
                     participante_oferta_id=participante_oferta.id,

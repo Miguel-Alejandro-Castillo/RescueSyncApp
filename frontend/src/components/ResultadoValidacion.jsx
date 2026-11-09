@@ -28,6 +28,6 @@ export default function ResultadoValidacion({ resultado, fecha }) {
         })}</tbody>
       </table>
     </div>}
-    {fecha && <p className={styles.date}>Inventario consultado el {new Date(fecha).toLocaleString('es-AR')}</p>}
+    {fecha && <p className={styles.date}>Inventario consultado el {new Date(fecha).toLocaleString('es-AR', { hour12: false })}</p>}
   </div>;
 }

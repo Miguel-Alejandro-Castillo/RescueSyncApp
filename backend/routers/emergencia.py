@@ -161,7 +161,8 @@ def get_lotes_disponibles(
     if REPRESENTANTE_ONG in get_user_roles(current_user):
         ofertados = select(Oferta.lote_id).where(
             Oferta.ong_lider_id == int(current_user['user_id']),
-            Oferta.valida == True
+            Oferta.valida == True,
+            Oferta.descartada_en.is_(None),
         )
         abiertos = abiertos.where(Lote.id.not_in(ofertados))
     lotes = session.exec(abiertos.order_by(Lote.fechaCreacion.desc(), Lote.id.desc())).all()

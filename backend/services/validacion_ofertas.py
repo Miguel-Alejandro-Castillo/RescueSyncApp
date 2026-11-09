@@ -61,7 +61,9 @@ def preparar_solicitud(session, emergencia_id, ahora=None):
         raise ConvocatoriaAbierta('La ventana de urgencia todavía está abierta')
     solicitud = {'lotes': []}
     for lote in lotes:
-        ofertas = session.exec(select(Oferta).where(Oferta.lote_id == lote.id).order_by(Oferta.id)).all()
+        ofertas = session.exec(select(Oferta).where(
+            Oferta.lote_id == lote.id, Oferta.descartada_en.is_(None),
+        ).order_by(Oferta.id)).all()
         if ofertas and all(o.validada_en is not None and o.ventana_validada is not None
                            and utc(o.ventana_validada) == utc(lote.fechaLimiteConvocatoria)
                            and o.estado_validacion in ('valida', 'invalida') for o in ofertas):
@@ -86,7 +88,9 @@ def preparar_solicitud(session, emergencia_id, ahora=None):
 
 def resultado_guardado(session, emergencia_id):
     lotes = session.exec(select(Lote).where(Lote.emergenciaId == emergencia_id, Lote.estado != 'reformulado')).all()
-    ofertas = session.exec(select(Oferta).where(Oferta.lote_id.in_([l.id for l in lotes]))).all()
+    ofertas = session.exec(select(Oferta).where(
+        Oferta.lote_id.in_([l.id for l in lotes]), Oferta.descartada_en.is_(None),
+    )).all()
     validacion_completa = all(
         o.validada_en is not None and o.estado_validacion in ('valida', 'invalida')
         for o in ofertas
@@ -101,7 +105,9 @@ def guardar_resultado(session, emergencia_id, respuesta):
         return solicitud['respuesta_guardada']
     comprobar_respuesta(respuesta, solicitud)
     lotes = session.exec(select(Lote).where(Lote.id.in_([l['lote_id'] for l in solicitud['lotes']]))).all()
-    ofertas_por_id = {o.id: o for o in session.exec(select(Oferta).where(Oferta.lote_id.in_([l.id for l in lotes]))).all()}
+    ofertas_por_id = {o.id: o for o in session.exec(select(Oferta).where(
+        Oferta.lote_id.in_([l.id for l in lotes]), Oferta.descartada_en.is_(None),
+    )).all()}
     lotes_por_id = {l.id: l for l in lotes}
     cobertura_por_id = {l['lote_id']: l for l in respuesta['cobertura_por_lote']}
     for item in respuesta['resultados']:
@@ -125,15 +131,13 @@ def guardar_resultado(session, emergencia_id, respuesta):
     return resultado_guardado(session, emergencia_id)
 
 
-def reiniciar_validacion(session, lote_id):
-    lote = session.get(Lote, lote_id)
+def descartar_ofertas(session, lote, motivo):
     lote.cantidadCubierta = 0
     session.add(lote)
-    for oferta in session.exec(select(Oferta).where(Oferta.lote_id == lote.id)).all():
-        oferta.valida = True
-        oferta.estado_validacion = 'pendiente'
-        oferta.validada_en = None
-        oferta.ventana_validada = None
-        oferta.resultado_validacion = None
-        oferta.accion_tomada = None
+    ahora = datetime.now(timezone.utc)
+    for oferta in session.exec(select(Oferta).where(
+        Oferta.lote_id == lote.id, Oferta.descartada_en.is_(None),
+    )).all():
+        oferta.descartada_en = ahora
+        oferta.motivo_descarte = motivo
         session.add(oferta)

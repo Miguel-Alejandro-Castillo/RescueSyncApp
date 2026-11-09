@@ -1,4 +1,4 @@
-from services.validacion_ofertas import reiniciar_validacion
+from services.validacion_ofertas import descartar_ofertas
 import os
 from datetime import datetime, timedelta, timezone
 from dependencies.bonita import get_bonita_service
@@ -216,7 +216,7 @@ async def reformular_lotes(
     if not oferta:
         raise HTTPException(status_code=404, detail="Oferta no encontrada")
 
-    if oferta.valida or oferta.accion_tomada != "reformular":
+    if oferta.descartada_en or oferta.valida or oferta.accion_tomada != "reformular":
         raise HTTPException(
             status_code=400,
             detail="La oferta no tiene confirmada la acción de reformular lotes."
@@ -288,9 +288,9 @@ async def reformular_lotes(
                                  if t["name"].strip() == "Generar lotes de necesidades"), None)
         if not tarea_generacion:
             raise HTTPException(409, "Bonita no llegó a la tarea de generar los nuevos lotes.")
-        reiniciar_validacion(session, lote_anterior.id)
         await bonita.completar_tarea_humana(tarea_generacion["id"])
-        emergencia.estado = "publicada"
+        descartar_ofertas(session, lote_anterior, "reformulacion")
+        emergencia.estado = EmergenciaEstado.PUBLICADA
         session.add(emergencia)
 
         session.commit()
@@ -323,13 +323,15 @@ async def reabrir_convocatoria(
     if not oferta:
         raise HTTPException(status_code=404, detail="Oferta no encontrada")
 
-    if oferta.valida or oferta.accion_tomada != "reabrir":
+    if oferta.descartada_en or oferta.valida or oferta.accion_tomada != "reabrir":
         raise HTTPException(
             status_code=400,
             detail="La oferta no tiene confirmada la acción de reabrir la convocatoria."
         )
 
     lote_oferta = session.get(Lote, oferta.lote_id)
+    if lote_oferta.estado == LoteEstado.REFORMULADO:
+        raise HTTPException(409, "El lote ya fue reformulado.")
     emergencia = session.get(Emergencia, lote_oferta.emergenciaId)
     if not emergencia.bonitaCaseId:
         raise HTTPException(
@@ -359,7 +361,7 @@ async def reabrir_convocatoria(
 
         await bonita.resolver_accion_coordinador(caso_id, "PUBLICAR_CONVOCATORIA", lote_oferta.id)
         await bonita.esperar_tareas_humanas_por_caso(caso_id, nombre_esperado="Cargar ofertas de  ayuda")
-        reiniciar_validacion(session, lote_oferta.id)
+        descartar_ofertas(session, lote_oferta, "reapertura")
 
         session.commit()
     except HTTPException:
@@ -401,7 +403,7 @@ def get_ofertas_lote(
         raise HTTPException(status_code=404, detail="Lote no encontrado")
 
     ofertas = session.exec(
-        select(Oferta).where(Oferta.lote_id == lote_id)
+        select(Oferta).where(Oferta.lote_id == lote_id, Oferta.descartada_en.is_(None))
     ).all()
 
     ofertas_response = []

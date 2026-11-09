@@ -14,21 +14,26 @@ const ACCIONES = [
   { value: 'parcial', label: 'Continuar con cobertura parcial' },
 ];
 
+async function cargarOfertas() {
+  const res = await authenticatedFetch(`${API_RESCUE}/ofertas/invalidas`);
+  if (!res.ok) throw new Error('Error al cargar las ofertas inválidas');
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
 export default function OfertasInvalidas() {
   const navigate = useNavigate();
   const [ofertas, setOfertas] = useState([]);
   const [acciones, setAcciones] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
   const [modalConfig, setModalConfig] = useState({ isOpen: false, id: null, accion: null, title: '', message: '' });
 
   useEffect(() => {
     const cargar = async () => {
       try {
-        const res = await authenticatedFetch(`${API_RESCUE}/ofertas/invalidas`);
-        if (!res.ok) throw new Error('Error al cargar las ofertas inválidas');
-        const data = await res.json();
-        setOfertas(Array.isArray(data) ? data : []);
+        setOfertas(await cargarOfertas());
       } catch (err) {
         setError(err.message);
       } finally {
@@ -44,6 +49,7 @@ export default function OfertasInvalidas() {
 
   const handleConfirmar = (id) => {
     setError('');
+    setMensaje('');
     const accion = acciones[id];
     if (!accion) return;
 
@@ -108,7 +114,8 @@ export default function OfertasInvalidas() {
     setError('');
     try {
       await reabrirConvocatoria(id);
-      setOfertas(lista => lista.map(o => o.id === id ? { ...o, convocatoria_abierta: true } : o));
+      setOfertas(await cargarOfertas());
+      setMensaje('Convocatoria reabierta. Las ofertas anteriores quedaron descartadas.');
     } catch (err) {
       setError(err.message);
     }
@@ -118,6 +125,7 @@ export default function OfertasInvalidas() {
     <div className={styles.page}>
       <h1>Ofertas inválidas</h1>
       {error && <div className="notice notice-error" role="alert"><p>{error}</p></div>}
+      {mensaje && <div className="notice" role="status"><p>{mensaje}</p></div>}
 
       {loading ? (
         <p>Cargando ofertas...</p>
@@ -148,6 +156,15 @@ export default function OfertasInvalidas() {
                 </div>
               )}
               <p>ONG líder: {oferta.ong_lider_id}</p>
+              {oferta.descartada_en ? (
+                <p>
+                  Descartada por {oferta.motivo_descarte === 'reapertura' ? 'reapertura' : 'reformulación'}
+                  {' el '}{new Date(oferta.descartada_en).toLocaleString('es-AR', { hour12: false })}.
+                </p>
+              ) : oferta.lote_estado === LOTE_ESTADOS.REFORMULADO ? (
+                <p>Los lotes ya fueron reformulados.</p>
+              ) : (
+              <>
               <label htmlFor={`accion-${oferta.id}`} className="form-label">Acción a tomar:</label>
               <div className={styles.accion}>
                 <select
@@ -189,7 +206,8 @@ export default function OfertasInvalidas() {
                 </button>
               )}
               {oferta.accion_tomada === 'reabrir' && oferta.convocatoria_abierta && <p>La convocatoria está abierta.</p>}
-              {oferta.lote_estado === LOTE_ESTADOS.REFORMULADO && <p>Los lotes ya fueron reformulados.</p>}
+              </>
+              )}
             </details>
           ))}
         </div>

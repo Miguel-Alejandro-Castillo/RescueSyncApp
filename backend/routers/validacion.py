@@ -47,6 +47,10 @@ def reservas_caso(caso_id: str, lote_id: int,
     lote = session.get(Lote, lote_id)
     if not lote or lote.emergenciaId != emergencia.id:
         raise HTTPException(404, 'El lote no pertenece al caso')
-    ofertas = session.exec(select(Oferta).where(Oferta.lote_id == lote_id)).all()
+    if lote.estado == 'reformulado':
+        raise HTTPException(409, 'El lote ya fue reformulado')
+    ofertas = session.exec(select(Oferta).where(
+        Oferta.lote_id == lote_id, Oferta.descartada_en.is_(None),
+    )).all()
     return {'resultados': [dict(oferta_id=o.id, resultado_validacion=o.resultado_validacion)
                            for o in ofertas if o.validada_en is not None and o.resultado_validacion]}
