@@ -331,15 +331,16 @@ class BonitaService:
         case_id: str,
         timeout_segundos: int = 20,
         intervalo_ms: int = 200,
-        nombre_esperado: str | None = None
+        nombre_esperado: str | tuple[str, ...] | None = None
     ):
         inicio = time.monotonic()
+        nombres = (nombre_esperado,) if isinstance(nombre_esperado, str) else nombre_esperado
 
         while True:
 
             tareas = await self.obtener_tareas_humanas_por_caso(case_id)
 
-            if tareas and (nombre_esperado is None or any(t["name"].strip() == nombre_esperado for t in tareas)):
+            if tareas and (nombres is None or any(t["name"].strip() in nombres for t in tareas)):
                 return tareas
 
             transcurrido = time.monotonic() - inicio

@@ -17,6 +17,7 @@ from dependencies.jwt_auth import get_current_user
 from dependencies.bonita import get_bonita_service
 from services.bonita_service import BonitaService
 from services.bonita_service import get_bonita_validacion_service
+from services.validacion_ofertas import bloquear_decisiones
 from fastapi import Response
 import traceback
 import httpx
@@ -80,6 +81,8 @@ def es_lote_vigente(lote: Lote, emergencia: Emergencia) -> bool:
 def exigir_oferta_activa(oferta, lote):
     if oferta.descartada_en or lote.estado == LoteEstado.REFORMULADO:
         raise HTTPException(409, "La oferta fue descartada.")
+    if oferta.tarea_bonita_descarte:
+        raise HTTPException(409, "El descarte de la oferta está en curso.")
 
 
 @router.get(
@@ -672,6 +675,9 @@ async def confirmar_accion_oferta_invalida(
 
     lote_oferta = session.get(Lote, oferta.lote_id)
     emergencia = session.get(Emergencia, lote_oferta.emergenciaId)
+    bloquear_decisiones(session, emergencia.id)
+    session.refresh(oferta)
+    session.refresh(lote_oferta)
     exigir_oferta_activa(oferta, lote_oferta)
     if oferta.valida:
         raise HTTPException(status_code=400, detail="La oferta es válida, no requiere acción.")
@@ -753,6 +759,8 @@ async def adjudicar_ofertas(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="El lote no existe."
         )
+    bloquear_decisiones(session, lote.emergenciaId)
+    session.refresh(lote)
     if lote.estado == LoteEstado.REFORMULADO:
         raise HTTPException(409, "El lote ya fue reformulado.")
 

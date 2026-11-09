@@ -30,9 +30,10 @@ const router = Router();
  *                 type: array
  *                 items:
  *                   type: object
- *                   required: [lote_id, recurso_nombre, tipo_recurso, cantidad_requerida, ofertas]
+ *                   required: [lote_id, reserva_id, recurso_nombre, tipo_recurso, cantidad_requerida, ofertas]
  *                   properties:
  *                     lote_id: { type: integer, minimum: 1, example: 31 }
+ *                     reserva_id: { type: string, example: "10001:31:2026-11-09T20:10:54+00:00" }
  *                     cantidad_requerida: { type: integer, minimum: 1, example: 10 }
  *                     recurso_nombre: { type: string, example: Medicos }
  *                     tipo_recurso: { type: string, example: Personal }
@@ -56,6 +57,7 @@ const router = Router();
  *           example:
  *             lotes:
  *               - lote_id: 31
+ *                 reserva_id: "10001:31:2026-11-09T20:10:54+00:00"
  *                 cantidad_requerida: 10
  *                 recurso_nombre: Medicos
  *                 tipo_recurso: Personal
@@ -150,7 +152,7 @@ router.post('/ofertas', async (req, res) => {
  * /api/v1/validaciones/reservas/liberar:
  *   post:
  *     summary: Liberar recursos reservados por una validación
- *     description: Libera los recursos reservados para cada participante, ONG y recurso. Indicá las cantidades verificadas que se obtuvieron al validar la oferta.
+ *     description: Libera una vez el inventario de la convocatoria identificada. Las reservas anteriores al registro usan el resultado histórico con legado habilitado.
  *     tags: [Validaciones]
  *     requestBody:
  *       required: true
@@ -158,8 +160,10 @@ router.post('/ofertas', async (req, res) => {
  *         application/json:
  *           schema:
  *             type: object
- *             required: [resultados]
+ *             required: [reserva_id, resultados]
  *             properties:
+ *               reserva_id: { type: string }
+ *               legado: { type: boolean, default: false }
  *               resultados:
  *                 type: array
  *                 items:
@@ -180,6 +184,7 @@ router.post('/ofertas', async (req, res) => {
  *                               recurso_nacional_id: { type: integer, example: 3 }
  *                               cantidad_verificada: { type: integer, minimum: 0, example: 10 }
  *           example:
+ *             reserva_id: "10001:31:2026-11-09T20:10:54+00:00"
  *             resultados:
  *               - resultado_validacion:
  *                   participantes:

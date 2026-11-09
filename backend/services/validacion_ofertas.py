@@ -1,5 +1,7 @@
 """Preparar aportes y persistir la validación calculada por la API Nacional."""
 from datetime import datetime, timezone
+from fastapi import HTTPException
+from sqlalchemy.exc import OperationalError
 from sqlmodel import select
 from models.emergencia import Emergencia
 from models.lote import Lote
@@ -11,6 +13,27 @@ def utc(value):
     return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
+def identificador_reserva(emergencia, lote, ventana):
+    return f'{emergencia.bonitaCaseId}:{lote.id}:{utc(ventana).isoformat()}'
+
+
+def bloquear_decisiones(session, emergencia_id, oferta_id=None):
+    try:
+        session.exec(select(Emergencia.id).where(Emergencia.id == emergencia_id)
+                     .with_for_update(nowait=True)).one()
+    except OperationalError as error:
+        raise HTTPException(409, 'Ya hay una operación en curso para esta emergencia.') from error
+    pendiente = select(Oferta.id).join(Lote).where(
+        Lote.emergenciaId == emergencia_id,
+        Oferta.descartada_en.is_(None),
+        Oferta.tarea_bonita_descarte.is_not(None),
+    )
+    if oferta_id is not None:
+        pendiente = pendiente.where(Oferta.id != oferta_id)
+    if session.exec(pendiente).first():
+        raise HTTPException(409, 'Hay otro descarte pendiente para esta emergencia.')
+
+
 class ConvocatoriaAbierta(ValueError):
     pass
 
@@ -20,6 +43,7 @@ def comprobar_respuesta(data, solicitud):
     if not isinstance(data, dict):
         raise ValueError('Respuesta de validación nacional inválida')
     esperadas = {o['oferta_id']: l['lote_id'] for l in solicitud['lotes'] for o in l['ofertas']}
+    reservas = {l['lote_id']: l['reserva_id'] for l in solicitud['lotes']}
     resultados = data.get('resultados')
     cobertura = data.get('cobertura_por_lote')
     if not isinstance(resultados, list) or not isinstance(cobertura, list):
@@ -34,6 +58,7 @@ def comprobar_respuesta(data, solicitud):
     for o in resultados:
         r = o.get('resultado_validacion')
         if (o.get('lote_id') != esperadas[o['oferta_id']] or not isinstance(r, dict)
+                or o.get('reserva_id') != reservas[o['lote_id']]
                 or o.get('estado_validacion') not in ('valida', 'invalida')):
             raise ValueError('Resultado de oferta nacional inválido')
         if not isinstance(r.get('participantes'), list):
@@ -64,11 +89,14 @@ def preparar_solicitud(session, emergencia_id, ahora=None):
         ofertas = session.exec(select(Oferta).where(
             Oferta.lote_id == lote.id, Oferta.descartada_en.is_(None),
         ).order_by(Oferta.id)).all()
+        if any(o.tarea_bonita_descarte for o in ofertas):
+            raise ConvocatoriaAbierta('Hay un descarte de ofertas pendiente')
         if ofertas and all(o.validada_en is not None and o.ventana_validada is not None
                            and utc(o.ventana_validada) == utc(lote.fechaLimiteConvocatoria)
                            and o.estado_validacion in ('valida', 'invalida') for o in ofertas):
             continue
         datos_lote = {'lote_id': lote.id,
+                      'reserva_id': identificador_reserva(emergencia, lote, lote.fechaLimiteConvocatoria),
                       'recurso_nombre': lote.descripcion, 'tipo_recurso': lote.tipoRecurso,
                       'cantidad_requerida': lote.cantidad, 'ofertas': []}
         for oferta in ofertas:
@@ -113,6 +141,7 @@ def guardar_resultado(session, emergencia_id, respuesta):
     for item in respuesta['resultados']:
         oferta = ofertas_por_id[item['oferta_id']]
         resultado = dict(item['resultado_validacion'])
+        resultado['reserva_id'] = item['reserva_id']
         oferta.resultado_validacion = resultado
         oferta.estado_validacion = item['estado_validacion']
         oferta.valida = item['estado_validacion'] == 'valida'

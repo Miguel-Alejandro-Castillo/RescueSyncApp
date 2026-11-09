@@ -72,6 +72,13 @@ model Compromiso {
   @@index([ongId, recursoId])
 }
 
+model ReservaConvocatoria {
+  id          String    @id
+  solicitud   Json?
+  resultado   Json
+  liberadaEn  DateTime?
+}
+
 model Categoria {
   id          Int      @id @default(autoincrement())
   nombre      String   @unique
