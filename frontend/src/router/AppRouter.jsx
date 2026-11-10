@@ -26,6 +26,7 @@ import OfertasConsorcio from '../pages/ofertas/OfertasConsorcio';
 import OfertasInvalidas from '../pages/ofertas/OfertasInvalidas';
 import Monitoreo from '../pages/monitoreo/Monitoreo';
 import TareasAdjudicadas from '../pages/monitoreo/TareasAdjudicadas';
+import Indicadores from '../pages/indicadores/Indicadores';
 function RequireSession() {
   const session = useSession();
   const location = useLocation();
@@ -71,6 +72,7 @@ export default function AppRouter() {
             <Route path="/validacion-ofertas" element={<Navigate to="/ofertas-invalidas" replace />} />
             <Route path="/monitoreo" element={<RequirePermission permission="monitoreo.ver"><Monitoreo /></RequirePermission>} />
             <Route path="/tareas-adjudicadas" element={<RequirePermission permission="monitoreo.finalizar_tareas"><TareasAdjudicadas /></RequirePermission>} />
+            <Route path="/indicadores" element={<RequirePermission permission="indicadores.ver"><Indicadores /></RequirePermission>} />
             <Route
               path="*"
               element={

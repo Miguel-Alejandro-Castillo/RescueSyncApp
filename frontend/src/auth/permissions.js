@@ -4,6 +4,7 @@ export const ROLE_NAMES = {
   coordinador: ['centro_coordinador'],
   ong: ['representante_ong'],
   auditor: ['auditor', 'directivo'],
+  directivo: ['directivo'],
 };
 
 const PERMISSION_PROFILES = {
@@ -17,6 +18,7 @@ const PERMISSION_PROFILES = {
   'ofertas.ver_invalidas': ['coordinador'],
   'monitoreo.ver': ['coordinador'],
   'monitoreo.finalizar_tareas': ['ong'],
+  'indicadores.ver': ['directivo'],
 };
 
 const ROUTE_PERMISSIONS = [
@@ -29,6 +31,7 @@ const ROUTE_PERMISSIONS = [
   { path: '/monitoreo', permission: 'monitoreo.ver' },
   { path: '/tareas-adjudicadas', permission: 'monitoreo.finalizar_tareas' },
   { path: '/ofertas-consorcio', permission: 'ofertas.ver_propias' },
+  { path: '/indicadores', permission: 'indicadores.ver' },
 ];
 
 const ROUTE_PERMISSION_PATTERNS = [
@@ -46,6 +49,7 @@ export const ACTIONS = [
   { permission: 'ofertas.ver_invalidas', profiles: ['coordinador'], path: '/ofertas-invalidas', label: 'Ofertas inválidas', title: 'Ofertas inválidas', description: 'Revisá las ofertas inválidas y elegí qué acción tomar.' },
   { permission: 'monitoreo.ver', profiles: ['coordinador'], path: '/monitoreo', label: 'Monitoreo', title: 'Monitoreo de la ejecución', description: 'Registrá los eventos posteriores a la adjudicación y finalizá el monitoreo.' },
   { permission: 'monitoreo.finalizar_tareas', profiles: ['ong'], path: '/tareas-adjudicadas', label: 'Tareas adjudicadas', title: 'Mis tareas adjudicadas', description: 'Consultá tus tareas adjudicadas y marcalas como finalizadas.' },
+  { permission: 'indicadores.ver', profiles: ['directivo'], path: '/indicadores', label: 'Indicadores', title: 'Indicadores de gestión', description: 'Evaluá el avance de las emergencias con métricas, gráficos y exportación de datos.' },
 ];
 
 export function getProfiles(memberships) {

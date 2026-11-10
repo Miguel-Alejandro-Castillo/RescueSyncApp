@@ -238,6 +238,35 @@ class BonitaService:
             headers=self._auth_headers()
         )
 
+    # Recorre todas las páginas de un recurso de la API BPM con los filtros indicados
+    async def _listar_todo(self, recurso: str, filtros: list[str], pagina_tam: int = 100):
+        resultado = []
+        pagina = 0
+        while True:
+            params = [("p", pagina), ("c", pagina_tam)] + [("f", filtro) for filtro in filtros]
+            response = await self.http_client.get(
+                f"{self.api_path}/{recurso}",
+                headers=self._auth_headers(),
+                params=params
+            )
+            items = response.json()
+            resultado.extend(items)
+            if len(items) < pagina_tam:
+                return resultado
+            pagina += 1
+
+    # Casos en curso de un proceso
+    async def obtener_casos_por_proceso(self, process_id: str):
+        return await self._listar_todo("case", [f"processDefinitionId={process_id}"])
+
+    # Casos finalizados (archivados) de un proceso
+    async def obtener_casos_archivados_por_proceso(self, process_id: str):
+        return await self._listar_todo("archivedCase", [f"processDefinitionId={process_id}"])
+
+    # Tareas humanas ya completadas (archivadas), de todos los procesos
+    async def obtener_tareas_humanas_archivadas(self):
+        return await self._listar_todo("archivedHumanTask", ["state=completed"])
+
     # Devuelve un listado de todas las tareas activas por caso
     async def obtener_tareas_por_caso(self, case_id: str):
         params = [

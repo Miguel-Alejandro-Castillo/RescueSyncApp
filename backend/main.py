@@ -8,6 +8,7 @@ from routers.oferta import router as oferta_router
 from routers.validacion import router as validacion_router
 from routers.monitoreo import router as monitoreo_router
 from routers.adjudicacion import router as adjudicacion_router
+from routers.dashboard import router as dashboard_router
 
 API_PREFIX = "/api/rescue"
 
@@ -70,5 +71,10 @@ app.include_router(
 
 app.include_router(
     adjudicacion_router,
+    prefix=API_PREFIX
+)
+
+app.include_router(
+    dashboard_router,
     prefix=API_PREFIX
 )
