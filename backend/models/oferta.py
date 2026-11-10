@@ -9,6 +9,9 @@ class Oferta(SQLModel, table=True):
     validada_en: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True)))
     ventana_validada: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True)))
     resultado_validacion: dict | None = Field(default=None, sa_column=Column(JSON))
+    descartada_en: datetime | None = Field(default=None, sa_column=Column(DateTime(timezone=True)))
+    motivo_descarte: str | None = Field(default=None, max_length=20)
+    tarea_bonita_descarte: str | None = Field(default=None, max_length=32)
 
     id: int | None = Field(
         default=None,

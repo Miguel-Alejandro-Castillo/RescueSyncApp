@@ -41,4 +41,6 @@ export const reabrirConvocatoria = ofertaId => request('/lotes/reabrir', {
 
 export const obtenerLote = loteId => request(`/lotes/${encodeURIComponent(loteId)}`);
 
+export const obtenerOfertaDetalle = ofertaId => request(`/ofertas/${encodeURIComponent(ofertaId)}/detalle`);
+
 export const obtenerOfertasLote = loteId => request(`/lotes/${encodeURIComponent(loteId)}/ofertas`);

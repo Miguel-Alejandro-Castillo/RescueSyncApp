@@ -136,7 +136,7 @@ services:
     depends_on:
       redis-db:
         condition: service_healthy
-      nacional-db:
+      bonita-db:
         condition: service_healthy
     restart: unless-stopped
 

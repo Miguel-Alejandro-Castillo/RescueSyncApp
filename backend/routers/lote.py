@@ -1,4 +1,4 @@
-from services.validacion_ofertas import reiniciar_validacion
+from services.validacion_ofertas import bloquear_decisiones, descartar_ofertas
 import os
 from datetime import datetime, timedelta, timezone
 from dependencies.bonita import get_bonita_service
@@ -48,6 +48,51 @@ class OfertaLoteResponse(BaseModel):
     id: int
     tipo_oferta: str
     participantes: list[ParticipanteOfertaResponse]
+
+
+TAREA_DECISION = "Evaluar acciones a tomar"
+TAREA_GENERAR = "Generar lotes de necesidades"
+TAREA_OFERTAR = "Cargar ofertas de  ayuda"
+
+
+async def ejecutar_decision_descarte(session, bonita, emergencia, lote, oferta, accion, ventana_ms):
+    bloquear_decisiones(session, emergencia.id, oferta.id)
+    session.refresh(oferta)
+    session.refresh(lote)
+    if oferta.descartada_en or lote.estado in (
+        LoteEstado.REFORMULADO, LoteEstado.ADJUDICADO, LoteEstado.EN_ADJUDICACION,
+    ):
+        raise HTTPException(409, "El lote ya no admite el descarte.")
+    caso_id = emergencia.bonitaCaseId
+    tareas = await bonita.obtener_tareas_humanas_por_caso(caso_id)
+    if not oferta.tarea_bonita_descarte:
+        tarea = next((t for t in tareas if t["name"].strip() == TAREA_DECISION), None)
+        if not tarea:
+            raise HTTPException(409, "El caso no está esperando la decisión del coordinador en Bonita.")
+        oferta.tarea_bonita_descarte = str(tarea["id"])
+        session.add(oferta)
+        # Conservar la identidad de la tarea antes de invocar a Bonita.
+        session.commit()
+        bloquear_decisiones(session, emergencia.id, oferta.id)
+        session.refresh(oferta)
+        if oferta.descartada_en:
+            raise HTTPException(409, "El descarte ya se completó.")
+        tareas = await bonita.obtener_tareas_humanas_por_caso(caso_id)
+
+    if any(str(t["id"]) == oferta.tarea_bonita_descarte for t in tareas):
+        await bonita.set_case_variable(caso_id, "ventana_tiempo_ms", "java.lang.Long", ventana_ms)
+        await bonita.completar_tarea_humana(oferta.tarea_bonita_descarte, {
+            "accionSeleccionadaInput": accion, "loteIdInput": str(lote.id),
+        })
+
+    if accion == "GENERAR_LOTES":
+        tareas = await bonita.esperar_tareas_humanas_por_caso(
+            caso_id, nombre_esperado=(TAREA_GENERAR, TAREA_OFERTAR),
+        )
+        tarea = next((t for t in tareas if t["name"].strip() == TAREA_GENERAR), None)
+        if tarea:
+            await bonita.completar_tarea_humana(tarea["id"])
+    await bonita.esperar_tareas_humanas_por_caso(caso_id, nombre_esperado=TAREA_OFERTAR)
 
 def calcular_fecha_limite(nivel_gravedad: str, fecha_inicio: datetime) -> datetime:
     horas_map = {
@@ -216,7 +261,7 @@ async def reformular_lotes(
     if not oferta:
         raise HTTPException(status_code=404, detail="Oferta no encontrada")
 
-    if oferta.valida or oferta.accion_tomada != "reformular":
+    if oferta.descartada_en or oferta.valida or oferta.accion_tomada != "reformular":
         raise HTTPException(
             status_code=400,
             detail="La oferta no tiene confirmada la acción de reformular lotes."
@@ -226,8 +271,20 @@ async def reformular_lotes(
     if lote_anterior.estado == LoteEstado.REFORMULADO:
         raise HTTPException(status_code=400, detail="Los lotes de esta oferta ya fueron reformulados.")
 
-    if not payload.lotes:
-        raise HTTPException(status_code=400, detail="Debe incluir al menos un lote")
+    if len(payload.lotes) != 1:
+        raise HTTPException(
+            status_code=400,
+            detail="En la reformulación no se pueden agregar nuevos lotes. Solo se puede editar el lote existente."
+        )
+
+    lote_item = payload.lotes[0]
+    if lote_item.cantidad <= 0:
+        raise HTTPException(422, "La cantidad requerida debe ser mayor a cero.")
+    if lote_item.tipoRecurso != lote_anterior.tipoRecurso or lote_item.descripcion != lote_anterior.descripcion:
+        raise HTTPException(
+            status_code=400,
+            detail="No se permite modificar el tipo de recurso ni la descripción del lote, únicamente la cantidad."
+        )
 
     emergencia = session.get(Emergencia, lote_anterior.emergenciaId)
     if not emergencia.bonitaCaseId:
@@ -241,6 +298,10 @@ async def reformular_lotes(
     ventana_emergencia_ms = calcular_diferencia_ms(fecha_limite, ahora)
 
     try:
+        await ejecutar_decision_descarte(
+            session, bonita, emergencia, lote_anterior, oferta, "GENERAR_LOTES", ventana_emergencia_ms,
+        )
+        descartar_ofertas(session, lote_anterior, "reformulacion")
         lote_anterior.estado = LoteEstado.REFORMULADO
         session.add(lote_anterior)
 
@@ -250,7 +311,7 @@ async def reformular_lotes(
                 emergenciaId=emergencia.id,
                 tipoRecurso=item.tipoRecurso,
                 descripcion=item.descripcion,
-                recurso_codigo=item.recurso_codigo,
+                recurso_codigo=lote_anterior.recurso_codigo,
                 cantidad=item.cantidad,
                 cantidadCubierta=0,
                 estado=LoteEstado.CREADO,
@@ -260,25 +321,7 @@ async def reformular_lotes(
             session.add(nuevo_lote)
             lotes_creados.append(nuevo_lote)
 
-        caso_id = emergencia.bonitaCaseId
-
-        await bonita.set_case_variable(
-            caso_id,
-            "ventana_tiempo_ms",
-            "java.lang.Long",
-            ventana_emergencia_ms
-        )
-
-        await bonita.resolver_accion_coordinador(caso_id, "GENERAR_LOTES", lote_anterior.id)
-        # Los nuevos lotes ya se cargaron en esta misma solicitud.
-        tareas_generacion = await bonita.esperar_tareas_humanas_por_caso(caso_id, nombre_esperado="Generar lotes de necesidades")
-        tarea_generacion = next((t for t in tareas_generacion
-                                 if t["name"].strip() == "Generar lotes de necesidades"), None)
-        if not tarea_generacion:
-            raise HTTPException(409, "Bonita no llegó a la tarea de generar los nuevos lotes.")
-        reiniciar_validacion(session, lote_anterior.id)
-        await bonita.completar_tarea_humana(tarea_generacion["id"])
-        emergencia.estado = "publicada"
+        emergencia.estado = EmergenciaEstado.PUBLICADA
         session.add(emergencia)
 
         session.commit()
@@ -311,13 +354,15 @@ async def reabrir_convocatoria(
     if not oferta:
         raise HTTPException(status_code=404, detail="Oferta no encontrada")
 
-    if oferta.valida or oferta.accion_tomada != "reabrir":
+    if oferta.descartada_en or oferta.valida or oferta.accion_tomada != "reabrir":
         raise HTTPException(
             status_code=400,
             detail="La oferta no tiene confirmada la acción de reabrir la convocatoria."
         )
 
     lote_oferta = session.get(Lote, oferta.lote_id)
+    if lote_oferta.estado == LoteEstado.REFORMULADO:
+        raise HTTPException(409, "El lote ya fue reformulado.")
     emergencia = session.get(Emergencia, lote_oferta.emergenciaId)
     if not emergencia.bonitaCaseId:
         raise HTTPException(
@@ -330,24 +375,15 @@ async def reabrir_convocatoria(
     ventana_emergencia_ms = calcular_diferencia_ms(fecha_limite, ahora)
 
     try:
+        await ejecutar_decision_descarte(
+            session, bonita, emergencia, lote_oferta, oferta, "PUBLICAR_CONVOCATORIA", ventana_emergencia_ms,
+        )
+        descartar_ofertas(session, lote_oferta, "reapertura")
         lote_oferta.fechaLimiteConvocatoria = fecha_limite
         session.add(lote_oferta)
 
         emergencia.estado = EmergenciaEstado.PUBLICADA
         session.add(emergencia)
-
-        caso_id = emergencia.bonitaCaseId
-
-        await bonita.set_case_variable(
-            caso_id,
-            "ventana_tiempo_ms",
-            "java.lang.Long",
-            ventana_emergencia_ms
-        )
-
-        await bonita.resolver_accion_coordinador(caso_id, "PUBLICAR_CONVOCATORIA", lote_oferta.id)
-        await bonita.esperar_tareas_humanas_por_caso(caso_id, nombre_esperado="Cargar ofertas de  ayuda")
-        reiniciar_validacion(session, lote_oferta.id)
 
         session.commit()
     except HTTPException:
@@ -389,7 +425,7 @@ def get_ofertas_lote(
         raise HTTPException(status_code=404, detail="Lote no encontrado")
 
     ofertas = session.exec(
-        select(Oferta).where(Oferta.lote_id == lote_id)
+        select(Oferta).where(Oferta.lote_id == lote_id, Oferta.descartada_en.is_(None))
     ).all()
 
     ofertas_response = []

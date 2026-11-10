@@ -14,15 +14,20 @@ export default function ResultadoValidacion({ resultado, fecha }) {
         <caption className="visually-hidden">Disponibilidad de los recursos ofertados por cada ONG</caption>
         <thead><tr><th scope="col">Organización</th><th scope="col" className={styles.quantity}>Ofrece</th>
           <th scope="col">Disponibilidad</th></tr></thead>
-        <tbody>{participantes.map(p => <tr key={p.participante_id}>
-          <td><span className={styles.ong}>{p.ong_nombre || 'Organización sin identificar'}</span></td>
-          <td className={styles.quantity}>{p.cantidad_ofertada}</td>
-          <td><span className={p.valida ? styles.check : styles.shortage}>
-            {p.valida ? 'Recursos suficientes' : 'Disponibilidad insuficiente'}
-          </span></td>
-        </tr>)}</tbody>
+        <tbody>{participantes.map(p => {
+          const suficiente = p.valida ?? (typeof p.cantidad_verificada === 'number' && p.cantidad_verificada >= p.cantidad_ofertada);
+          return <tr key={p.participante_id}>
+            <td><span className={styles.ong}>{p.ong_nombre || 'Organización sin identificar'}</span></td>
+            <td className={styles.quantity}>{p.cantidad_ofertada}</td>
+            <td><span className={suficiente ? styles.check : styles.shortage}>
+              {suficiente
+                ? `Recursos suficientes (${p.cantidad_verificada ?? p.cantidad_ofertada} verificados)`
+                : `Disponibilidad insuficiente (${p.cantidad_verificada ?? 0} verificados)`}
+            </span></td>
+          </tr>;
+        })}</tbody>
       </table>
     </div>}
-    {fecha && <p className={styles.date}>Inventario consultado el {new Date(fecha).toLocaleString('es-AR')}</p>}
+    {fecha && <p className={styles.date}>Inventario consultado el {new Date(fecha).toLocaleString('es-AR', { hour12: false })}</p>}
   </div>;
 }

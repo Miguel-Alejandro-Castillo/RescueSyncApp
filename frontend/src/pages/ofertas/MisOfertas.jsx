@@ -117,7 +117,9 @@ export default function MisOfertas() {
                   Recurso: <strong>{item.lote_tipo}</strong> | Cantidad ofertada: <strong>{item.cant_recurso}</strong>
                 </p>
                 <small style={{ color: item.es_editable ? '#1e8e3e' : '#d93025', fontWeight: '500' }}>
-                  {item.es_editable ? '● Convocatoria abierta' : '● Convocatoria cerrada / Finalizada'}
+                  {item.descartada_en
+                    ? `● Descartada por ${item.motivo_descarte === 'reapertura' ? 'reapertura' : 'reformulación'}`
+                    : item.es_editable ? '● Convocatoria abierta' : '● Convocatoria cerrada / Finalizada'}
                 </small>
               </div>
 
