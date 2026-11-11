@@ -85,42 +85,6 @@ router.post('/', createRecurso);
 
 /**
  * @swagger
- * /api/v1/recursos/{id}:
- *   get:
- *     tags:
- *       - Recursos
- *     summary: Obtener un recurso por ID
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: integer
- *         description: ID del recurso
- *     responses:
- *       200:
- *         description: Recurso encontrado
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 id: { type: integer, example: 1 }
- *                 codigo: { type: string, example: MED-GEN }
- *                 nombre: { type: string, example: Médico clínico }
- *                 categoriaId: { type: integer, example: 1 }
- *                 descripcion: { type: string, example: Descripción del recurso }
- *       404:
- *         description: Recurso no encontrado
- *       401:
- *         description: Token ausente, inválido o vencido
- *       500:
- *         description: Error interno del servidor
- */
-router.get('/:id', getRecursoById);
-
-/**
- * @swagger
  * /api/v1/recursos/liberar:
  *   post:
  *     tags:
@@ -134,9 +98,9 @@ router.get('/:id', getRecursoById);
  *           schema:
  *             type: object
  *             required:
- *               - recursos
+ *               - data
  *             properties:
- *               recursos:
+ *               data:
  *                 type: array
  *                 items:
  *                   type: object

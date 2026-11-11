@@ -45,12 +45,12 @@ export const getRecursoById = async (req, res) => {
 
 export const liberarRecursos = async (req, res) => {
   // Acepta tanto { recursos: [...] } como directamente el array [...]
-  const items = Array.isArray(req.body) ? req.body : req.body.recursos;
+  const items = Array.isArray(req.body) ? req.body : req.body.data;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return ApiResponse.badRequest(
       res,
-      'Debe proporcionar un array "recursos" con al menos un elemento a liberar.'
+      'Debe proporcionar un array "data" con al menos un elemento a liberar.'
     );
   }
 
