@@ -140,6 +140,15 @@ export default function OfertasConsorcio() {
 
     } catch (err) {
       setError(err.message);
+
+      // Si la convocatoria expiró, recargamos solo la lista de ofertas para que 
+      // desaparezca la tarjeta de invitación, manteniendo visible el cartel de error.
+      if (err.message.toLowerCase().includes('expirado')) {
+        await cargarOfertas();
+      }
+      // ---------------------------------------------------------
+      
+      setError(err.message);
     } finally {
       setSubmittingId(null);
     }

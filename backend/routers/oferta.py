@@ -315,7 +315,30 @@ def get_mis_ofertas_consorcio(
     session: Session = Depends(get_session)
 ):
     ong_id_actual = int(current_user['user_id'])
+    ahora = datetime.now(timezone.utc)
 
+    # Eliminar invitaciones pendientes (cantidad_aportada es None) 
+    # cuyos lotes ya hayan expirado.
+    stmt_pendientes = select(ParticipanteOferta).where(ParticipanteOferta.cantidad_aportada.is_(None))
+    participantes_pendientes = session.exec(stmt_pendientes).all()
+    
+    hubo_cambios = False
+    for p in participantes_pendientes:
+        oferta = session.get(Oferta, p.oferta_id)
+        if not oferta:
+            continue
+        lote = session.get(Lote, oferta.lote_id)
+        if lote and lote.fechaLimiteConvocatoria:
+            fecha_limite = lote.fechaLimiteConvocatoria
+            if fecha_limite.tzinfo is None:
+                fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
+            if ahora > fecha_limite:
+                session.delete(p)
+                hubo_cambios = True
+    if hubo_cambios:
+        session.commit()
+
+    # 2. Consultar participaciones actuales de la ONG
     stmt_participaciones = select(ParticipanteOferta).where(ParticipanteOferta.ong_id == ong_id_actual)
     participaciones = session.exec(stmt_participaciones).all()
     ofertas_ids = [p.oferta_id for p in participaciones]
@@ -331,11 +354,35 @@ def get_mis_ofertas_consorcio(
         lote = session.get(Lote, oferta.lote_id)
         emergencia = session.get(Emergencia, lote.emergenciaId) if lote else None
         
+        # Validar vigencia del lote
+        vigente = True
+        if lote and lote.fechaLimiteConvocatoria:
+            fecha_limite = lote.fechaLimiteConvocatoria
+            if fecha_limite.tzinfo is None:
+                fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
+            vigente = (lote.estado != LoteEstado.REFORMULADO and ahora <= fecha_limite)
+        else:
+            vigente = False
+
         stmt_parts = select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta.id)
         todos_participantes = session.exec(stmt_parts).all()
 
+        # 3. FILTRAR OFERTAS QUE TERMINARON SIENDO INDIVIDUALES
+        # Contamos cuántas ONGs tienen un aporte confirmado (distinto de None)
+        participantes_confirmados = [p for p in todos_participantes if p.cantidad_aportada is not None]
+        
+        # Si hay menos de 2 participantes confirmados, significa que nadie más se unió 
+        # y la oferta quedó exclusivamente en manos del líder (es individual). La saltamos.
+        if len(participantes_confirmados) < 2:
+            continue
+
         es_lider = (oferta.ong_lider_id == ong_id_actual)
         mi_participacion = next((p for p in todos_participantes if p.ong_id == ong_id_actual), None)
+        
+        # Si es una invitación pendiente y el lote ya expiró, tampoco la mostramos
+        if not es_lider and mi_participacion and mi_participacion.cantidad_aportada is None and not vigente:
+            continue
+
         estado_invitacion = "lider" if es_lider else ("pendiente" if mi_participacion and mi_participacion.cantidad_aportada is None else "aceptada")
 
         resultado.append({
