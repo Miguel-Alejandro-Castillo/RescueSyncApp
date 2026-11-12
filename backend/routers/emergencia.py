@@ -1,5 +1,9 @@
 import os
 from datetime import datetime, timezone
+from backend.models.adjudicacion import Adjudicacion
+from backend.models.adjudicacion_detalle import AdjudicacionDetalle
+from backend.models.participante_oferta import ParticipanteOferta
+from backend.routers.monitoreo import get_participantes_adjudicados
 from fastapi import Depends, HTTPException, Response
 from dependencies.jwt_auth import get_current_user
 from dependencies.bonita import get_bonita_service
@@ -202,3 +206,76 @@ async def notificar_por_timeout(
     session.commit()
 
     return Response(status_code=204)
+
+
+
+@router.get("/ofertas_finalizadas_emergencia", status_code=200, dependencies=[Depends(require_roles(USUARIO_BONITA))])
+async def obtener_ofertas_finalizadas_emergencia(
+    case_id: str,
+    session: Session = Depends(get_session)
+):
+    # 1. Buscar emergencia por case_id
+    emergencia = session.exec(
+        select(Emergencia).where(Emergencia.bonitaCaseId == case_id)
+    ).first()
+    
+    if not emergencia:
+        raise HTTPException(status_code=404, detail="Emergencia no encontrada")
+
+    # 2. Obtener las ofertas finalizadas de esa emergencia, sus participantes y la cantidad adjudicada
+
+    statement = (
+        select(Oferta, ParticipanteOferta, AdjudicacionDetalle, Lote)
+        .join(Lote, Lote.id == Oferta.lote_id)
+        .join(ParticipanteOferta, ParticipanteOferta.oferta_id == Oferta.id)
+        .join(Adjudicacion, Adjudicacion.lote_id == Lote.id)
+        .join(AdjudicacionDetalle, AdjudicacionDetalle.adjudicacion_id == Adjudicacion.id)
+        .where(AdjudicacionDetalle.participante_oferta_id == ParticipanteOferta.id)
+        .where(
+            Lote.emergenciaId == emergencia.id,
+            Oferta.estado_validacion == "finalizada"
+        )
+    )
+    
+    resultados = session.exec(statement).all()
+
+    if not resultados:
+        raise HTTPException(status_code=409, detail="No hay ofertas finalizadas ni adjudicadas para esta emergencia.")
+
+    items_a_liberar = []
+
+    for oferta, participante, detalle, lote in resultados:
+        items_a_liberar.append({
+            "cuit": participante.ong_cuit.strip() if participante.ong_cuit else "",
+            "descripcion": lote.descripcion.strip(), # O el campo de texto que tenga el modelo Lote
+            "cantidad_adjudicada": float(detalle.cantidad_adjudicada)
+        })
+
+    return items_a_liberar
+
+
+@router.patch("/cambiar_estado", status_code=200, dependencies=[Depends(require_roles(USUARIO_BONITA))])
+def actualizar_estado_emergencia(
+    case_id: str,
+    session: Session = Depends(get_session)
+):
+    # Buscar la emergencia usando el bonitaCaseId
+    emergencia = session.exec(
+        select(Emergencia).where(Emergencia.bonitaCaseId == case_id)
+    ).first()
+    
+    if not emergencia:
+        raise HTTPException(status_code=404, detail="Emergencia no encontrada")
+    
+    # Actualizar el estado
+    emergencia.estado = "finalizado"
+    
+    session.add(emergencia)
+    session.commit()
+    session.refresh(emergencia)
+    
+    return {
+        "mensaje": "Estado de la emergencia actualizado con éxito",
+        "bonita_case_id": emergencia.bonitaCaseId,
+        "nuevo_estado": emergencia.estado
+    }
