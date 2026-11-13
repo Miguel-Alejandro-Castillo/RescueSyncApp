@@ -1,9 +1,9 @@
 import os
 from datetime import datetime, timezone
-from backend.models.adjudicacion import Adjudicacion
-from backend.models.adjudicacion_detalle import AdjudicacionDetalle
-from backend.models.participante_oferta import ParticipanteOferta
-from backend.routers.monitoreo import get_participantes_adjudicados
+from models.adjudicacion import Adjudicacion
+from models.adjudicacion_detalle import AdjudicacionDetalle
+from models.participante_oferta import ParticipanteOferta
+from routers.monitoreo import get_participantes_adjudicados
 from fastapi import Depends, HTTPException, Response
 from dependencies.jwt_auth import get_current_user
 from dependencies.bonita import get_bonita_service
