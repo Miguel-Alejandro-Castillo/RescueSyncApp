@@ -44,25 +44,24 @@ export const getRecursoById = async (req, res) => {
 };
 
 export const liberarRecursos = async (req, res) => {
-  // Acepta tanto { recursos: [...] } como directamente el array [...]
-  const items = Array.isArray(req.body) ? req.body : req.body.data;
+  const items = req.body;
 
-  if (!items || !Array.isArray(items) || items.length === 0) {
+  if (!Array.isArray(items) || items.length === 0) {
     return ApiResponse.badRequest(
       res,
-      'Debe proporcionar un array "data" con al menos un elemento a liberar.'
+      'Debe proporcionar un array con al menos un elemento a liberar.'
     );
   }
 
   // 1. Validar que cada ítem tenga el formato correcto
   for (let i = 0; i < items.length; i++) {
-    const { cuit, descripcion, cantidad_adjudicada } = items[i];
-    const cantidad = Number(cantidad_adjudicada);
+    const { cuit, descripcion, cantidad_a_liberar } = items[i];
+    const cantidad = Number(cantidad_a_liberar);
 
     if (!cuit || !descripcion || isNaN(cantidad) || cantidad <= 0) {
       return ApiResponse.badRequest(
         res,
-        `El ítem en la posición ${i} es inválido. Debe tener cuit, descripcion y cantidad_adjudicada mayor a cero.`
+        `El ítem en la posición ${i} es inválido. Debe tener cuit, descripcion y cantidad_a_liberar mayor a cero.`
       );
     }
   }
@@ -75,7 +74,7 @@ export const liberarRecursos = async (req, res) => {
       for (const item of items) {
         const cuitLimpio = item.cuit.trim();
         const descLimpia = item.descripcion.trim();
-        const cantidad = Number(item.cantidad_adjudicada);
+        const cantidad = Number(item.cantidad_a_liberar);
 
         // A. Buscar la ONG por CUIT
         const ong = await tx.ong.findUnique({

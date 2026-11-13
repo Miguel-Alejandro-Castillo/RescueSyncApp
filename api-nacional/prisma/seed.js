@@ -158,6 +158,26 @@ async function ensureOngRecurso({ ongId, recursoId, cantidadTotal, cantidadReser
   });
 }
 
+async function ensureAguaEnInventario(ongId, recurso) {
+  return prisma.ongRecurso.upsert({
+    where: {
+      ongId_recursoId: {
+        ongId,
+        recursoId: recurso.id,
+      },
+    },
+    update: {
+      cantidadTotal: 20,
+    },
+    create: {
+      ongId,
+      recursoId: recurso.id,
+      cantidadTotal: 20,
+      cantidadReservada: 0,
+    },
+  });
+}
+
 async function main() {
   for (const usuario of usuariosBase) {
     await ensureUser(usuario);
@@ -194,6 +214,9 @@ async function main() {
         cantidadReservada: 50 + index * 20,
       });
     }
+
+    const agua = recursosPorNombre.get('Insumos:Agua');
+    await ensureAguaEnInventario(ong.id, agua);
   }
 
   console.log('Seed completado exitosamente');

@@ -132,28 +132,24 @@ router.get('/:id', getRecursoById);
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - data
- *             properties:
- *               data:
- *                 type: array
- *                 items:
- *                   type: object
- *                   required:
- *                     - cuit
- *                     - descripcion
- *                     - cantidad_adjudicada
- *                   properties:
- *                     cuit:
- *                       type: string
- *                       example: "30-54603392-5"
- *                     descripcion:
- *                       type: string
- *                       example: "Raciones de comida"
- *                     cantidad_adjudicada:
- *                       type: integer
- *                       example: 20
+ *             type: array
+ *             minItems: 1
+ *             items:
+ *               type: object
+ *               required:
+ *                 - cuit
+ *                 - descripcion
+ *                 - cantidad_a_liberar
+ *               properties:
+ *                 cuit:
+ *                   type: string
+ *                   example: "30-54603392-5"
+ *                 descripcion:
+ *                   type: string
+ *                   example: "Raciones de comida"
+ *                 cantidad_a_liberar:
+ *                   type: integer
+ *                   example: 20
  *     responses:
  *       200:
  *         description: Recursos liberados exitosamente

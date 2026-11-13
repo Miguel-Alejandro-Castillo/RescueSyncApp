@@ -4,9 +4,11 @@ from fastapi import HTTPException
 from sqlalchemy.exc import OperationalError
 from sqlmodel import select
 from models.emergencia import Emergencia
-from models.lote import Lote
+from models.lote import Lote, LoteEstado
 from models.oferta import Oferta
 from models.participante_oferta import ParticipanteOferta
+from models.adjudicacion import Adjudicacion
+from models.adjudicacion_detalle import AdjudicacionDetalle
 
 
 def utc(value):
@@ -80,7 +82,7 @@ def preparar_solicitud(session, emergencia_id, ahora=None):
     if not emergencia:
         raise LookupError('Emergencia no encontrada')
     lotes = session.exec(select(Lote).where(
-        Lote.emergenciaId == emergencia_id, Lote.estado != 'reformulado',
+        Lote.emergenciaId == emergencia_id, Lote.estado != LoteEstado.REFORMULADO,
     ).order_by(Lote.id)).all()
     if not lotes or any(utc(l.fechaLimiteConvocatoria) >= ahora for l in lotes):
         raise ConvocatoriaAbierta('La ventana de urgencia todavía está abierta')
@@ -115,7 +117,7 @@ def preparar_solicitud(session, emergencia_id, ahora=None):
 
 
 def resultado_guardado(session, emergencia_id):
-    lotes = session.exec(select(Lote).where(Lote.emergenciaId == emergencia_id, Lote.estado != 'reformulado')).all()
+    lotes = session.exec(select(Lote).where(Lote.emergenciaId == emergencia_id, Lote.estado != LoteEstado.REFORMULADO)).all()
     ofertas = session.exec(select(Oferta).where(
         Oferta.lote_id.in_([l.id for l in lotes]), Oferta.descartada_en.is_(None),
     )).all()
@@ -124,6 +126,109 @@ def resultado_guardado(session, emergencia_id):
         for o in ofertas
     )
     return dict(cobertura_suficiente=validacion_completa and all(l.cantidadCubierta >= l.cantidad for l in lotes))
+
+
+def obtener_reservas_no_adjudicadas(session, emergencia_id):
+    """Calcula el remanente reservado después de las adjudicaciones."""
+    lotes = session.exec(select(Lote).where(Lote.emergenciaId == emergencia_id)).all()
+    lote_ids = [lote.id for lote in lotes if lote.id is not None]
+    respuesta_vacia = {"emergencia_id": emergencia_id, "data": [], "ofertas": []}
+    if not lote_ids:
+        return respuesta_vacia
+
+    ofertas = session.exec(select(Oferta).where(
+        Oferta.lote_id.in_(lote_ids),
+        Oferta.resultado_validacion.is_not(None),
+    ).order_by(Oferta.lote_id, Oferta.id)).all()
+    if not ofertas:
+        return respuesta_vacia
+
+    detalles = session.exec(
+        select(AdjudicacionDetalle, ParticipanteOferta)
+        .join(
+            ParticipanteOferta,
+            AdjudicacionDetalle.participante_oferta_id == ParticipanteOferta.id,
+        )
+        .join(
+            Adjudicacion,
+            AdjudicacionDetalle.adjudicacion_id == Adjudicacion.id,
+        )
+        .join(Lote, Adjudicacion.lote_id == Lote.id)
+        .where(Lote.emergenciaId == emergencia_id)
+    ).all()
+    adjudicado_por_participante = {}
+    for detalle, participante in detalles:
+        adjudicado_por_participante[participante.id] = (
+            adjudicado_por_participante.get(participante.id, 0)
+            + detalle.cantidad_adjudicada
+        )
+
+    lotes_por_id = {lote.id: lote for lote in lotes}
+    data_por_recurso = {}
+    ofertas_resultado = []
+
+    for oferta in ofertas:
+        lote = lotes_por_id[oferta.lote_id]
+        resultado = oferta.resultado_validacion or {}
+        participantes_restantes = []
+
+        for participante in resultado.get("participantes", []):
+            participante_id = participante.get("participante_id")
+            cantidad_reservada = participante.get("cantidad_verificada", 0)
+            if (
+                not isinstance(participante_id, int)
+                or not isinstance(cantidad_reservada, int)
+            ):
+                raise ValueError(f"Resultado inválido para la oferta {oferta.id}")
+
+            cantidad_adjudicada = adjudicado_por_participante.get(participante_id, 0)
+            cantidad_a_liberar = cantidad_reservada - cantidad_adjudicada
+            if cantidad_a_liberar < 0:
+                raise ValueError(
+                    f"La cantidad adjudicada excede la reservada para el participante "
+                    f"{participante_id}"
+                )
+            if not cantidad_a_liberar:
+                continue
+
+            cuit = participante.get("cuit")
+            if not isinstance(cuit, str) or not cuit.strip():
+                raise ValueError(
+                    f"El participante {participante_id} no tiene CUIT para liberar"
+                )
+
+            participantes_restantes.append({
+                **participante,
+                "cantidad_reservada": cantidad_reservada,
+                "cantidad_adjudicada": cantidad_adjudicada,
+                "cantidad_a_liberar": cantidad_a_liberar,
+            })
+            clave = (cuit.strip(), lote.descripcion)
+            data_por_recurso[clave] = (
+                data_por_recurso.get(clave, 0) + cantidad_a_liberar
+            )
+
+        if participantes_restantes:
+            ofertas_resultado.append({
+                "oferta_id": oferta.id,
+                "lote_id": lote.id,
+                "descripcion": lote.descripcion,
+                "participantes": participantes_restantes,
+            })
+
+    data = [
+        {
+            "cuit": cuit,
+            "descripcion": descripcion,
+            "cantidad_a_liberar": cantidad,
+        }
+        for (cuit, descripcion), cantidad in sorted(data_por_recurso.items())
+    ]
+    return {
+        "emergencia_id": emergencia_id,
+        "data": data,
+        "ofertas": ofertas_resultado,
+    }
 
 
 def guardar_resultado(session, emergencia_id, respuesta):
