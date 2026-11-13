@@ -9,7 +9,7 @@ from dependencies.rbac import (
 )
 from models.emergencia import Emergencia, EmergenciaEstado
 from models.lote import Lote, LoteEstado
-from models.oferta import Oferta
+from models.oferta import Oferta, OfertaEstado
 from models.participante_oferta import ParticipanteOferta
 from models.adjudicacion import Adjudicacion
 from models.adjudicacion_detalle import AdjudicacionDetalle
@@ -694,7 +694,7 @@ async def confirmar_accion_oferta_invalida(
 
     if data.accion == "parcial":
         resultado = oferta.resultado_validacion
-        if not resultado or oferta.estado_validacion == 'pendiente':
+        if not resultado or oferta.estado_validacion == OfertaEstado.PENDIENTE:
             raise HTTPException(status_code=409, detail="Primero debe completarse la consulta de recursos para aceptar una cantidad parcial.")
         participantes_validados = resultado.get('participantes', [])
         cantidad_verificada = sum(p.get('cantidad_verificada', 0) for p in participantes_validados)

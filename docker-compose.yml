@@ -24,6 +24,7 @@ services:
     - ./bonita/deploy.sh:/opt/bonita/deploy.sh
     - ./bonita/configure-platform.sh:/opt/bonita/configure-platform.sh
     environment:
+      TZ: America/Argentina/Buenos_Aires
       DB_VENDOR: postgres
       DB_HOST: bonita-db
       DB_PORT: 5432
