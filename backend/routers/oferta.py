@@ -150,9 +150,11 @@ async def create_oferta_consorcio(
     ofertas_ids = [o.id for o in ofertas_en_lote]
 
     if ofertas_ids:
+        # Solo consideramos participación previa si YA FUE CONFIRMADA (cantidad_aportada no es None)
         stmt_participacion_previa = select(ParticipanteOferta).where(
             ParticipanteOferta.oferta_id.in_(ofertas_ids),
-            ParticipanteOferta.ong_id == ong_id_actual
+            ParticipanteOferta.ong_id == ong_id_actual,
+            ParticipanteOferta.cantidad_aportada.is_not(None) # <--- FILTRO CLAVE
         )
         if session.exec(stmt_participacion_previa).first():
             raise HTTPException(
@@ -197,8 +199,14 @@ async def create_oferta_consorcio(
         session.add(invitacion)
 
     session.commit()
-    return {"mensaje": "Oferta en consorcio creada con éxito", "oferta_id": nueva_oferta.id}
+    invitados_reales = [uid for uid in (data.invitados or []) if uid != ong_id_actual]
+    mensaje = (
+        "Oferta en consorcio creada con éxito"
+        if len(invitados_reales) > 0
+        else "Oferta individual creada con éxito"
+    )
 
+    return {"mensaje": mensaje, "oferta_id": nueva_oferta.id}
 
 @router.post(
     "/{oferta_id}/invitar",
@@ -267,6 +275,7 @@ async def responder_invitacion(
     if not participacion:
         raise HTTPException(status_code=404, detail="No tenés ninguna invitación pendiente para esta oferta.")
 
+    # Si rechaza la invitación, se elimina la participación y listo (no hay problema)
     if not data.aceptar:
         session.delete(participacion)
         session.commit()
@@ -280,11 +289,45 @@ async def responder_invitacion(
     if not es_lote_vigente(lote, emergencia):
         raise HTTPException(status_code=400, detail="La convocatoria del lote ha expirado.")
 
+    #  Verificar si ya participa en otra oferta para este lote ---
+    stmt_ofertas_lote = select(Oferta).where(
+        Oferta.lote_id == oferta.lote_id,
+        Oferta.valida == True,
+        Oferta.descartada_en.is_(None)
+    )
+    ofertas_en_lote = session.exec(stmt_ofertas_lote).all()
+    ofertas_ids = [o.id for o in ofertas_en_lote]
+
+    if ofertas_ids:
+        # 1. ¿Es líder de otra oferta en este lote?
+        lider_en_otra = any(o.ong_lider_id == ong_id_actual and o.id != oferta_id for o in ofertas_en_lote)
+        
+        # 2. ¿Ya tiene una participación CONFIRMADA en otra oferta de este lote?
+        stmt_otra_part = select(ParticipanteOferta).where(
+            ParticipanteOferta.oferta_id.in_(ofertas_ids),
+            ParticipanteOferta.oferta_id != oferta_id,
+            ParticipanteOferta.ong_id == ong_id_actual,
+            ParticipanteOferta.cantidad_aportada.is_not(None)
+        )
+        otra_participacion_confirmada = session.exec(stmt_otra_part).first()
+
+        if lider_en_otra or otra_participacion_confirmada:
+            # --- LIMPIEZA AUTOMÁTICA ---
+            # Como ya está participando en otro lado, borramos esta invitación basura para que desaparezca de su vista
+            session.delete(participacion)
+            session.commit()
+            # ---------------------------
+            
+            raise HTTPException(
+                status_code=400,
+                detail="Ya tenés una oferta activa o participas de forma confirmada en otro consorcio para este lote. Esta invitación ha sido descartada."
+            )
+    # ------------------------------------------------------------------------------
+
     # Calcular cuánto lleva sumado ESTA oferta en consorcio en total
     stmt_parts = select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta_id)
     todos_participantes = session.exec(stmt_parts).all()
     
-    aporte_anterior = participacion.cantidad_aportada or 0
     suma_actual_oferta = sum(p.cantidad_aportada for p in todos_participantes if p.cantidad_aportada is not None and p.ong_id != ong_id_actual)
     
     total_propuesto = suma_actual_oferta + data.cantidad_aportada
@@ -298,6 +341,7 @@ async def responder_invitacion(
         participacion.ong_cuit = await obtener_cuit_aporte(bonita, ong_id_actual)
     elif not participacion.ong_cuit:
         raise HTTPException(409, "Debe revisarse la ONG de origen del aporte antes de modificarlo.")
+        
     participacion.cantidad_aportada = data.cantidad_aportada
     session.add(participacion)
     session.commit()
@@ -367,21 +411,25 @@ def get_mis_ofertas_consorcio(
         stmt_parts = select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta.id)
         todos_participantes = session.exec(stmt_parts).all()
 
-        # 3. FILTRAR OFERTAS QUE TERMINARON SIENDO INDIVIDUALES
-        # Contamos cuántas ONGs tienen un aporte confirmado (distinto de None)
-        participantes_confirmados = [p for p in todos_participantes if p.cantidad_aportada is not None]
-        
-        # Si hay menos de 2 participantes confirmados, significa que nadie más se unió 
-        # y la oferta quedó exclusivamente en manos del líder (es individual). La saltamos.
-        if len(participantes_confirmados) < 2:
-            continue
-
         es_lider = (oferta.ong_lider_id == ong_id_actual)
         mi_participacion = next((p for p in todos_participantes if p.ong_id == ong_id_actual), None)
         
-        # Si es una invitación pendiente y el lote ya expiró, tampoco la mostramos
+        # Si es una invitación pendiente y el lote ya expiró, la saltamos
         if not es_lider and mi_participacion and mi_participacion.cantidad_aportada is None and not vigente:
             continue
+
+        # Si NO soy el líder y SÍ tengo una invitación pendiente válida, 
+        # permitimos que se muestre para que pueda aceptarla o rechazarla.
+        es_invitacion_pendiente = (not es_lider and mi_participacion and mi_participacion.cantidad_aportada is None)
+
+        if not es_invitacion_pendiente:
+            # Si no es una invitación pendiente para mí, aplicamos la regla de los consorcios:
+            # Contamos cuántas ONGs tienen un aporte confirmado (distinto de None)
+            participantes_confirmados = [p for p in todos_participantes if p.cantidad_aportada is not None]
+            
+            # Si hay menos de 2 participantes confirmados, es una oferta individual y la ocultamos de consorcios
+            if len(participantes_confirmados) < 2:
+                continue
 
         estado_invitacion = "lider" if es_lider else ("pendiente" if mi_participacion and mi_participacion.cantidad_aportada is None else "aceptada")
 

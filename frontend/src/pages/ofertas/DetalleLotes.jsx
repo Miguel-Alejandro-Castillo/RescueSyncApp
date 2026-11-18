@@ -143,7 +143,7 @@ export default function DetalleLotes() {
         : '¡Oferta creada con éxito!';
 
       navigate('/ofertas', { 
-        state: { mensajeExito: '¡Oferta en consorcio creada con éxito!' } 
+        state: { mensajeExito: mensajeExitoFinal } 
       });
 
     } catch (err) {
