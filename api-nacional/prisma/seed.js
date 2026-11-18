@@ -167,12 +167,12 @@ async function ensureAguaEnInventario(ongId, recurso) {
       },
     },
     update: {
-      cantidadTotal: 20,
+      cantidadTotal: 100,
     },
     create: {
       ongId,
       recursoId: recurso.id,
-      cantidadTotal: 20,
+      cantidadTotal: 100,
       cantidadReservada: 0,
     },
   });
