@@ -304,7 +304,7 @@ export default function OfertasConsorcio() {
                     <ul style={{ margin: 0, paddingLeft: '1.2rem', fontSize: '0.85rem', color: 'var(--muted)' }}>
                       {(item.participantes || []).map((p, idx) => (
                         <li key={idx} style={{ marginBottom: '0.2rem' }}>
-                          ONG #{p.ong_id}: {p.cantidad_aportada !== null ? `${p.cantidad_aportada} unidades (Confirmado)` : 'Invitación pendiente'}
+                          <strong>{obtenerNombreOng(p.ong_id)}</strong>: {p.cantidad_aportada !== null ? `${p.cantidad_aportada} unidades (Confirmado)` : 'Invitación pendiente'}
                         </li>
                       ))}
                     </ul>
