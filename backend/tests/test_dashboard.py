@@ -6,6 +6,8 @@ from services.dashboard_calculos import (
     a_csv,
     calcular_resumen_casos,
     calcular_tiempos_por_etapa,
+    cruzar_casos,
+    filas_dataset,
     inicio_de_casos,
     meses_anteriores,
     parsear_fecha_bonita,
@@ -130,3 +132,47 @@ def test_a_csv_incluye_encabezado_y_filas():
     texto = a_csv(["tipo", "cantidad"], [{"tipo": "Insumos", "cantidad": 5, "extra": "x"}])
 
     assert texto.splitlines() == ["tipo,cantidad", "Insumos,5"]
+
+
+def _proyecto(id, caso, estado, gravedad, cobertura=100.0):
+    return {"id": id, "caso_bonita": caso, "zona": f"Z{id}", "estado": estado, "gravedad": gravedad, "cobertura_pct": cobertura}
+
+
+def test_cruce_une_emergencias_locales_con_casos_de_bonita():
+    proyectos = [
+        _proyecto(1, "10", "monitoreo_finalizado", "alto"),
+        _proyecto(2, "11", "monitoreo_finalizado", "alto", 80.0),
+        _proyecto(3, "12", "adjudicada", "bajo"),
+        _proyecto(4, None, "creada", "bajo"),
+    ]
+    abiertos = [{"id": "12"}]
+    archivados = [
+        {"id": "90", "sourceObjectId": "10", "state": "completed", "start": "2026-11-01 00:00:00.000", "end_date": "2026-11-01 04:00:00.000"},
+        {"id": "91", "sourceObjectId": "11", "state": "completed", "start": "2026-11-01 00:00:00.000", "end_date": "2026-11-01 08:00:00.000"},
+    ]
+
+    cruce = cruzar_casos(proyectos, abiertos, archivados)
+
+    assert cruce["tiempo_por_gravedad"] == [{"gravedad": "alto", "casos": 2, "duracion_promedio_horas": 6.0}]
+    assert cruce["estados_casos"] == [{"estado_bonita": "completed", "cantidad": 2}, {"estado_bonita": "en_curso", "cantidad": 1}]
+    assert [f["emergencia_id"] for f in cruce["cobertura_vs_duracion"]] == [1, 2]
+    assert cruce["consistencia"] == []
+
+
+def test_cruce_detecta_inconsistencias_entre_la_base_local_y_bonita():
+    proyectos = [_proyecto(1, "10", "monitoreo_finalizado", "alto")]
+
+    cruce = cruzar_casos(proyectos, [{"id": "10"}], [])
+
+    assert cruce["consistencia"] == [
+        {"emergencia_id": 1, "caso_bonita": "10", "estado_local": "monitoreo_finalizado", "estado_bonita": "en_curso"}
+    ]
+
+
+def test_dataset_del_cruce_se_exporta():
+    reporte = {"kpis": {}, "bonita": {"cruce": cruzar_casos([], [], [])}}
+
+    columnas, filas = filas_dataset(reporte, "tiempo_por_gravedad")
+
+    assert columnas == ["gravedad", "casos", "duracion_promedio_horas"]
+    assert filas == []

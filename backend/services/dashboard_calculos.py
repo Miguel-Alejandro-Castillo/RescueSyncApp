@@ -125,6 +125,50 @@ def inicio_de_casos(casos_abiertos: list[dict], casos_archivados: list[dict]) ->
     return inicios
 
 
+CRUCE_VACIO = {"tiempo_por_gravedad": [], "estados_casos": [], "cobertura_vs_duracion": [], "consistencia": []}
+
+
+def cruzar_casos(proyectos: list[dict], casos_abiertos: list[dict], casos_archivados: list[dict], desde=None, hasta=None) -> dict:
+    """Une cada emergencia local (por bonitaCaseId) con su caso en Bonita."""
+    por_caso = {}
+    for caso in casos_abiertos:
+        por_caso[str(caso["id"])] = ("en_curso", None)
+    for caso in casos_archivados:
+        inicio, fin = parsear_fecha_bonita(caso.get("start")), parsear_fecha_bonita(caso.get("end_date"))
+        duracion = _horas(fin - inicio) if inicio and fin and caso.get("state") == "completed" else None
+        por_caso[str(caso.get("sourceObjectId") or caso["id"])] = (caso.get("state") or "desconocido", duracion)
+
+    filas = []
+    for proyecto in proyectos:
+        caso = por_caso.get(str(proyecto.get("caso_bonita")))
+        if caso is not None:
+            filas.append({**proyecto, "estado_bonita": caso[0], "duracion_horas": caso[1]})
+
+    por_gravedad: dict[str, list[float]] = {}
+    estados: dict[str, int] = {}
+    for fila in filas:
+        estados[fila["estado_bonita"]] = estados.get(fila["estado_bonita"], 0) + 1
+        if fila["duracion_horas"] is not None:
+            por_gravedad.setdefault(fila["gravedad"], []).append(fila["duracion_horas"])
+
+    return {
+        "tiempo_por_gravedad": [
+            {"gravedad": gravedad, "casos": len(v), "duracion_promedio_horas": round(sum(v) / len(v), 2)}
+            for gravedad, v in sorted(por_gravedad.items())
+        ],
+        "estados_casos": [{"estado_bonita": e, "cantidad": c} for e, c in sorted(estados.items())],
+        "cobertura_vs_duracion": [
+            {"emergencia_id": f["id"], "zona": f["zona"], "cobertura_pct": f["cobertura_pct"], "duracion_horas": f["duracion_horas"]}
+            for f in filas if f["duracion_horas"] is not None
+        ],
+        # Debe estar vacía: una emergencia finalizada localmente <=> su caso está completado en Bonita.
+        "consistencia": [
+            {"emergencia_id": f["id"], "caso_bonita": f["caso_bonita"], "estado_local": f["estado"], "estado_bonita": f["estado_bonita"]}
+            for f in filas if (f["estado"] == "monitoreo_finalizado") != (f["estado_bonita"] == "completed")
+        ],
+    }
+
+
 def meses_anteriores(ahora: datetime, cantidad: int) -> list[str]:
     """['AAAA-MM', ...] de los últimos `cantidad` meses (el actual al final)."""
     meses = []
@@ -141,10 +185,14 @@ DATASETS = {
     "suministros_por_tipo": ("suministros_por_tipo", ["tipo", "cantidad"]),
     "suministros_por_mes": ("suministros_por_mes", ["mes", "cantidad"]),
     "proyectos": ("proyectos", [
-        "id", "zona", "gravedad", "estado", "fecha_creacion", "lotes_total", "lotes_adjudicados",
+        "id", "caso_bonita", "zona", "gravedad", "estado", "fecha_creacion", "lotes_total", "lotes_adjudicados",
         "cobertura_pct", "ongs_adjudicadas", "ongs_finalizadas",
     ]),
     "etapas": (None, ["etapa", "promedio_horas", "minimo_horas", "maximo_horas", "muestras"]),
+    "tiempo_por_gravedad": (None, ["gravedad", "casos", "duracion_promedio_horas"]),
+    "estados_casos": (None, ["estado_bonita", "cantidad"]),
+    "cobertura_vs_duracion": (None, ["emergencia_id", "zona", "cobertura_pct", "duracion_horas"]),
+    "consistencia": (None, ["emergencia_id", "caso_bonita", "estado_local", "estado_bonita"]),
 }
 
 
@@ -155,7 +203,12 @@ def filas_dataset(reporte: dict, dataset: str) -> tuple[list[str], list[dict]]:
     if dataset not in DATASETS:
         raise ValueError("Dataset desconocido.")
     clave, columnas = DATASETS[dataset]
-    filas = reporte["bonita"].get("etapas", []) if dataset == "etapas" else reporte[clave]
+    if dataset == "etapas":
+        filas = reporte["bonita"].get("etapas", [])
+    elif clave is None:
+        filas = reporte["bonita"].get("cruce", CRUCE_VACIO)[dataset]
+    else:
+        filas = reporte[clave]
     return columnas, filas
 
 
