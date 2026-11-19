@@ -7,10 +7,29 @@ from models.oferta import Oferta
 from models.lote import Lote
 from models.emergencia import Emergencia
 from services.validacion_ofertas import (
-    ConvocatoriaAbierta, guardar_resultado, identificador_reserva, preparar_solicitud,
+    ConvocatoriaAbierta,
+    guardar_resultado,
+    identificador_reserva, preparar_solicitud,
+    obtener_reservas_no_adjudicadas
 )
 
 router = APIRouter(tags=['Validación de ofertas'])
+
+@router.get(
+    '/integraciones/bonita/casos/{caso_id}/reservas/no-adjudicadas',
+    dependencies=[Depends(require_roles(USUARIO_BONITA))],
+)
+def reservas_no_adjudicadas(
+    caso_id: str,
+    session: Session = Depends(get_session),
+):
+    emergencia = caso_integracion(caso_id, session)
+    try:
+        resultado = obtener_reservas_no_adjudicadas(session, emergencia.id)
+        resultado["caso_id"] = caso_id
+        return resultado
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
 
 
 def caso_integracion(caso_id, session):

@@ -12,7 +12,7 @@ from dependencies.rbac import (
 from services.bonita_service import BonitaService
 from models.emergencia import Emergencia, EmergenciaEstado
 from models.lote import Lote, LoteEstado
-from models.oferta import Oferta
+from models.oferta import Oferta, OfertaEstado
 from models.participante_oferta import ParticipanteOferta
 
 router = APIRouter(
@@ -106,13 +106,13 @@ def calcular_fecha_limite(nivel_gravedad: str, fecha_inicio: datetime) -> dateti
 
 def calcular_fecha_limite_demo(nivel_gravedad: str, fecha_inicio: datetime) -> datetime:
     minutos_map = {
-        "critico": 2,
-        "alto": 4,
-        "medio": 6,
-        "bajo": 8
+        "critico": 4,
+        "alto": 8,
+        "medio": 12,
+        "bajo": 16
     }
 
-    minutos = minutos_map.get(nivel_gravedad.lower(), 8)
+    minutos = minutos_map.get(nivel_gravedad.lower(), 10)
     return fecha_inicio + timedelta(minutes=minutos)
 
 def calcular_diferencia_ms(fecha_limite: datetime, fecha_actual: datetime) -> int:
@@ -410,6 +410,26 @@ def delete_lote(
     session.commit()
     return {"ok": True}
 
+def obtener_cantidad_visible(oferta, participante):
+    if oferta.estado_validacion == OfertaEstado.PENDIENTE:
+        return participante.cantidad_aportada
+
+    resultado_validacion = oferta.resultado_validacion or {}
+    participantes_validados = resultado_validacion.get("participantes") or []
+
+    participante_validado = next(
+        (
+            item for item in participantes_validados
+            if item.get("participante_id") == participante.id
+        ),
+        None,
+    )
+
+    if participante_validado is None:
+        return 0
+
+    return int(participante_validado.get("cantidad_verificada", 0))
+
 @router.get(
     "/{lote_id}/ofertas",
     response_model=list[OfertaLoteResponse],
@@ -442,9 +462,9 @@ def get_ofertas_lote(
                 id=participante.id,
                 ong_id=participante.ong_id,
                 ong_name="ONG " + str(participante.ong_id),
-                cantidad_aportada=participante.cantidad_aportada
+                cantidad_aportada= obtener_cantidad_visible(oferta, participante) # convertir cantidad_verificada en entero
             ) for participante in participantes]
-        )
+        )   
         ofertas_response.append(oferta_response)
 
     return ofertas_response
