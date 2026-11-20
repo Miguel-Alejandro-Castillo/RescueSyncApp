@@ -1,4 +1,4 @@
-from services.validacion_ofertas import bloquear_decisiones, descartar_ofertas
+import json
 import os
 from datetime import datetime, timedelta, timezone
 from dependencies.bonita import get_bonita_service
@@ -10,6 +10,11 @@ from dependencies.rbac import (
     require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES
 )
 from services.bonita_service import BonitaService
+from services.decisiones_convocatoria import (
+    DecisionOfertasInvalidasEmergencia, clasificar_lotes_invalidos, lotes_pendientes,
+    ofertas_vigentes, validacion_completa, validar_decision,
+)
+from services.validacion_ofertas import bloquear_decisiones, descartar_ofertas, resultado_guardado, utc
 from models.emergencia import Emergencia, EmergenciaEstado
 from models.lote import Lote, LoteEstado
 from models.oferta import Oferta, OfertaEstado
@@ -339,6 +344,77 @@ async def reformular_lotes(
             detail=str(e)
         )
     return lotes_creados
+
+
+@router.get("/emergencias/decisiones-pendientes", dependencies=[Depends(require_roles(CENTRO_COORDINADOR))])
+def decisiones_pendientes(session: Session = Depends(get_session)):
+    emergencias = session.exec(select(Emergencia).where(
+        Emergencia.estado == EmergenciaEstado.CONVOCATORIA_CERRADA,
+    )).all()
+    ahora = datetime.now(timezone.utc)
+    pendientes = []
+    for emergencia in emergencias:
+        lotes = lotes_pendientes(session, emergencia.id)
+        ofertas = ofertas_vigentes(session, lotes)
+        if (not lotes or any(utc(lote.fechaLimiteConvocatoria) >= ahora for lote in lotes)
+                or not validacion_completa(ofertas)
+                or resultado_guardado(session, emergencia.id)["cobertura_suficiente"]):
+            continue
+        invalidos, reabribles = clasificar_lotes_invalidos(ofertas)
+        pendientes.append({
+            "id": emergencia.id,
+            "zona": emergencia.zonaAfectada,
+            "lotes_invalidos": sorted(invalidos),
+            "lotes_reabribles": sorted(reabribles),
+            "lotes_sin_ofertas": sorted({lote.id for lote in lotes} - {oferta.lote_id for oferta in ofertas}),
+        })
+    return pendientes
+
+
+@router.post(
+    "/emergencias/{emergencia_id}/decision-invalidas",
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_roles(CENTRO_COORDINADOR))]
+)
+async def decidir_ofertas_invalidas_emergencia(
+    emergencia_id: int,
+    payload: DecisionOfertasInvalidasEmergencia,
+    bonita: BonitaService = Depends(get_bonita_service),
+    session: Session = Depends(get_session),
+):
+    emergencia = session.get(Emergencia, emergencia_id)
+    if not emergencia:
+        raise HTTPException(404, "La emergencia no existe.")
+    caso_id = emergencia.bonitaCaseId
+    if not caso_id:
+        raise HTTPException(409, "Esta emergencia no tiene un caso asociado en Bonita.")
+
+    bloquear_decisiones(session, emergencia_id)
+    session.refresh(emergencia)
+    validar_decision(session, emergencia, payload)
+    ahora = datetime.now(timezone.utc)
+    ventana_ms = calcular_diferencia_ms(calcular_fecha_limite_demo(emergencia.nivelGravedad, ahora), ahora)
+    # Bonita vuelve a consultar el backend al ejecutar la tarea. Soltar el bloqueo antes de llamarla.
+    session.rollback()
+
+    tareas = await bonita.obtener_tareas_humanas_por_caso(caso_id)
+    tarea = next((t for t in tareas if t["name"].strip() == TAREA_DECISION), None)
+    if not tarea:
+        raise HTTPException(409, "El caso no está esperando la decisión del coordinador en Bonita.")
+    tarea_id = str(tarea["id"])
+    if payload.accion == "parcial":
+        contrato = {"accionSeleccionadaInput": "ACEPTAR_OFERTAS", "loteIdInput": ""}
+        siguiente_tarea = "Adjudicar ofertas y notificar a ONGs"
+    else:
+        await bonita.set_case_variable(caso_id, "ventana_tiempo_ms", "java.lang.Long", ventana_ms)
+        decision = {**payload.model_dump(), "tarea_id": tarea_id, "ventana_ms": ventana_ms}
+        # Las cantidades se aplican en la misma operación que confirma las liberaciones.
+        contrato = {"accionSeleccionadaInput": "PUBLICAR_CONVOCATORIA", "loteIdInput": json.dumps(decision)}
+        siguiente_tarea = TAREA_OFERTAR
+    await bonita.completar_tarea_humana(tarea_id, contrato)
+    await bonita.esperar_tareas_humanas_por_caso(caso_id, nombre_esperado=siguiente_tarea)
+    return {"mensaje": "La decisión de la emergencia se aplicó correctamente."}
+
 
 @router.post(
     "/reabrir",

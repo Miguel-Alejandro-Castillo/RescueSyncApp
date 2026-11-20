@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
+from pydantic import BaseModel
 from sqlmodel import Session, select
 from sqlalchemy.exc import OperationalError
 from database import get_session
@@ -6,8 +7,13 @@ from dependencies.rbac import require_roles, USUARIO_BONITA
 from models.oferta import Oferta
 from models.lote import Lote
 from models.emergencia import Emergencia
+from services.decisiones_convocatoria import (
+    DecisionConvocatoriaBonita, abrir_nueva_convocatoria, decision_ya_aplicada,
+    iniciar_adjudicacion, ofertas_vigentes, validar_decision,
+)
 from services.validacion_ofertas import (
     ConvocatoriaAbierta,
+    bloquear_decisiones,
     guardar_resultado,
     identificador_reserva, preparar_solicitud,
     obtener_reservas_no_adjudicadas
@@ -37,6 +43,45 @@ def caso_integracion(caso_id, session):
     if not emergencia:
         raise HTTPException(404, 'El caso no tiene una emergencia asociada')
     return emergencia
+
+
+@router.post('/integraciones/bonita/casos/{caso_id}/reservas-decision',
+             dependencies=[Depends(require_roles(USUARIO_BONITA))])
+def reservas_decision(caso_id: str, decision: DecisionConvocatoriaBonita,
+                      session: Session = Depends(get_session)):
+    emergencia = caso_integracion(caso_id, session)
+    bloquear_decisiones(session, emergencia.id)
+    session.refresh(emergencia)
+    if decision_ya_aplicada(session, emergencia, decision.tarea_id):
+        return []
+    lotes, _ = validar_decision(session, emergencia, decision)
+    return [datos_reserva(emergencia, lote, ofertas_vigentes(session, [lote])) for lote in lotes]
+
+
+@router.post('/integraciones/bonita/casos/{caso_id}/convocatoria-decidida',
+             dependencies=[Depends(require_roles(USUARIO_BONITA))], status_code=204)
+def convocatoria_decidida(caso_id: str, decision: DecisionConvocatoriaBonita,
+                          session: Session = Depends(get_session)):
+    emergencia = caso_integracion(caso_id, session)
+    bloquear_decisiones(session, emergencia.id)
+    session.refresh(emergencia)
+    abrir_nueva_convocatoria(session, emergencia, decision)
+    return Response(status_code=204)
+
+
+class InicioAdjudicacion(BaseModel):
+    parcial: bool
+
+
+@router.post('/integraciones/bonita/casos/{caso_id}/inicio-adjudicacion',
+             dependencies=[Depends(require_roles(USUARIO_BONITA))], status_code=204)
+def adjudicacion_iniciada(caso_id: str, data: InicioAdjudicacion,
+                          session: Session = Depends(get_session)):
+    emergencia = caso_integracion(caso_id, session)
+    bloquear_decisiones(session, emergencia.id)
+    session.refresh(emergencia)
+    iniciar_adjudicacion(session, emergencia, data.parcial)
+    return Response(status_code=204)
 
 
 @router.get('/integraciones/bonita/casos/{caso_id}/solicitud-validacion', dependencies=[Depends(require_roles(USUARIO_BONITA))])
@@ -75,6 +120,10 @@ def reservas_caso(caso_id: str, lote_id: int,
     )).all()
     if not any(o.tarea_bonita_descarte for o in ofertas):
         raise HTTPException(409, 'El lote no tiene un descarte pendiente')
+    return datos_reserva(emergencia, lote, ofertas)
+
+
+def datos_reserva(emergencia, lote, ofertas):
     validadas = [o for o in ofertas if o.validada_en is not None and o.resultado_validacion]
     reservas = {
         o.resultado_validacion.get('reserva_id') or identificador_reserva(

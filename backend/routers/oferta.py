@@ -9,7 +9,7 @@ from dependencies.rbac import (
 )
 from models.emergencia import Emergencia, EmergenciaEstado
 from models.lote import Lote, LoteEstado
-from models.oferta import Oferta, OfertaEstado
+from models.oferta import Oferta
 from models.participante_oferta import ParticipanteOferta
 from models.adjudicacion import Adjudicacion
 from models.adjudicacion_detalle import AdjudicacionDetalle
@@ -47,12 +47,6 @@ class AdjudicacionDetalleRequest(BaseModel):
 
 class AdjudicacionRequest(BaseModel):
     detalles: list[AdjudicacionDetalleRequest]
-
-class AccionOfertaInvalida(BaseModel):
-    accion: str
-
-ACCIONES_OFERTA_INVALIDA = ["reabrir", "reformular", "parcial"]
-
 
 async def obtener_cuit_aporte(bonita, user_id):
     try:
@@ -735,79 +729,18 @@ def get_oferta_detalle(oferta_id: int, session: Session = Depends(get_session)):
 )
 async def confirmar_accion_oferta_invalida(
     oferta_id: int,
-    data: AccionOfertaInvalida,
     session: Session = Depends(get_session),
-    bonita: BonitaService = Depends(get_bonita_service),
 ):
-    if data.accion not in ACCIONES_OFERTA_INVALIDA:
-        raise HTTPException(status_code=422, detail="La acción no es válida.")
-
     oferta = session.get(Oferta, oferta_id)
     if not oferta:
         raise HTTPException(status_code=404, detail="La oferta no existe.")
-
-    lote_oferta = session.get(Lote, oferta.lote_id)
-    emergencia = session.get(Emergencia, lote_oferta.emergenciaId)
-    bloquear_decisiones(session, emergencia.id)
-    session.refresh(oferta)
-    session.refresh(lote_oferta)
-    exigir_oferta_activa(oferta, lote_oferta)
-    if oferta.valida:
-        raise HTTPException(status_code=400, detail="La oferta es válida, no requiere acción.")
-
-    if oferta.accion_tomada:
-        raise HTTPException(status_code=400, detail="Ya se confirmó una acción para esta oferta.")
-
-    if data.accion == "parcial":
-        resultado = oferta.resultado_validacion
-        if not resultado or oferta.estado_validacion == OfertaEstado.PENDIENTE:
-            raise HTTPException(status_code=409, detail="Primero debe completarse la consulta de recursos para aceptar una cantidad parcial.")
-        participantes_validados = resultado.get('participantes', [])
-        cantidad_verificada = sum(p.get('cantidad_verificada', 0) for p in participantes_validados)
-        if cantidad_verificada <= 0:
-            raise HTTPException(status_code=400, detail="No hay recursos disponibles para aceptar una cobertura parcial.")
-        # Conservar lo prometido y aceptar sólo la cantidad respaldada por inventario.
-        resultado = dict(resultado)
-        resultado['cantidad_aceptada'] = cantidad_verificada
-        resultado['participantes'] = [{**p, 'cantidad_aceptada': p['cantidad_verificada']}
-                                     for p in participantes_validados]
-        oferta.resultado_validacion = resultado
-
-    oferta.accion_tomada = data.accion
-    session.add(oferta)
-
-    if data.accion == "parcial":
-        ahora = datetime.now(timezone.utc)
-        lotes = session.exec(
-            select(Lote).where(
-                Lote.emergenciaId == lote_oferta.emergenciaId,
-                Lote.estado != LoteEstado.REFORMULADO
-            )
-        ).all()
-        for lote in lotes:
-            if lote.estado == LoteEstado.ADJUDICADO:
-                continue
-            fecha_limite = lote.fechaLimiteConvocatoria
-            if fecha_limite.tzinfo is None:
-                fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
-            if fecha_limite > ahora:
-                lote.fechaLimiteConvocatoria = ahora
-            lote.estado = LoteEstado.EN_ADJUDICACION
-            session.add(lote)
-
-    if data.accion == "parcial":
-        if not emergencia or not emergencia.bonitaCaseId:
-            session.rollback()
-            raise HTTPException(409, "Esta emergencia no tiene un caso asociado en Bonita.")
-        try:
-            await bonita.resolver_accion_coordinador(emergencia.bonitaCaseId, "ACEPTAR_OFERTAS")
-        except Exception:
-            session.rollback()
-            raise
-
-    session.commit()
-
-    return {"mensaje": "Acción confirmada correctamente."}
+    lote = session.get(Lote, oferta.lote_id)
+    if not lote:
+        raise HTTPException(status_code=404, detail="El lote de la oferta no existe.")
+    raise HTTPException(
+        status_code=409,
+        detail=f"Las decisiones se toman por emergencia completa. Use POST /lotes/emergencias/{lote.emergenciaId}/decision-invalidas.",
+    )
 
 class AdjudicacionDetalleRequest(BaseModel):
     participante_id: int
@@ -837,8 +770,8 @@ async def adjudicar_ofertas(
         )
     bloquear_decisiones(session, lote.emergenciaId)
     session.refresh(lote)
-    if lote.estado == LoteEstado.REFORMULADO:
-        raise HTTPException(409, "El lote ya fue reformulado.")
+    if lote.estado != LoteEstado.EN_ADJUDICACION:
+        raise HTTPException(409, "El lote no está en adjudicación.")
 
     # Validar cantidades antes de realizar modificaciones
     total_adjudicado = 0

@@ -187,23 +187,21 @@ async def notificar_por_timeout(
     if not emergencia:
         raise HTTPException(status_code=404, detail="Emergencia no encontrada")
 
+    if emergencia.estado != EmergenciaEstado.PUBLICADA:
+        return Response(status_code=204)
+
     ahora = datetime.now(timezone.utc)
-    lotes = session.exec(
-        select(Lote).where(
-            Lote.emergenciaId == emergencia.id,
-            Lote.estado != LoteEstado.REFORMULADO
-        )
-    ).all()
+    lotes = session.exec(select(Lote).where(
+        Lote.emergenciaId == emergencia.id,
+        Lote.estado.notin_([LoteEstado.REFORMULADO, LoteEstado.ADJUDICADO]),
+    )).all()
     for lote in lotes:
-        if lote.estado == LoteEstado.ADJUDICADO:
-            continue
         fecha_limite = lote.fechaLimiteConvocatoria
         if fecha_limite.tzinfo is None:
             fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
         if fecha_limite > ahora:
             lote.fechaLimiteConvocatoria = ahora
-        lote.estado = LoteEstado.EN_ADJUDICACION
-        session.add(lote)
+            session.add(lote)
 
     emergencia.estado = EmergenciaEstado.CONVOCATORIA_CERRADA
     session.commit()

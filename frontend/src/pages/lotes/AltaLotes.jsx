@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import SeleccionarEmergencia from './SeleccionarEmergencia';
 import ConfirmModal from '../../components/ConfirmModal';
-import { obtenerEmergenciaPorId, crearLotes, reformularLotes, obtenerOfertaDetalle } from '../../services/lotesService';
+import { obtenerEmergenciaPorId, obtenerLotesEmergencia, crearLotes, reformularLotes, reformularLotesEmergencia, obtenerOfertaDetalle } from '../../services/lotesService';
 import { EMERGENCIA_ESTADOS } from '../../constants/emergencia';
 import { NIVELES_GRAVEDAD, getNivelGravedadLabel, normalizeNivelGravedad } from '../../constants/gravedad';
 import { RECURSOS_POR_TIPO, TIPOS_RECURSOS } from '../../constants/lote';
@@ -20,6 +20,9 @@ const FormularioLotes = () => {
     const navigate = useNavigate();
     const emergenciaId = searchParams.get('emergenciaId');
     const ofertaId = searchParams.get('ofertaId');
+    const reformularEmergencia = searchParams.get('reformularEmergencia') === 'true';
+    const loteIdsParam = searchParams.get('loteIds') || '';
+    const loteIds = loteIdsParam.split(',').filter(Boolean).map(Number);
 
     const [emergenciaSeleccionada, setEmergenciaSeleccionada] = useState(null);
     const [loadingEmergencia, setLoadingEmergencia] = useState(false);
@@ -58,24 +61,39 @@ const FormularioLotes = () => {
         const promesas = [obtenerEmergenciaPorId(emergenciaId)];
         if (ofertaId) {
             promesas.push(obtenerOfertaDetalle(ofertaId));
+        } else if (reformularEmergencia) {
+            promesas.push(obtenerLotesEmergencia(emergenciaId));
         }
 
         Promise.all(promesas)
-            .then(([dataEmergencia, dataOferta]) => {
-                if (!ofertaId && dataEmergencia.estado !== EMERGENCIA_ESTADOS.CREADA) {
+            .then(([dataEmergencia, detalle]) => {
+                if (!ofertaId && !reformularEmergencia && dataEmergencia.estado !== EMERGENCIA_ESTADOS.CREADA) {
                     setError('La emergencia seleccionada no se encuentra pendiente de desglose.');
                     return;
                 }
                 setEmergenciaSeleccionada(dataEmergencia);
-                if (dataOferta) {
+                if (ofertaId && detalle) {
                     setLotes([
                         {
-                            tipoRecurso: dataOferta.lote_tipo,
-                            descripcion: dataOferta.lote_descripcion,
-                            cantidad: dataOferta.lote_cantidad,
-                            recurso_codigo: dataOferta.lote_recurso_codigo || null
+                            tipoRecurso: detalle.lote_tipo,
+                            descripcion: detalle.lote_descripcion,
+                            cantidad: detalle.lote_cantidad,
+                            recurso_codigo: detalle.lote_recurso_codigo || null
                         }
                     ]);
+                } else if (reformularEmergencia) {
+                    const lotesInvalidos = (detalle || []).filter(lote => loteIds.includes(lote.id) && lote.estado !== 'reformulado');
+                    if (!lotesInvalidos.length) {
+                        setError('La emergencia no tiene lotes inválidos para reformular.');
+                        return;
+                    }
+                    setLotes(lotesInvalidos.map(lote => ({
+                        id: lote.id,
+                        tipoRecurso: lote.tipoRecurso,
+                        descripcion: lote.descripcion,
+                        cantidad: lote.cantidad,
+                        recurso_codigo: lote.recurso_codigo || null,
+                    })));
                 }
             })
             .catch((err) => {
@@ -84,7 +102,7 @@ const FormularioLotes = () => {
             .finally(() => {
                 setLoadingEmergencia(false);
             });
-    }, [emergenciaId, ofertaId]);
+    }, [emergenciaId, ofertaId, reformularEmergencia, loteIdsParam]);
 
     const handleAddLote = () => {
         setLotes([
@@ -162,6 +180,12 @@ const FormularioLotes = () => {
             setSaving(true);
             if (ofertaId) {
                 await reformularLotes({ ofertaId: Number(ofertaId), lotes: payload.lotes });
+            } else if (reformularEmergencia) {
+                await reformularLotesEmergencia({
+                    emergenciaId: Number(emergenciaId),
+                    lote_ids: lotes.map(lote => lote.id),
+                    lotes: lotes.map(lote => ({ lote_id: lote.id, cantidad: Number(lote.cantidad) })),
+                });
             } else {
                 await crearLotes(payload);
             }
@@ -174,7 +198,7 @@ const FormularioLotes = () => {
     };
 
     if (error) {
-        return <div className="panel"><p className="notice notice-error" role="alert">{error}</p><Link className="btn btn-outline-secondary" to="/lotes/nuevo">Elegir otra emergencia</Link></div>;
+        return <div className="panel"><p className="notice notice-error" role="alert">{error}</p><Link className="btn btn-outline-secondary" to={reformularEmergencia ? '/ofertas-invalidas' : '/lotes/nuevo'}>{reformularEmergencia ? 'Volver a ofertas inválidas' : 'Elegir otra emergencia'}</Link></div>;
     }
 
     if (loadingEmergencia || !emergenciaSeleccionada) {
@@ -188,7 +212,7 @@ const FormularioLotes = () => {
                     <div className="panel">
                         <div className={styles.content}>
                             <h1 className={styles.title}>
-                                {ofertaId ? 'Reformular lotes y abrir convocatoria' : 'Crear lotes y abrir convocatoria'}
+                                {ofertaId ? 'Reformular lote y abrir convocatoria' : reformularEmergencia ? 'Reformular cantidades' : 'Crear lotes y abrir convocatoria'}
                             </h1>
 
                             <ValidatedForm key={lotes.length} onSubmit={handleSubmit} aria-busy={saving}>
@@ -210,9 +234,9 @@ const FormularioLotes = () => {
 
                                 <div className={styles.row}>
                                     <h5 className="mb-0 fw-bold">
-                                        {ofertaId ? 'Lote de necesidad a modificar' : 'Lotes de recursos requeridos'}
+                                            {ofertaId ? 'Lote de necesidad a modificar' : reformularEmergencia ? 'Cantidades de lotes inválidos' : 'Lotes de recursos requeridos'}
                                     </h5>
-                                    {!ofertaId && (
+                                    {!ofertaId && !reformularEmergencia && (
                                         <button
                                             type="button"
                                             className="btn btn-outline-secondary"
@@ -227,7 +251,7 @@ const FormularioLotes = () => {
                                     <div key={index} className={styles.lote}>
                                         <div className={styles.row}>
                                             <span className="badge bg-secondary">Lote #{index + 1}</span>
-                                            {!ofertaId && lotes.length > 1 && (
+                                            {!ofertaId && !reformularEmergencia && lotes.length > 1 && (
                                                 <button
                                                     type="button"
                                                     className="btn btn-outline-danger btn-sm border-0"
@@ -248,7 +272,7 @@ const FormularioLotes = () => {
                                                     data-validation-key={`tipo-${index}`}
                                                     value={lote.tipoRecurso}
                                                     onChange={(e) => handleTipoRecursoChange(index, e)}
-                                                    disabled={Boolean(ofertaId)}
+                                                    disabled={Boolean(ofertaId || reformularEmergencia)}
                                                     required
                                                 >
                                                     {TIPOS_RECURSOS.map((tipo) => (
@@ -267,7 +291,7 @@ const FormularioLotes = () => {
                                                     data-validation-key={`descripcion-${index}`}
                                                     value={lote.descripcion}
                                                     onChange={(e) => handleLoteChange(index, e)}
-                                                    disabled={Boolean(ofertaId)}
+                                                    disabled={Boolean(ofertaId || reformularEmergencia)}
                                                     required
                                                  >
                                                     {(RECURSOS_POR_TIPO[lote.tipoRecurso] || []).map((recurso) => (
@@ -299,12 +323,12 @@ const FormularioLotes = () => {
                                 ))}
 
                                 <div className="form-actions">
-                                    <Link className="btn btn-outline-secondary" to="/lotes/nuevo">Elegir otra emergencia</Link>
+                                    <Link className="btn btn-outline-secondary" to={reformularEmergencia ? '/ofertas-invalidas' : '/lotes/nuevo'}>{reformularEmergencia ? 'Volver a ofertas inválidas' : 'Elegir otra emergencia'}</Link>
                                     <button
                                         type="submit"
                                         className="btn btn-primary"
                                     >
-                                        {saving ? 'Publicando…' : 'Publicar lotes y abrir convocatoria'}
+                                        {saving ? 'Guardando.' : reformularEmergencia ? 'Confirmar nuevas cantidades' : 'Publicar lotes y abrir convocatoria'}
                                     </button>
                                 </div>
                                 </fieldset>
@@ -317,13 +341,13 @@ const FormularioLotes = () => {
 
             <ConfirmModal
                 isOpen={showModal}
-                title={ofertaId ? 'Reformular lotes' : 'Publicar convocatoria'}
+                title={ofertaId || reformularEmergencia ? 'Reformular lotes' : 'Publicar convocatoria'}
                 message={
-                    ofertaId
+                    ofertaId || reformularEmergencia
                         ? '¿Confirma la reformulación de los lotes y la apertura de una nueva convocatoria? Esto liberará los recursos previamente reservados en la API Nacional.'
                         : '¿Confirma la publicación de estos lotes y la apertura de la convocatoria para recibir ofertas?'
                 }
-                confirmText={ofertaId ? 'Reformular y abrir' : 'Publicar y abrir'}
+                confirmText={ofertaId || reformularEmergencia ? 'Reformular y abrir' : 'Publicar y abrir'}
                 onConfirm={handleConfirmSubmit}
                 onCancel={() => setShowModal(false)}
             />

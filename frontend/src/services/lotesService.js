@@ -39,6 +39,24 @@ export const reabrirConvocatoria = ofertaId => request('/lotes/reabrir', {
   body: JSON.stringify({ ofertaId }),
 });
 
+export const obtenerLotesEmergencia = emergenciaId => request(`/lotes?emergenciaId=${encodeURIComponent(emergenciaId)}`);
+
+export const obtenerDecisionesPendientes = () => request('/lotes/emergencias/decisiones-pendientes');
+
+export const decidirOfertasInvalidasEmergencia = (emergenciaId, payload) => request(
+  `/lotes/emergencias/${encodeURIComponent(emergenciaId)}/decision-invalidas`,
+  {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }
+);
+
+export const reformularLotesEmergencia = payload => decidirOfertasInvalidasEmergencia(
+  payload.emergenciaId,
+  { accion: 'reformular', lote_ids: payload.lote_ids, lotes: payload.lotes }
+);
+
 export const obtenerLote = loteId => request(`/lotes/${encodeURIComponent(loteId)}`);
 
 export const obtenerOfertaDetalle = ofertaId => request(`/ofertas/${encodeURIComponent(ofertaId)}/detalle`);
