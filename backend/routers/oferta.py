@@ -361,28 +361,7 @@ def get_mis_ofertas_consorcio(
     ong_id_actual = int(current_user['user_id'])
     ahora = datetime.now(timezone.utc)
 
-    # Eliminar invitaciones pendientes (cantidad_aportada es None) 
-    # cuyos lotes ya hayan expirado.
-    stmt_pendientes = select(ParticipanteOferta).where(ParticipanteOferta.cantidad_aportada.is_(None))
-    participantes_pendientes = session.exec(stmt_pendientes).all()
-    
-    hubo_cambios = False
-    for p in participantes_pendientes:
-        oferta = session.get(Oferta, p.oferta_id)
-        if not oferta:
-            continue
-        lote = session.get(Lote, oferta.lote_id)
-        if lote and lote.fechaLimiteConvocatoria:
-            fecha_limite = lote.fechaLimiteConvocatoria
-            if fecha_limite.tzinfo is None:
-                fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
-            if ahora > fecha_limite:
-                session.delete(p)
-                hubo_cambios = True
-    if hubo_cambios:
-        session.commit()
-
-    # 2. Consultar participaciones actuales de la ONG
+    # 1. Consultar participaciones actuales de la ONG (solo lectura, sin escrituras en BDD)
     stmt_participaciones = select(ParticipanteOferta).where(ParticipanteOferta.ong_id == ong_id_actual)
     participaciones = session.exec(stmt_participaciones).all()
     ofertas_ids = [p.oferta_id for p in participaciones]
@@ -399,14 +378,12 @@ def get_mis_ofertas_consorcio(
         emergencia = session.get(Emergencia, lote.emergenciaId) if lote else None
         
         # Validar vigencia del lote
-        vigente = True
+        vigente = False
         if lote and lote.fechaLimiteConvocatoria:
             fecha_limite = lote.fechaLimiteConvocatoria
             if fecha_limite.tzinfo is None:
                 fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
             vigente = (lote.estado != LoteEstado.REFORMULADO and ahora <= fecha_limite)
-        else:
-            vigente = False
 
         stmt_parts = select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta.id)
         todos_participantes = session.exec(stmt_parts).all()
@@ -414,20 +391,14 @@ def get_mis_ofertas_consorcio(
         es_lider = (oferta.ong_lider_id == ong_id_actual)
         mi_participacion = next((p for p in todos_participantes if p.ong_id == ong_id_actual), None)
         
-        # Si es una invitación pendiente y el lote ya expiró, la saltamos
+        # Red de seguridad visual: si venció hace segundos y Bonita aún no corrió el conector, igual no la mostramos
         if not es_lider and mi_participacion and mi_participacion.cantidad_aportada is None and not vigente:
             continue
 
-        # Si NO soy el líder y SÍ tengo una invitación pendiente válida, 
-        # permitimos que se muestre para que pueda aceptarla o rechazarla.
         es_invitacion_pendiente = (not es_lider and mi_participacion and mi_participacion.cantidad_aportada is None)
 
         if not es_invitacion_pendiente:
-            # Si no es una invitación pendiente para mí, aplicamos la regla de los consorcios:
-            # Contamos cuántas ONGs tienen un aporte confirmado (distinto de None)
             participantes_confirmados = [p for p in todos_participantes if p.cantidad_aportada is not None]
-            
-            # Si hay menos de 2 participantes confirmados, es una oferta individual y la ocultamos de consorcios
             if len(participantes_confirmados) < 2:
                 continue
 
@@ -991,3 +962,51 @@ async def adjudicar_ofertas(
         ) from error
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/limpiar-invitaciones-vencidas",
+    status_code=status.HTTP_200_OK,
+    # Si tienen alguna dependencia para validar llamadas internas desde Bonita, agregala acá:
+    # dependencies=[Depends(verificar_api_key_bonita)] 
+)
+def limpiar_invitaciones_vencidas_bonita(
+    session: Session = Depends(get_session)
+):
+    """
+    Endpoint invocado por un Timer/Conector REST de Bonita BPM al vencer
+    el plazo de convocatoria para eliminar invitaciones pendientes huérfanas.
+    """
+    ahora = datetime.now(timezone.utc)
+    
+    stmt_pendientes = select(ParticipanteOferta).where(
+        ParticipanteOferta.cantidad_aportada.is_(None)
+    )
+    participantes_pendientes = session.exec(stmt_pendientes).all()
+    
+    eliminados = 0
+    for p in participantes_pendientes:
+        oferta = session.get(Oferta, p.oferta_id)
+        if not oferta:
+            session.delete(p)
+            eliminados += 1
+            continue
+            
+        lote = session.get(Lote, oferta.lote_id)
+        if lote and lote.fechaLimiteConvocatoria:
+            fecha_limite = lote.fechaLimiteConvocatoria
+            if fecha_limite.tzinfo is None:
+                fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
+            
+            # Si ya venció el plazo o el lote fue reformulado, limpiamos la invitación
+            if ahora > fecha_limite or lote.estado == LoteEstado.REFORMULADO:
+                session.delete(p)
+                eliminados += 1
+
+    if eliminados > 0:
+        session.commit()
+
+    return {
+        "mensaje": "Limpieza de invitaciones vencidas ejecutada correctamente.",
+        "invitaciones_eliminadas": eliminados
+    }
