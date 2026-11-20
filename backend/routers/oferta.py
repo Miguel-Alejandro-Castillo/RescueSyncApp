@@ -785,12 +785,15 @@ async def confirmar_accion_oferta_invalida(
             )
         ).all()
         for lote in lotes:
+            if lote.estado == LoteEstado.ADJUDICADO:
+                continue
             fecha_limite = lote.fechaLimiteConvocatoria
             if fecha_limite.tzinfo is None:
                 fecha_limite = fecha_limite.replace(tzinfo=timezone.utc)
             if fecha_limite > ahora:
                 lote.fechaLimiteConvocatoria = ahora
-                session.add(lote)
+            lote.estado = LoteEstado.EN_ADJUDICACION
+            session.add(lote)
 
     if data.accion == "parcial":
         if not emergencia or not emergencia.bonitaCaseId:

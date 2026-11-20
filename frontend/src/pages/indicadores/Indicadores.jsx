@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis, ZAxis,
 } from 'recharts';
 import { exportarIndicadores, obtenerIndicadores } from '../../services/indicadoresService';
 import styles from './Indicadores.module.css';
@@ -14,6 +14,7 @@ const ESTADOS = {
   adjudicada: 'Adjudicada',
   monitoreo_finalizado: 'Finalizada',
 };
+const ESTADOS_BONITA = { en_curso: 'En curso', completed: 'Finalizado', cancelled: 'Cancelado', aborted: 'Abortado' };
 const DATASETS = [
   { valor: 'completo', etiqueta: 'Reporte completo (solo JSON)' },
   { valor: 'resumen', etiqueta: 'Resumen de indicadores' },
@@ -21,6 +22,10 @@ const DATASETS = [
   { valor: 'suministros_por_tipo', etiqueta: 'Suministros por tipo' },
   { valor: 'suministros_por_mes', etiqueta: 'Suministros por mes' },
   { valor: 'etapas', etiqueta: 'Tiempos por etapa (Bonita)' },
+  { valor: 'tiempo_por_gravedad', etiqueta: 'Duración por gravedad (Bonita + BD)' },
+  { valor: 'estados_casos', etiqueta: 'Estados de casos (Bonita)' },
+  { valor: 'cobertura_vs_duracion', etiqueta: 'Cobertura vs duración (Bonita + BD)' },
+  { valor: 'consistencia', etiqueta: 'Consistencia BD vs Bonita' },
 ];
 const TOOLTIP_STYLE = {
   contentStyle: { background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--ink)' },
@@ -99,6 +104,8 @@ export default function Indicadores() {
   const proyectos = useMemo(() => (datos?.proyectos ?? []).filter(p => !estadoFiltro || p.estado === estadoFiltro), [datos, estadoFiltro]);
   const bonita = datos?.bonita;
   const kpis = datos?.kpis;
+  const cruce = bonita?.cruce ?? {};
+  const estadosCasos = (cruce.estados_casos ?? []).map(item => ({ ...item, nombre: ESTADOS_BONITA[item.estado_bonita] ?? item.estado_bonita }));
 
   return (
     <div className={styles.page}>
@@ -188,6 +195,47 @@ export default function Indicadores() {
               </Bar>
             </BarChart>
           </Grafico>
+
+          <Grafico titulo="Duración media de un caso por gravedad" descripcion="Cruce: gravedad de la emergencia (base local) con la duración del caso finalizado (Bonita)."
+            vacio={!bonita.disponible || (cruce.tiempo_por_gravedad ?? []).length === 0}>
+            <BarChart data={cruce.tiempo_por_gravedad}>
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+              <XAxis dataKey="gravedad" {...EJE} />
+              <YAxis {...EJE} unit=" h" />
+              <Tooltip {...TOOLTIP_STYLE} formatter={(valor, _n, { payload }) => [`${valor} h (${payload.casos} casos)`, 'Promedio']} />
+              <Bar dataKey="duracion_promedio_horas" name="Promedio (h)" fill={COLORES[2]} radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </Grafico>
+
+          <Grafico titulo="Estado de los casos en Bonita" descripcion="Casos del proceso vinculados a emergencias de la base local."
+            vacio={!bonita.disponible || estadosCasos.length === 0}>
+            <PieChart>
+              <Pie data={estadosCasos} dataKey="cantidad" nameKey="nombre" innerRadius="45%" outerRadius="75%" paddingAngle={2} stroke="var(--surface)">
+                {estadosCasos.map((item, i) => <Cell key={item.estado_bonita} fill={COLORES[i % COLORES.length]} />)}
+              </Pie>
+              <Tooltip {...TOOLTIP_STYLE} />
+              <Legend />
+            </PieChart>
+          </Grafico>
+
+          <Grafico titulo="Cobertura vs duración del caso" descripcion="Cada punto es una emergencia finalizada: % de cobertura (base local) y horas de resolución (Bonita)."
+            vacio={!bonita.disponible || (cruce.cobertura_vs_duracion ?? []).length === 0}>
+            <ScatterChart margin={{ left: 10 }}>
+              <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+              <XAxis type="number" dataKey="cobertura_pct" name="Cobertura" unit="%" domain={[0, 100]} {...EJE} />
+              <YAxis type="number" dataKey="duracion_horas" name="Duración" unit=" h" {...EJE} />
+              <ZAxis range={[80, 80]} />
+              <Tooltip {...TOOLTIP_STYLE} cursor={{ strokeDasharray: '3 3' }} />
+              <Scatter name="Emergencias" data={cruce.cobertura_vs_duracion} fill={COLORES[1]} />
+            </ScatterChart>
+          </Grafico>
+
+          {bonita.disponible && (cruce.consistencia ?? []).length > 0 && (
+            <div className={`notice notice-error ${styles.ancho}`} role="alert">
+              <p>Hay {cruce.consistencia.length} emergencia(s) cuyo estado local no coincide con su caso en Bonita:
+                {' '}{cruce.consistencia.map(c => `#${c.emergencia_id} (${c.estado_local} / ${ESTADOS_BONITA[c.estado_bonita] ?? c.estado_bonita})`).join(', ')}.</p>
+            </div>
+          )}
 
           <section className={`${styles.grafico} ${styles.ancho}`} aria-label="Tiempos promedio por etapa">
             <h2>Tiempo promedio por etapa de la emergencia</h2>

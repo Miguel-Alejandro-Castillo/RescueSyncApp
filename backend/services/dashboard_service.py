@@ -13,6 +13,8 @@ from services.bonita_service import BonitaService
 from services.dashboard_calculos import (
     calcular_resumen_casos,
     calcular_tiempos_por_etapa,
+    CRUCE_VACIO,
+    cruzar_casos,
     inicio_de_casos,
     meses_anteriores,
     rango_mes,
@@ -118,6 +120,7 @@ def estado_de_proyectos(session: Session, desde, hasta) -> list[dict]:
 
         proyectos.append({
             "id": emergencia.id,
+            "caso_bonita": emergencia.bonitaCaseId,
             "zona": emergencia.zonaAfectada,
             "gravedad": emergencia.nivelGravedad,
             "estado": emergencia.estado,
@@ -138,7 +141,7 @@ def proyectos_por_estado(proyectos: list[dict]) -> list[dict]:
     return [{"estado": estado, "cantidad": cantidad} for estado, cantidad in conteo.items()]
 
 
-async def datos_bonita(bonita: BonitaService, desde, hasta) -> dict:
+async def datos_bonita(bonita: BonitaService, proyectos: list[dict], desde, hasta) -> dict:
     """Si Bonita no responde, el dashboard sigue mostrando los datos propios."""
     try:
         procesos = await bonita.obtener_procesos_por_nombre(os.getenv("BONITA_PROCESS"))
@@ -153,9 +156,10 @@ async def datos_bonita(bonita: BonitaService, desde, hasta) -> dict:
             "error": None,
             "casos": calcular_resumen_casos(abiertos, archivados, desde, hasta),
             "etapas": calcular_tiempos_por_etapa(tareas, inicios, desde, hasta),
+            "cruce": cruzar_casos(proyectos, abiertos, archivados, desde, hasta),
         }
     except Exception as error:
-        return {"disponible": False, "error": f"No se pudo consultar Bonita: {error}", "casos": None, "etapas": []}
+        return {"disponible": False, "error": f"No se pudo consultar Bonita: {error}", "casos": None, "etapas": [], "cruce": CRUCE_VACIO}
 
 
 async def generar_reporte(session: Session, bonita: BonitaService, mes: str | None) -> dict:
@@ -166,7 +170,7 @@ async def generar_reporte(session: Session, bonita: BonitaService, mes: str | No
     consorcios = resolucion_por_consorcios(session, desde, hasta)
     proyectos = estado_de_proyectos(session, desde, hasta)
     finalizados = sum(1 for p in proyectos if p["estado"] == EmergenciaEstado.MONITOREO_FINALIZADO)
-    bonita_datos = await datos_bonita(bonita, desde, hasta)
+    bonita_datos = await datos_bonita(bonita, proyectos, desde, hasta)
 
     return {
         "periodo": {

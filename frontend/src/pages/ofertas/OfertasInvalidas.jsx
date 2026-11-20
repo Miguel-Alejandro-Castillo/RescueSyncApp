@@ -123,7 +123,7 @@ export default function OfertasInvalidas() {
 
   return (
     <div className={styles.page}>
-      <h1>Ofertas inválidas</h1>
+      <h1>Lotes inválidos</h1>
       {error && <div className="notice notice-error" role="alert"><p>{error}</p></div>}
       {mensaje && <div className="notice" role="status"><p>{mensaje}</p></div>}
 
