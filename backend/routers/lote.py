@@ -111,10 +111,10 @@ def calcular_fecha_limite(nivel_gravedad: str, fecha_inicio: datetime) -> dateti
 
 def calcular_fecha_limite_demo(nivel_gravedad: str, fecha_inicio: datetime) -> datetime:
     minutos_map = {
-        "critico": 4,
-        "alto": 8,
-        "medio": 12,
-        "bajo": 16
+        "critico": 1,
+        "alto": 2,
+        "medio": 3,
+        "bajo": 4
     }
 
     minutos = minutos_map.get(nivel_gravedad.lower(), 10)
