@@ -191,7 +191,13 @@ def obtener_reservas_no_adjudicadas(session, emergencia_id):
             if not cantidad_a_liberar:
                 continue
 
-            cuit = participante.get("cuit")
+            participante_db = session.get(ParticipanteOferta, participante_id)
+
+            if not participante_db:
+                raise ValueError(f"No existe el participante {participante_id}")
+
+            cuit = participante_db.ong_cuit
+            
             if not isinstance(cuit, str) or not cuit.strip():
                 raise ValueError(
                     f"El participante {participante_id} no tiene CUIT para liberar"
@@ -203,7 +209,7 @@ def obtener_reservas_no_adjudicadas(session, emergencia_id):
                 "cantidad_adjudicada": cantidad_adjudicada,
                 "cantidad_a_liberar": cantidad_a_liberar,
             })
-            clave = (cuit.strip(), lote.descripcion)
+            clave = (cuit, lote.descripcion)
             data_por_recurso[clave] = (
                 data_por_recurso.get(clave, 0) + cantidad_a_liberar
             )
