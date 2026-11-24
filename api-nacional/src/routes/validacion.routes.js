@@ -127,7 +127,7 @@ const router = Router();
  *                           ong_nombre: Cruz Roja Argentina
  *                           ong_nacional_id: 1
  *                           recurso_nacional_id: 32
- *                           cantidad_ofertada: 10
+ *                           cantidad_ofertada: 1
  *                           cantidad_verificada: 1
  *                         - participante_id: 102
  *                           ong_nombre: Fundación Huésped

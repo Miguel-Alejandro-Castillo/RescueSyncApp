@@ -46,11 +46,12 @@ function evaluarOferta(oferta, lote, inventarios) {
       recurso_nacional_id: recurso?.recursoId ?? null, recurso_codigo: lote.recurso_codigo, cantidad_ofertada: p.cantidad_ofertada,
       cantidad_verificada: verificada };
   });
+  const cantidadOfertada = participantes.reduce((n, p) => n + p.cantidad_ofertada, 0);
   const cantidadVerificada = participantes.reduce((n, p) => n + p.cantidad_verificada, 0);
-  const valida = participantes.length > 0 && cantidadVerificada >= lote.cantidad_requerida;
+  const valida = cantidadOfertada > 0 && cantidadVerificada === cantidadOfertada;
   const resultado = { valida, inventario_valido: valida, participantes,
-    motivo: valida ? null : `La oferta conjunta cubre ${cantidadVerificada} de ${lote.cantidad_requerida} unidades requeridas.`,
-    cantidad_ofertada: participantes.reduce((n, p) => n + p.cantidad_ofertada, 0),
+    motivo: valida ? null : `Se verificaron ${cantidadVerificada} de ${cantidadOfertada} unidades ofertadas.`,
+    cantidad_ofertada: cantidadOfertada,
     cantidad_verificada: cantidadVerificada };
   if (oferta.cantidad_aceptada != null) {
     resultado.cantidad_aceptada = Math.min(oferta.cantidad_aceptada, resultado.cantidad_verificada);
