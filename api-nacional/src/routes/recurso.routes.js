@@ -126,14 +126,13 @@ router.get('/:id', getRecursoById);
  *     tags:
  *       - Recursos
  *     summary: Liberar recursos comprometidos/reservados de ONGs
- *     description: Decrementa la cantidad reservada en el inventario nacional de las ONGs indicadas al finalizar una emergencia o proyecto.
+ *     description: Decrementa la cantidad reservada en el inventario nacional. Un array vacío devuelve éxito sin modificar el inventario.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: array
- *             minItems: 1
  *             items:
  *               type: object
  *               required:

@@ -12,6 +12,14 @@ class LoteEstado(str, Enum):
     REFORMULADO = "reformulado"
     EN_ADJUDICACION = "en_adjudicacion"
     ADJUDICADO = "adjudicado"
+    CERRADO_SIN_ADJUDICACION = "cerrado_sin_adjudicacion"
+
+
+ESTADOS_LOTE_CERRADO = (
+    LoteEstado.REFORMULADO,
+    LoteEstado.ADJUDICADO,
+    LoteEstado.CERRADO_SIN_ADJUDICACION,
+)
 
 class Lote(SQLModel, table=True):
     __tablename__ = "lotes"

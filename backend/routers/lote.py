@@ -11,12 +11,12 @@ from dependencies.rbac import (
 )
 from services.bonita_service import BonitaService
 from services.decisiones_convocatoria import (
-    DecisionOfertasInvalidasEmergencia, clasificar_lotes_invalidos, lotes_pendientes,
-    ofertas_vigentes, validacion_completa, validar_decision,
+    DecisionOfertasInvalidasEmergencia, lotes_con_faltante, lotes_pendientes,
+    lotes_con_recursos_verificados, ofertas_vigentes, validacion_completa, validar_decision,
 )
 from services.validacion_ofertas import bloquear_decisiones, descartar_ofertas, resultado_guardado, utc
 from models.emergencia import Emergencia, EmergenciaEstado
-from models.lote import Lote, LoteEstado
+from models.lote import ESTADOS_LOTE_CERRADO, Lote, LoteEstado
 from models.oferta import Oferta, OfertaEstado
 from models.participante_oferta import ParticipanteOferta
 
@@ -64,9 +64,7 @@ async def ejecutar_decision_descarte(session, bonita, emergencia, lote, oferta, 
     bloquear_decisiones(session, emergencia.id, oferta.id)
     session.refresh(oferta)
     session.refresh(lote)
-    if oferta.descartada_en or lote.estado in (
-        LoteEstado.REFORMULADO, LoteEstado.ADJUDICADO, LoteEstado.EN_ADJUDICACION,
-    ):
+    if oferta.descartada_en or lote.estado in (*ESTADOS_LOTE_CERRADO, LoteEstado.EN_ADJUDICACION):
         raise HTTPException(409, "El lote ya no admite el descarte.")
     caso_id = emergencia.bonitaCaseId
     tareas = await bonita.obtener_tareas_humanas_por_caso(caso_id)
@@ -360,12 +358,14 @@ def decisiones_pendientes(session: Session = Depends(get_session)):
                 or not validacion_completa(ofertas)
                 or resultado_guardado(session, emergencia.id)["cobertura_suficiente"]):
             continue
-        invalidos, reabribles = clasificar_lotes_invalidos(ofertas)
+        adjudicables = lotes_con_recursos_verificados(ofertas)
         pendientes.append({
             "id": emergencia.id,
             "zona": emergencia.zonaAfectada,
-            "lotes_invalidos": sorted(invalidos),
-            "lotes_reabribles": sorted(reabribles),
+            "lotes_invalidos": sorted({oferta.lote_id for oferta in ofertas if not oferta.valida}),
+            "lotes_reabribles": sorted(lotes_con_faltante(lotes)),
+            "permite_parcial": bool(adjudicables),
+            "lotes_sin_recursos_verificados": sorted({lote.id for lote in lotes} - adjudicables),
             "lotes_sin_ofertas": sorted({lote.id for lote in lotes} - {oferta.lote_id for oferta in ofertas}),
         })
     return pendientes
@@ -393,7 +393,8 @@ async def decidir_ofertas_invalidas_emergencia(
     session.refresh(emergencia)
     validar_decision(session, emergencia, payload)
     ahora = datetime.now(timezone.utc)
-    ventana_ms = calcular_diferencia_ms(calcular_fecha_limite_demo(emergencia.nivelGravedad, ahora), ahora)
+    fecha_limite = calcular_fecha_limite_demo(emergencia.nivelGravedad, ahora)
+    ventana_ms = calcular_diferencia_ms(fecha_limite, ahora)
     # Bonita vuelve a consultar el backend al ejecutar la tarea. Soltar el bloqueo antes de llamarla.
     session.rollback()
 
@@ -407,7 +408,8 @@ async def decidir_ofertas_invalidas_emergencia(
         siguiente_tarea = "Adjudicar ofertas y notificar a ONGs"
     else:
         await bonita.set_case_variable(caso_id, "ventana_tiempo_ms", "java.lang.Long", ventana_ms)
-        decision = {**payload.model_dump(), "tarea_id": tarea_id, "ventana_ms": ventana_ms}
+        decision = {**payload.model_dump(), "tarea_id": tarea_id, "ventana_ms": ventana_ms,
+                    "fecha_limite": fecha_limite.isoformat()}
         # Las cantidades se aplican en la misma operación que confirma las liberaciones.
         contrato = {"accionSeleccionadaInput": "PUBLICAR_CONVOCATORIA", "loteIdInput": json.dumps(decision)}
         siguiente_tarea = TAREA_OFERTAR

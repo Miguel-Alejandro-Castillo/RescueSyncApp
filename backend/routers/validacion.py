@@ -52,7 +52,7 @@ def reservas_decision(caso_id: str, decision: DecisionConvocatoriaBonita,
     emergencia = caso_integracion(caso_id, session)
     bloquear_decisiones(session, emergencia.id)
     session.refresh(emergencia)
-    if decision_ya_aplicada(session, emergencia, decision.tarea_id):
+    if decision_ya_aplicada(session, emergencia, decision):
         return []
     lotes, _ = validar_decision(session, emergencia, decision)
     return [datos_reserva(emergencia, lote, ofertas_vigentes(session, [lote])) for lote in lotes]

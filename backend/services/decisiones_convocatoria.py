@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlmodel import select
 
 from models.emergencia import EmergenciaEstado
-from models.lote import Lote, LoteEstado
+from models.lote import ESTADOS_LOTE_CERRADO, Lote, LoteEstado
 from models.oferta import Oferta, OfertaEstado
 from services.validacion_ofertas import descartar_ofertas, resultado_guardado, utc
 
@@ -26,12 +26,13 @@ class DecisionConvocatoriaBonita(DecisionOfertasInvalidasEmergencia):
     accion: Literal['reabrir', 'reformular']
     tarea_id: str = Field(pattern=r'^[0-9]{1,32}$')
     ventana_ms: int = Field(gt=0)
+    fecha_limite: datetime | None = None
 
 
 def lotes_pendientes(session, emergencia_id):
     return session.exec(select(Lote).where(
         Lote.emergenciaId == emergencia_id,
-        Lote.estado.notin_([LoteEstado.REFORMULADO, LoteEstado.ADJUDICADO]),
+        Lote.estado.notin_(ESTADOS_LOTE_CERRADO),
     ).order_by(Lote.id)).all()
 
 
@@ -41,10 +42,16 @@ def ofertas_vigentes(session, lotes):
     )).all()
 
 
-def clasificar_lotes_invalidos(ofertas):
-    invalidos = {o.lote_id for o in ofertas if not o.valida}
-    con_validas = {o.lote_id for o in ofertas if o.valida}
-    return invalidos, invalidos - con_validas
+def lotes_con_faltante(lotes):
+    return {lote.id for lote in lotes if lote.cantidadCubierta < lote.cantidad}
+
+
+def lotes_con_recursos_verificados(ofertas):
+    return {
+        oferta.lote_id for oferta in ofertas
+        if any(p.get('cantidad_verificada', 0) > 0
+               for p in (oferta.resultado_validacion or {}).get('participantes', []))
+    }
 
 
 def validacion_completa(ofertas):
@@ -68,8 +75,10 @@ def validar_decision(session, emergencia, decision):
         raise HTTPException(409, 'La convocatoria sigue abierta.')
     if resultado_guardado(session, emergencia.id)['cobertura_suficiente']:
         raise HTTPException(409, 'La emergencia tiene cobertura suficiente para adjudicar.')
-    invalidos, reabribles = clasificar_lotes_invalidos(ofertas)
-    elegibles = invalidos if decision.accion == 'parcial' else reabribles
+    if decision.accion == 'parcial' and not lotes_con_recursos_verificados(ofertas):
+        raise HTTPException(409, 'La emergencia no tiene recursos verificados para adjudicar.')
+    elegibles = ({o.lote_id for o in ofertas if not o.valida}
+                 if decision.accion == 'parcial' else lotes_con_faltante(lotes))
     if ((decision.accion != 'parcial' and not elegibles)
             or len(decision.lote_ids) != len(elegibles) or set(decision.lote_ids) != elegibles):
         raise HTTPException(422, 'La decisión debe incluir todos los lotes elegibles de la ronda actual.')
@@ -83,18 +92,32 @@ def validar_decision(session, emergencia, decision):
     return [lote for lote in lotes if lote.id in elegibles], cantidades
 
 
-def decision_ya_aplicada(session, emergencia, tarea_id):
-    return session.exec(select(Oferta.id).join(Lote).where(
-        Lote.emergenciaId == emergencia.id, Oferta.tarea_bonita_descarte == tarea_id,
+def decision_ya_aplicada(session, emergencia, decision):
+    if session.exec(select(Oferta.id).join(Lote).where(
+        Lote.emergenciaId == emergencia.id, Oferta.tarea_bonita_descarte == decision.tarea_id,
         Oferta.descartada_en.is_not(None),
-    )).first() is not None
+    )).first() is not None:
+        return True
+    if not decision.fecha_limite or not decision.lote_ids:
+        return False
+
+    # Los lotes sin ofertas no tienen filas de descarte que identifiquen el reintento.
+    fecha_limite = utc(decision.fecha_limite)
+    origen = Lote.id if decision.accion == 'reabrir' else Lote.loteOrigenId
+    lotes = session.exec(select(origen, Lote.fechaLimiteConvocatoria).where(
+        Lote.emergenciaId == emergencia.id, origen.in_(decision.lote_ids),
+    )).all()
+    aplicados = {lote_id for lote_id, limite in lotes if utc(limite) == fecha_limite}
+    return aplicados == set(decision.lote_ids)
 
 
 def abrir_nueva_convocatoria(session, emergencia, decision):
-    if decision_ya_aplicada(session, emergencia, decision.tarea_id):
+    if decision_ya_aplicada(session, emergencia, decision):
         return
     lotes, cantidades = validar_decision(session, emergencia, decision)
-    fecha_limite = datetime.now(timezone.utc) + timedelta(milliseconds=decision.ventana_ms)
+    fecha_limite = decision.fecha_limite or (
+        datetime.now(timezone.utc) + timedelta(milliseconds=decision.ventana_ms)
+    )
     for oferta in ofertas_vigentes(session, lotes):
         oferta.accion_tomada = decision.accion
         oferta.tarea_bonita_descarte = decision.tarea_id
@@ -131,9 +154,13 @@ def iniciar_adjudicacion(session, emergencia, parcial):
         raise HTTPException(409, 'La validación nacional todavía no se completó.')
     if not parcial and not resultado_guardado(session, emergencia.id)['cobertura_suficiente']:
         raise HTTPException(409, 'La cobertura es insuficiente para adjudicar automáticamente.')
+    adjudicables = {lote.id for lote in lotes}
     if parcial:
+        adjudicables = lotes_con_recursos_verificados(ofertas)
+        if not adjudicables:
+            raise HTTPException(409, 'La emergencia no tiene recursos verificados para adjudicar.')
         for oferta in ofertas:
-            if oferta.valida:
+            if oferta.valida or oferta.lote_id not in adjudicables:
                 continue
             resultado = oferta.resultado_validacion or {}
             participantes = [
@@ -150,7 +177,8 @@ def iniciar_adjudicacion(session, emergencia, parcial):
     for lote in lotes:
         if utc(lote.fechaLimiteConvocatoria) > ahora:
             lote.fechaLimiteConvocatoria = ahora
-        lote.estado = LoteEstado.EN_ADJUDICACION
+        lote.estado = (LoteEstado.EN_ADJUDICACION if lote.id in adjudicables
+                       else LoteEstado.CERRADO_SIN_ADJUDICACION)
         session.add(lote)
     emergencia.estado = EmergenciaEstado.EN_ADJUDICACION
     session.add(emergencia)

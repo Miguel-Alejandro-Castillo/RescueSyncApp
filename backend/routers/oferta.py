@@ -5,10 +5,10 @@ from database import get_session
 from pydantic import BaseModel
 from typing import List, Optional
 from dependencies.rbac import (
-    require_roles, REPRESENTANTE_ONG, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, AUDITORES, get_user_roles
+    require_roles, REPRESENTANTE_ONG, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, AUDITORES, USUARIO_BONITA, get_user_roles
 )
 from models.emergencia import Emergencia, EmergenciaEstado
-from models.lote import Lote, LoteEstado
+from models.lote import ESTADOS_LOTE_CERRADO, Lote, LoteEstado
 from models.oferta import Oferta
 from models.participante_oferta import ParticipanteOferta
 from models.adjudicacion import Adjudicacion
@@ -616,10 +616,28 @@ def marcar_oferta_invalida(
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_roles(CENTRO_COORDINADOR))]
 )
-def get_ofertas_invalidas(session: Session = Depends(get_session)):
-    ofertas = session.exec(select(Oferta).where(
-        (Oferta.valida == False) | Oferta.descartada_en.is_not(None),
-    ).order_by(Oferta.fecha_creacion.desc(), Oferta.id.desc())).all()
+def get_ofertas_invalidas(
+    incluir_contexto: bool = False,
+    session: Session = Depends(get_session),
+):
+    filtro = Oferta.valida.is_(False) | Oferta.descartada_en.is_not(None)
+    if incluir_contexto:
+        lotes_con_invalidas = select(Oferta.lote_id).where(
+            Oferta.valida.is_(False), Oferta.descartada_en.is_(None),
+        )
+        lotes_en_evaluacion = select(Lote.id).join(Emergencia).where(
+            Emergencia.estado == EmergenciaEstado.CONVOCATORIA_CERRADA,
+            Lote.estado.notin_(ESTADOS_LOTE_CERRADO),
+            (Lote.cantidadCubierta < Lote.cantidad) | Lote.id.in_(lotes_con_invalidas),
+        )
+        filtro |= (
+            Oferta.lote_id.in_(lotes_en_evaluacion)
+            & Oferta.descartada_en.is_(None)
+            & Oferta.validada_en.is_not(None)
+        )
+    ofertas = session.exec(
+        select(Oferta).where(filtro).order_by(Oferta.fecha_creacion.desc(), Oferta.id.desc())
+    ).all()
 
     respuesta = []
     for oferta in ofertas:
@@ -669,6 +687,9 @@ def get_ofertas_invalidas(session: Session = Depends(get_session)):
             "ong_lider_id": oferta.ong_lider_id,
             "ong_lider_nombre": nombre_ong_lider,
             "cantidad_ofertada": sum(p.cantidad_aportada for p in participantes if p.cantidad_aportada is not None),
+            "cantidad_verificada": sum(p.get("cantidad_verificada", 0) or 0 for p in aportes_validados)
+            if oferta.validada_en is not None else None,
+            "estado_validacion": oferta.estado_validacion,
             "accion_tomada": oferta.accion_tomada,
             "resultado_validacion": oferta.resultado_validacion,
             "validada_en": oferta.validada_en,
@@ -860,12 +881,13 @@ async def adjudicar_ofertas(
         # Hacer explícito que el nuevo estado llegue a BD dentro de la transacción
         # antes de consultar los demás lotes.
         session.flush()
-        # buscar todos los lotes de la emergencia y validar que todos estan correctamente en estado ADJUDICADO
-        lote_no_adjudicado = session.exec(
-            select(Lote).where(Lote.emergenciaId == lote.emergenciaId, Lote.estado != LoteEstado.ADJUDICADO)
+        lote_pendiente = session.exec(
+            select(Lote).where(
+                Lote.emergenciaId == lote.emergenciaId,
+                Lote.estado.notin_(ESTADOS_LOTE_CERRADO),
+            )
         ).first()
-        if not lote_no_adjudicado:
-            # estan todos los lotes adjudicados, se completa la tarea humana en Bonita
+        if lote_pendiente is None:
             emergencia: Emergencia = session.get(Emergencia, lote.emergenciaId)
             if emergencia.bonitaCaseId:
                 await bonita.completar_tarea_humana_por_caso(emergencia.bonitaCaseId)
@@ -903,8 +925,7 @@ async def adjudicar_ofertas(
 @router.post(
     "/limpiar-invitaciones-vencidas",
     status_code=status.HTTP_200_OK,
-    # Si tienen alguna dependencia para validar llamadas internas desde Bonita, agregala acá:
-    # dependencies=[Depends(verificar_api_key_bonita)] 
+    dependencies=[Depends(require_roles(USUARIO_BONITA))],
 )
 def limpiar_invitaciones_vencidas_bonita(
     session: Session = Depends(get_session)

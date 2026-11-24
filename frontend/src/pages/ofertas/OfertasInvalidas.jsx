@@ -15,8 +15,8 @@ const ACCIONES = [
 ];
 
 async function cargarOfertas() {
-  const res = await authenticatedFetch(`${API_RESCUE}/ofertas/invalidas`);
-  if (!res.ok) throw new Error('Error al cargar las ofertas inválidas');
+  const res = await authenticatedFetch(`${API_RESCUE}/ofertas/invalidas?incluir_contexto=true`);
+  if (!res.ok) throw new Error('Error al cargar las ofertas para evaluación');
   const data = await res.json();
   return Array.isArray(data) ? data : [];
 }
@@ -27,6 +27,7 @@ function agruparPorEmergencia(ofertas, pendientes) {
   ]));
   return Object.entries(ofertas.reduce((grupos, oferta) => {
     const key = oferta.emergencia_id ?? `sin-emergencia-${oferta.id}`;
+    if (oferta.estado_validacion === 'valida' && !oferta.descartada_en && !grupos[key]?.pendiente) return grupos;
     if (!grupos[key]) {
       grupos[key] = {
         id: oferta.emergencia_id,
@@ -76,10 +77,14 @@ function LotesDeEmergencia({ ofertas, lotesSinOfertas }) {
 }
 
 function DetalleOferta({ oferta }) {
+  const estado = oferta.descartada_en ? 'Descartada' : {
+    valida: 'Válida', invalida: 'Inválida', pendiente: 'Pendiente de validación',
+  }[oferta.estado_validacion];
   return (
     <section className={styles.oferta}>
       <h3>Oferta #{oferta.id}</h3>
-      <p>Cantidad ofertada: <strong>{oferta.cantidad_ofertada}</strong> · ONG líder: {oferta.ong_lider_nombre || 'Sin identificar'}</p>
+      <p>Cantidad ofertada: <strong>{oferta.cantidad_ofertada}</strong> · Cantidad verificada: <strong>{oferta.cantidad_verificada ?? 'Pendiente'}</strong> · ONG líder: {oferta.ong_lider_nombre || 'Sin identificar'}</p>
+      {estado && <p>Estado: <strong>{estado}</strong></p>}
       <ResultadoValidacion resultado={oferta.resultado_validacion} fecha={oferta.validada_en} />
       {oferta.lotes_nuevos?.length > 0 && (
         <div>
@@ -128,18 +133,21 @@ export default function OfertasInvalidas() {
     const accion = acciones[grupo.id];
     if (!accion || !grupo.pendiente) return;
     const loteIds = accion === 'parcial' ? grupo.pendiente.lotes_invalidos : grupo.pendiente.lotes_reabribles;
+    const sinRecursos = grupo.pendiente.lotes_sin_recursos_verificados;
     const messages = {
       reabrir: {
         title: 'Reabrir convocatoria',
-        message: 'Se reabrirá la convocatoria de los lotes con ofertas inválidas y sin ninguna oferta válida.',
+        message: 'Los lotes con faltante volverán a convocarse por la cantidad original. Se descartarán todas sus ofertas de esta ronda y se liberarán sus reservas.',
       },
       reformular: {
         title: 'Reformular cantidades',
-        message: 'Podrás modificar las cantidades de los lotes con ofertas inválidas y sin ninguna oferta válida.',
+        message: 'Podrás cambiar las cantidades de los lotes con faltante. Al confirmar las nuevas cantidades, se descartarán todas sus ofertas de esta ronda y se liberarán sus reservas.',
       },
       parcial: {
         title: 'Continuar con cobertura parcial',
-        message: 'Se aceptarán las cantidades verificadas de las ofertas inválidas. Todos los lotes activos pasarán a adjudicación.',
+        message: sinRecursos.length
+          ? `Los lotes con recursos pasarán a adjudicación. Se cerrarán sin adjudicación, por falta de recursos verificados, los lotes ${sinRecursos.map(id => `#${id}`).join(', ')}.`
+          : 'Los lotes pasarán a adjudicación con los recursos verificados disponibles.',
       },
     };
     setModalConfig({ isOpen: true, emergenciaId: grupo.id, loteIds, accion, ...messages[accion] });
@@ -158,8 +166,8 @@ export default function OfertasInvalidas() {
       await decidirOfertasInvalidasEmergencia(emergenciaId, { accion, lote_ids: loteIds });
       await actualizarGrupos();
       setMensaje(accion === 'reabrir'
-        ? 'La convocatoria se reabrió para los lotes inválidos de la emergencia.'
-        : 'Se aceptaron las cantidades verificadas de las ofertas inválidas y todos los lotes activos pasaron a adjudicación.');
+        ? 'La convocatoria se reabrió para los lotes con faltante de la emergencia.'
+        : 'Los lotes con recursos verificados pasaron a adjudicación.');
       setAcciones(current => ({ ...current, [emergenciaId]: '' }));
     } catch (err) {
       setError(err.message);
@@ -183,7 +191,8 @@ export default function OfertasInvalidas() {
           {grupos.map(([clave, grupo]) => {
             const pendiente = grupo.pendiente;
             const decision = grupo.ofertas.find(oferta => !oferta.descartada_en && oferta.accion_tomada)?.accion_tomada;
-            const accionesDisponibles = ACCIONES.filter(accion => accion.value === 'parcial' || pendiente?.lotes_reabribles.length);
+            const accionesDisponibles = ACCIONES.filter(accion => accion.value === 'parcial'
+              ? pendiente?.permite_parcial : pendiente?.lotes_reabribles.length);
             return (
               <section key={clave} className={styles.item}>
                 <header className={styles.encabezado}>
@@ -209,6 +218,7 @@ export default function OfertasInvalidas() {
                           Confirmar decisión
                         </button>
                       </div>
+                      {!pendiente.permite_parcial && <p>No hay recursos verificados para continuar con cobertura parcial.</p>}
                     </div>
                   ) : decision ? (
                     <p>Decisión registrada: <strong>{ACCIONES.find(item => item.value === decision)?.label || decision}</strong>.</p>

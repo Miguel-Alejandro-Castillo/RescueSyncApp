@@ -139,9 +139,18 @@ def obtener_reservas_no_adjudicadas(session, emergencia_id):
     ofertas = session.exec(select(Oferta).where(
         Oferta.lote_id.in_(lote_ids),
         Oferta.resultado_validacion.is_not(None),
+        Oferta.descartada_en.is_(None),
     ).order_by(Oferta.lote_id, Oferta.id)).all()
     if not ofertas:
         return respuesta_vacia
+
+    cuits_por_participante = {
+        (oferta_id, participante_id): cuit
+        for oferta_id, participante_id, cuit in session.exec(
+            select(ParticipanteOferta.oferta_id, ParticipanteOferta.id, ParticipanteOferta.ong_cuit)
+            .where(ParticipanteOferta.oferta_id.in_([oferta.id for oferta in ofertas]))
+        ).all()
+    }
 
     detalles = session.exec(
         select(AdjudicacionDetalle, ParticipanteOferta)
@@ -193,12 +202,15 @@ def obtener_reservas_no_adjudicadas(session, emergencia_id):
 
             cuit = participante.get("cuit")
             if not isinstance(cuit, str) or not cuit.strip():
+                cuit = cuits_por_participante.get((oferta.id, participante_id))
+            if not isinstance(cuit, str) or not cuit.strip():
                 raise ValueError(
                     f"El participante {participante_id} no tiene CUIT para liberar"
                 )
 
             participantes_restantes.append({
                 **participante,
+                "cuit": cuit.strip(),
                 "cantidad_reservada": cantidad_reservada,
                 "cantidad_adjudicada": cantidad_adjudicada,
                 "cantidad_a_liberar": cantidad_a_liberar,

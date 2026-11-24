@@ -46,11 +46,18 @@ export const getRecursoById = async (req, res) => {
 export const liberarRecursos = async (req, res) => {
   const items = req.body;
 
-  if (!Array.isArray(items) || items.length === 0) {
+  if (!Array.isArray(items)) {
     return ApiResponse.badRequest(
       res,
-      'Debe proporcionar un array con al menos un elemento a liberar.'
+      'INVALID_RELEASE_ITEMS',
+      'Debe proporcionar un array de recursos a liberar.'
     );
+  }
+  if (items.length === 0) {
+    return ApiResponse.ok(res, {
+      mensaje: 'Se liberaron exitosamente 0 recursos asignados.',
+      data: [],
+    });
   }
 
   // 1. Validar que cada ítem tenga el formato correcto

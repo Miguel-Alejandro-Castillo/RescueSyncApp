@@ -84,7 +84,7 @@ const FormularioLotes = () => {
                 } else if (reformularEmergencia) {
                     const lotesInvalidos = (detalle || []).filter(lote => loteIds.includes(lote.id) && lote.estado !== 'reformulado');
                     if (!lotesInvalidos.length) {
-                        setError('La emergencia no tiene lotes inválidos para reformular.');
+                        setError('La emergencia no tiene lotes con faltante para reformular.');
                         return;
                     }
                     setLotes(lotesInvalidos.map(lote => ({
@@ -234,7 +234,7 @@ const FormularioLotes = () => {
 
                                 <div className={styles.row}>
                                     <h5 className="mb-0 fw-bold">
-                                            {ofertaId ? 'Lote de necesidad a modificar' : reformularEmergencia ? 'Cantidades de lotes inválidos' : 'Lotes de recursos requeridos'}
+                                            {ofertaId ? 'Lote de necesidad a modificar' : reformularEmergencia ? 'Cantidades de lotes con faltante' : 'Lotes de recursos requeridos'}
                                     </h5>
                                     {!ofertaId && !reformularEmergencia && (
                                         <button
