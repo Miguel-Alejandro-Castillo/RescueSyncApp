@@ -581,13 +581,39 @@ async def get_mis_ofertas_compat(
     dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
 )
 async def listar_ongs_desde_bonita(
+    lote_id: int | None = None,
     current_user: dict = Depends(get_current_user),
-    bonita: BonitaService = Depends(get_bonita_validacion_service)
+    session: Session = Depends(get_session),
+    bonita: BonitaService = Depends(get_bonita_validacion_service),
 ):
     ong_id_actual = int(current_user['user_id'])
     try:
         mi_cuit = await _obtener_cuit_seguro(bonita, ong_id_actual)
         ongs = await bonita.obtener_ongs_agrupadas_por_cuit(REPRESENTANTE_ONG)
+
+        cuits_ocupados_en_lote: set[str] = set()
+        if lote_id is not None:
+            stmt_ofertas = select(Oferta).where(
+                Oferta.lote_id == lote_id,
+                Oferta.valida == True,
+                Oferta.descartada_en.is_(None),
+            )
+            ofertas_lote = session.exec(stmt_ofertas).all()
+            ofertas_ids = [o.id for o in ofertas_lote if o.id is not None]
+
+            if ofertas_ids:
+                stmt_parts = select(ParticipanteOferta).where(
+                    ParticipanteOferta.oferta_id.in_(ofertas_ids),
+                    ParticipanteOferta.cantidad_aportada.is_not(None),
+                    ParticipanteOferta.ong_cuit.is_not(None),
+                )
+                participantes_confirmados = session.exec(stmt_parts).all()
+                cuits_ocupados_en_lote = {
+                    p.ong_cuit.strip()
+                    for p in participantes_confirmados
+                    if p.ong_cuit and p.ong_cuit.strip()
+                }
+
         return [
             {
                 "id": ong["id"],
@@ -595,7 +621,9 @@ async def listar_ongs_desde_bonita(
                 "nombre": ong["nombre"],
             }
             for ong in ongs
-            if not (mi_cuit and ong.get("ong_cuit") == mi_cuit) and int(ong["id"]) != ong_id_actual
+            if not (mi_cuit and ong.get("ong_cuit") == mi_cuit)
+            and int(ong["id"]) != ong_id_actual
+            and not (ong.get("ong_cuit") and ong["ong_cuit"].strip() in cuits_ocupados_en_lote)
         ]
     except Exception as e:
         traceback.print_exc()

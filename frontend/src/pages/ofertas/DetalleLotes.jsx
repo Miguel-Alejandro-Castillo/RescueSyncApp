@@ -7,6 +7,31 @@ import CuentaRegresiva from '../../components/CuentaRegresiva';
 import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 import { LOTE_ESTADOS } from '../../constants/lote';
 
+const ONG_NOMBRES_POR_CUIT = {
+  "30-54603392-5": "Cruz Roja Argentina",
+  "30-51731290-4": "Cáritas Argentina",
+  "30-71250682-9": "Fundación Sí",
+  "30-63749647-2": "Fundación Huésped",
+  "30-58650783-0": "Fundación Cruzada Patagónica",
+  "30-71203700-4": "Fundación Potenciar Solidario",
+  "30-71600757-6": "Fundación Cultura de Trabajo",
+  "30-70759612-7": "Fundación Banco de Alimentos",
+};
+
+const obtenerNombreOng = (ong) => {
+  const cuit = (ong?.ong_cuit || '').trim();
+  if (cuit && ONG_NOMBRES_POR_CUIT[cuit]) {
+    return ONG_NOMBRES_POR_CUIT[cuit];
+  }
+  if (ong?.nombre && !ong.nombre.startsWith('ONG CUIT ')) {
+    return ong.nombre;
+  }
+  if (cuit) {
+    return `ONG CUIT ${cuit}`;
+  }
+  return `ONG #${ong?.id ?? ''}`;
+};
+
 export default function DetalleLotes() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -26,7 +51,22 @@ export default function DetalleLotes() {
 
   const [hacerConsorcio, setHacerConsorcio] = useState(false);
 
-  // Cargar lotes de la emergencia y la lista de ONGs de Bonita
+  const cargarOngsDisponibles = async (loteId = null) => {
+    try {
+      const url = loteId
+        ? `${API_RESCUE}/ofertas/ongs-bonita?lote_id=${loteId}`
+        : `${API_RESCUE}/ofertas/ongs-bonita`;
+      const resOngs = await authenticatedFetch(url);
+      if (resOngs.ok) {
+        const dataOngs = await resOngs.json();
+        setOngsDisponibles(Array.isArray(dataOngs) ? dataOngs : []);
+      }
+    } catch (err) {
+      console.error('Error al cargar ONGs disponibles:', err);
+    }
+  };
+
+  // Cargar lotes de la emergencia y la lista inicial de ONGs de Bonita
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -37,12 +77,8 @@ export default function DetalleLotes() {
         const dataLotes = await resLotes.json();
         setLotes(Array.isArray(dataLotes) ? dataLotes : []);
 
-        // 2. Obtener lista de ONGs disponibles desde Bonita
-        const resOngs = await authenticatedFetch(`${API_RESCUE}/ofertas/ongs-bonita`);
-        if (resOngs.ok) {
-          const dataOngs = await resOngs.json();
-          setOngsDisponibles(Array.isArray(dataOngs) ? dataOngs : []);
-        }
+        // 2. Obtener lista base de ONGs disponibles desde Bonita
+        await cargarOngsDisponibles();
       } catch (err) {
         console.error(err);
         setError(err.message);
@@ -54,7 +90,7 @@ export default function DetalleLotes() {
     fetchData();
   }, [id]);
 
-  const toggleFormulario = (loteId) => {
+  const toggleFormulario = async (loteId) => {
     setError('');
     if (loteSeleccionadoId === loteId) {
       setLoteSeleccionadoId(null);
@@ -63,6 +99,14 @@ export default function DetalleLotes() {
       setCantRecurso('');
       setOngsInvitadas({});
       setHacerConsorcio(false);
+      await cargarOngsDisponibles(loteId);
+    }
+  };
+
+  const handleToggleConsorcio = async (checked, loteId) => {
+    setHacerConsorcio(checked);
+    if (checked) {
+      await cargarOngsDisponibles(loteId);
     }
   };
 
@@ -244,7 +288,7 @@ export default function DetalleLotes() {
                         <input
                           type="checkbox"
                           checked={hacerConsorcio}
-                          onChange={(e) => setHacerConsorcio(e.target.checked)}
+                          onChange={(e) => handleToggleConsorcio(e.target.checked, lote.id)}
                           style={{ width: '1rem', height: '1rem', cursor: 'pointer' }}
                         />
                         Hacer Consorcio
@@ -262,8 +306,7 @@ export default function DetalleLotes() {
                           ) : (
                             ongsDisponibles.map((ong) => {
                               const claveOng = ong.ong_cuit || String(ong.id);
-                              const etiquetaCuit = ong.ong_cuit ? `CUIT: ${ong.ong_cuit}` : `ONG #${ong.id}`;
-                              const etiquetaNombre = ong.nombre && !ong.nombre.startsWith('ONG CUIT ') ? ` — ${ong.nombre}` : '';
+                              const nombreOng = obtenerNombreOng(ong);
 
                               return (
                                 <label key={claveOng} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
@@ -272,9 +315,7 @@ export default function DetalleLotes() {
                                     checked={!!ongsInvitadas[claveOng]}
                                     onChange={() => handleCheckboxChange(claveOng)}
                                   />
-                                  <span>
-                                    <strong>{etiquetaCuit}</strong>{etiquetaNombre}
-                                  </span>
+                                  <span>{nombreOng}</span>
                                 </label>
                               );
                             })
