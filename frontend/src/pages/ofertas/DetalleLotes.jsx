@@ -62,15 +62,14 @@ export default function DetalleLotes() {
       setLoteSeleccionadoId(loteId);
       setCantRecurso('');
       setOngsInvitadas({});
-
       setHacerConsorcio(false);
     }
   };
 
-  const handleCheckboxChange = (ongId) => {
+  const handleCheckboxChange = (claveOng) => {
     setOngsInvitadas(prev => ({
       ...prev,
-      [ongId]: !prev[ongId]
+      [claveOng]: !prev[claveOng]
     }));
   };
 
@@ -113,9 +112,14 @@ export default function DetalleLotes() {
       return;
     }
 
-    const idsInvitados = Object.keys(ongsInvitadas)
-      .filter(ongId => ongsInvitadas[ongId] && Number(ongId) !== Number(currentOngId))
-      .map(Number);
+    const idsInvitados = hacerConsorcio
+      ? ongsDisponibles
+          .filter(ong => {
+            const claveOng = ong.ong_cuit || String(ong.id);
+            return !!ongsInvitadas[claveOng] && Number(ong.id) !== Number(currentOngId);
+          })
+          .map(ong => Number(ong.id))
+      : [];
 
     try {
       setSubmitting(true);
@@ -138,12 +142,12 @@ export default function DetalleLotes() {
         throw new Error(data.detail || 'Error al procesar la oferta en consorcio');
       }
 
-      const mensajeExitoFinal = hacerConsorcio 
-        ? '¡Oferta en consorcio creada con éxito!' 
+      const mensajeExitoFinal = hacerConsorcio
+        ? '¡Oferta en consorcio creada con éxito!'
         : '¡Oferta creada con éxito!';
 
-      navigate('/ofertas', { 
-        state: { mensajeExito: mensajeExitoFinal } 
+      navigate('/ofertas', {
+        state: { mensajeExito: mensajeExitoFinal }
       });
 
     } catch (err) {
@@ -156,9 +160,9 @@ export default function DetalleLotes() {
   return (
     <div className={styles.page} style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto' }}>
       {error && <div className="notice notice-error" role="alert"><strong>No se pudo completar la acción</strong><p>{error}</p></div>}
-      
-      <button 
-        onClick={() => navigate('/ofertas')} 
+
+      <button
+        onClick={() => navigate('/ofertas')}
         style={{ marginBottom: '1.5rem', cursor: 'pointer', padding: '0.5rem 1rem', borderRadius: '0.5rem', border: '1px solid var(--border)' }}
       >
         ← Volver al portal
@@ -217,7 +221,7 @@ export default function DetalleLotes() {
                       <label htmlFor={`oferta-cantidad-${lote.id}`} style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '0.2rem' }}>
                         Tu aporte inicial (Máx: {faltante}):
                       </label>
-                      <input 
+                      <input
                         className="form-control"
                         id={`oferta-cantidad-${lote.id}`}
                         name="cantidadOferta"
@@ -233,11 +237,11 @@ export default function DetalleLotes() {
                       />
                       <FieldError name="cantidadOferta" />
                     </div>
-                    
+
                     {/* Checkbox para activar la opción de consorcio */}
                     <div style={{ marginTop: '0.2rem' }}>
                       <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem', fontWeight: '600', cursor: 'pointer' }}>
-                        <input 
+                        <input
                           type="checkbox"
                           checked={hacerConsorcio}
                           onChange={(e) => setHacerConsorcio(e.target.checked)}
@@ -247,38 +251,45 @@ export default function DetalleLotes() {
                       </label>
                     </div>
 
-
-
                     {hacerConsorcio && (
-                    <div style={{ marginTop: '0.5rem' }}>
-                      <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-                        Invitar a otras ONGs a este consorcio (opcional):
-                      </label>
-                      <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                        {ongsDisponibles.length === 0 ? (
-                          <p style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>No hay otras ONGs disponibles para invitar.</p>
-                        ) : (
-                          ongsDisponibles.map((ong) => (
-                            <label key={ong.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
-                              <input 
-                                type="checkbox"
-                                checked={!!ongsInvitadas[ong.id]}
-                                onChange={() => handleCheckboxChange(ong.id)}
-                              />
-                              {ong.nombre || `ONG #${ong.id}`}
-                            </label>
-                          ))
-                        )}
+                      <div style={{ marginTop: '0.5rem' }}>
+                        <label style={{ display: 'block', fontWeight: '600', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                          Invitar a otras ONGs a este consorcio (opcional):
+                        </label>
+                        <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid var(--border)', padding: '0.5rem', borderRadius: '4px', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                          {ongsDisponibles.length === 0 ? (
+                            <p style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>No hay otras ONGs disponibles para invitar.</p>
+                          ) : (
+                            ongsDisponibles.map((ong) => {
+                              const claveOng = ong.ong_cuit || String(ong.id);
+                              const etiquetaCuit = ong.ong_cuit ? `CUIT: ${ong.ong_cuit}` : `ONG #${ong.id}`;
+                              const etiquetaNombre = ong.nombre && !ong.nombre.startsWith('ONG CUIT ') ? ` — ${ong.nombre}` : '';
+
+                              return (
+                                <label key={claveOng} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', cursor: 'pointer' }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={!!ongsInvitadas[claveOng]}
+                                    onChange={() => handleCheckboxChange(claveOng)}
+                                  />
+                                  <span>
+                                    <strong>{etiquetaCuit}</strong>{etiquetaNombre}
+                                  </span>
+                                </label>
+                              );
+                            })
+                          )}
+                        </div>
                       </div>
-                    </div>
-                      )}
+                    )}
+
                     <button
                       type="submit"
                       disabled={submitting}
                       style={{ alignSelf: 'flex-start', padding: '0.6rem 1.2rem', backgroundColor: 'var(--primary)', color: 'var(--on-primary)', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: submitting ? 'not-allowed' : 'pointer' }}
                     >
-                      {submitting 
-                        ? (hacerConsorcio ? 'Creando consorcio…' : 'Creando oferta…') 
+                      {submitting
+                        ? (hacerConsorcio ? 'Creando consorcio…' : 'Creando oferta…')
                         : (hacerConsorcio ? 'Confirmar consorcio' : 'Confirmar')}
                     </button>
                   </ValidatedForm>

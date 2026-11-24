@@ -443,7 +443,78 @@ class BonitaService:
             if len(values) < 100:
                 return None
             page += 1
+    async def obtener_info_ong_usuario(self, user_id: int) -> dict:
+        """
+        Devuelve {'cuit': str | None, 'nombre_ong': str | None} a partir de
+        los custom user info en Bonita.
+        """
+        cuit = None
+        nombre_ong = None
+        page = 0
 
+        while True:
+            response = await self.http_client.get(
+                f"{self.CUSTOM_USER_INFO_API}/user",
+                headers=self._auth_headers(),
+                params={"p": page, "c": 100, "f": f"userId={user_id}"},
+            )
+            values = response.json()
+            for item in values:
+                def_name = (item.get("definitionId", {}).get("name") or "").strip()
+                val = (item.get("value") or "").strip()
+                if not val:
+                    continue
+                if def_name == "cuitONG":
+                    cuit = val
+                elif def_name in {"nombreONG", "organizacionONG", "ongNombre", "nombreOrganizacion"}:
+                    nombre_ong = val
+
+            if len(values) < 100:
+                break
+            page += 1
+
+        return {"cuit": cuit, "nombre_ong": nombre_ong}
+
+    async def obtener_cuit_ong(self, user_id: int):
+        info = await self.obtener_info_ong_usuario(user_id)
+        return info["cuit"]
+
+    async def obtener_ongs_agrupadas_por_cuit(self, role_name: str) -> list[dict]:
+        """
+        Obtiene usuarios con el rol indicado y los agrupa por cuitONG.
+        Cada elemento representa una ONG única con sus user_ids asociados.
+        """
+        usuarios = await self.obtener_usuarios_por_rol(role_name)
+        agrupadas: dict[str, dict] = {}
+
+        for u in usuarios:
+            uid = int(u.get("id", 0))
+            if not uid:
+                continue
+
+            info = await self.obtener_info_ong_usuario(uid)
+            cuit = info["cuit"]
+            firstname = (u.get("firstname") or "").strip()
+            lastname = (u.get("lastname") or "").strip()
+            nombre_usuario = f"{firstname} {lastname}".strip() or u.get("userName") or f"ONG #{uid}"
+
+            # Clave de agrupación: el CUIT si está configurado; si no, fallback por usuario
+            clave = cuit if cuit else f"sin-cuit-{uid}"
+            nombre_ong = info["nombre_ong"] or (f"ONG CUIT {cuit}" if cuit else nombre_usuario)
+
+            if clave not in agrupadas:
+                agrupadas[clave] = {
+                    "id": uid,  # ID representativo para compatibilidad con el front
+                    "ong_cuit": cuit,
+                    "nombre": nombre_ong,
+                    "usuario_ids": [uid],
+                    "representantes": [nombre_usuario],
+                }
+            else:
+                agrupadas[clave]["usuario_ids"].append(uid)
+                agrupadas[clave]["representantes"].append(nombre_usuario)
+
+        return list(agrupadas.values())
 
 class BonitaValidacionService(BonitaService):
     """Autentica al consultar identidades; permite guardar y reintentar fallas."""
@@ -461,3 +532,5 @@ async def get_bonita_validacion_service():
         yield service
     finally:
         await service.close()
+
+

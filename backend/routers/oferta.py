@@ -15,7 +15,7 @@ from models.adjudicacion import Adjudicacion
 from models.adjudicacion_detalle import AdjudicacionDetalle
 from dependencies.jwt_auth import get_current_user
 from dependencies.bonita import get_bonita_service
-from services.bonita_service import BonitaService
+from services.bonita_service import BonitaService, BonitaValidacionService
 from services.bonita_service import get_bonita_validacion_service
 from services.validacion_ofertas import bloquear_decisiones
 from fastapi import Response
@@ -59,6 +59,53 @@ async def obtener_cuit_aporte(bonita, user_id):
     if len(cuit) > 32:
         raise HTTPException(422, "El cuitONG configurado en Bonita no es válido.")
     return cuit
+
+
+async def _obtener_cuit_seguro(bonita: BonitaService, user_id: int) -> str:
+    """Obtiene y valida el cuitONG del usuario; si usa BonitaValidacionService, garantiza login."""
+    if isinstance(bonita, BonitaValidacionService) and not bonita.api_token:
+        import os
+        auth = await bonita.login(os.getenv("BONITA_USER"), os.getenv("BONITA_PASSWORD"))
+        if not auth.get("success"):
+            raise HTTPException(502, "No se pudo autenticar la cuenta de servicio de Bonita.")
+    return await obtener_cuit_aporte(bonita, user_id)
+
+
+async def _obtener_ids_misma_ong(bonita: BonitaService, ong_cuit: str, fallback_user_id: int) -> list[int]:
+    """Devuelve todos los user_id de REPRESENTANTE_ONG que comparten el mismo cuitONG."""
+    ongs = await bonita.obtener_ongs_agrupadas_por_cuit(REPRESENTANTE_ONG)
+    for ong in ongs:
+        if ong.get("ong_cuit") and ong["ong_cuit"] == ong_cuit:
+            return [int(uid) for uid in ong.get("usuario_ids", [])]
+    return [int(fallback_user_id)]
+
+
+def _ong_tiene_participacion_confirmada_en_lote(
+    session: Session,
+    lote_id: int,
+    ong_cuit: str,
+    excluir_oferta_id: int | None = None,
+) -> bool:
+    """Verifica si una ONG (por ong_cuit) ya tiene participación confirmada o liderazgo en el lote."""
+    stmt_ofertas = select(Oferta).where(
+        Oferta.lote_id == lote_id,
+        Oferta.valida == True,
+        Oferta.descartada_en.is_(None),
+    )
+    ofertas_lote = session.exec(stmt_ofertas).all()
+    if not ofertas_lote:
+        return False
+
+    ofertas_ids = [o.id for o in ofertas_lote if excluir_oferta_id is None or o.id != excluir_oferta_id]
+    if not ofertas_ids:
+        return False
+
+    stmt_part = select(ParticipanteOferta).where(
+        ParticipanteOferta.oferta_id.in_(ofertas_ids),
+        ParticipanteOferta.ong_cuit == ong_cuit,
+        ParticipanteOferta.cantidad_aportada.is_not(None),
+    )
+    return session.exec(stmt_part).first() is not None
 
 class ResponderInvitacion(BaseModel):
     aceptar: bool
@@ -136,33 +183,20 @@ async def create_oferta_consorcio(
     if not es_lote_vigente(lote, emergencia):
         raise HTTPException(status_code=400, detail="La convocatoria de este lote ha expirado.")
 
-    
-    stmt_ofertas_lote = select(Oferta).where(
-        Oferta.lote_id == data.id_lote, Oferta.valida == True, Oferta.descartada_en.is_(None),
-    )
-    ofertas_en_lote = session.exec(stmt_ofertas_lote).all()
-    ofertas_ids = [o.id for o in ofertas_en_lote]
-
-    if ofertas_ids:
-        # Solo consideramos participación previa si YA FUE CONFIRMADA (cantidad_aportada no es None)
-        stmt_participacion_previa = select(ParticipanteOferta).where(
-            ParticipanteOferta.oferta_id.in_(ofertas_ids),
-            ParticipanteOferta.ong_id == ong_id_actual,
-            ParticipanteOferta.cantidad_aportada.is_not(None) # <--- FILTRO CLAVE
-        )
-        if session.exec(stmt_participacion_previa).first():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Ya estás participando en una oferta o consorcio para este lote."
-            )
-    # Cada oferta puede pedir hasta el total del lote de forma independiente
     if data.cantidad_lider > lote.cantidad:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Tu aporte no puede superar el total requerido por el lote ({lote.cantidad} unidades)."
         )
 
-    ong_cuit = await obtener_cuit_aporte(bonita, ong_id_actual)
+    ong_cuit = await _obtener_cuit_seguro(bonita, ong_id_actual)
+
+    # Cada ONG (identificada por ong_cuit) solo puede tener una participación confirmada por lote
+    if _ong_tiene_participacion_confirmada_en_lote(session, data.id_lote, ong_cuit):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tu ONG ya está participando en una oferta o consorcio para este lote."
+        )
 
     # 1. Crear la Oferta cabecera
     nueva_oferta = Oferta(
@@ -172,7 +206,7 @@ async def create_oferta_consorcio(
     session.add(nueva_oferta)
     session.flush()
 
-    # 2. Agregar al líder como participante confirmado
+    # 2. Agregar al líder como participante confirmado con su ong_cuit
     lider_participante = ParticipanteOferta(
         oferta_id=nueva_oferta.id,
         ong_id=ong_id_actual,
@@ -181,22 +215,52 @@ async def create_oferta_consorcio(
     )
     session.add(lider_participante)
 
-    # 3. Registrar invitaciones a otras ONGs
-    for ong_invitada_id in data.invitados:
-        if ong_invitada_id == ong_id_actual:
+    # 3. Registrar invitaciones para todos los miembros de cada ONG invitada (por ong_cuit)
+    ongs_bonita = await bonita.obtener_ongs_agrupadas_por_cuit(REPRESENTANTE_ONG)
+    user_to_ong = {}
+    for ong in ongs_bonita:
+        for uid in ong.get("usuario_ids", []):
+            user_to_ong[int(uid)] = ong
+
+    invitaciones_creadas: set[tuple[int, str | None]] = set()
+    cuits_invitados_unicos: set[str] = set()
+
+    for raw_invitado_id in (data.invitados or []):
+        invitado_uid = int(raw_invitado_id)
+        ong_invitada = user_to_ong.get(invitado_uid)
+        cuit_invitada = ong_invitada.get("ong_cuit") if ong_invitada else await _obtener_cuit_seguro(bonita, invitado_uid)
+
+        # No invitar a la propia ONG
+        if cuit_invitada and cuit_invitada == ong_cuit:
             continue
-        invitacion = ParticipanteOferta(
-            oferta_id=nueva_oferta.id,
-            ong_id=ong_invitada_id,
-            cantidad_aportada=None
+        if not cuit_invitada and invitado_uid == ong_id_actual:
+            continue
+
+        usuarios_a_invitar = (
+            [int(u) for u in ong_invitada.get("usuario_ids", [])]
+            if ong_invitada and cuit_invitada
+            else [invitado_uid]
         )
-        session.add(invitacion)
+
+        for uid_miembro in usuarios_a_invitar:
+            clave_inv = (uid_miembro, cuit_invitada)
+            if clave_inv in invitaciones_creadas:
+                continue
+            invitaciones_creadas.add(clave_inv)
+            session.add(ParticipanteOferta(
+                oferta_id=nueva_oferta.id,
+                ong_id=uid_miembro,
+                ong_cuit=cuit_invitada,
+                cantidad_aportada=None
+            ))
+
+        if cuit_invitada:
+            cuits_invitados_unicos.add(cuit_invitada)
 
     session.commit()
-    invitados_reales = [uid for uid in (data.invitados or []) if uid != ong_id_actual]
     mensaje = (
         "Oferta en consorcio creada con éxito"
-        if len(invitados_reales) > 0
+        if len(cuits_invitados_unicos) > 0
         else "Oferta individual creada con éxito"
     )
 
@@ -261,17 +325,25 @@ async def responder_invitacion(
     lote = session.get(Lote, oferta.lote_id)
     exigir_oferta_activa(oferta, lote)
 
+    ong_cuit_actual = await _obtener_cuit_seguro(bonita, ong_id_actual)
+
     stmt = select(ParticipanteOferta).where(
         ParticipanteOferta.oferta_id == oferta_id,
-        ParticipanteOferta.ong_id == ong_id_actual
+        (ParticipanteOferta.ong_id == ong_id_actual) | (ParticipanteOferta.ong_cuit == ong_cuit_actual)
     )
-    participacion = session.exec(stmt).first()
+    participaciones_ong = session.exec(stmt).all()
+    participacion = next(
+        (p for p in participaciones_ong if p.cantidad_aportada is None),
+        None
+    )
     if not participacion:
-        raise HTTPException(status_code=404, detail="No tenés ninguna invitación pendiente para esta oferta.")
+        raise HTTPException(404, "No tenés ninguna invitación pendiente para esta oferta.")
 
-    # Si rechaza la invitación, se elimina la participación y listo (no hay problema)
+    # Si rechaza, eliminamos las invitaciones pendientes de esta ONG en esta oferta
     if not data.aceptar:
-        session.delete(participacion)
+        for p in participaciones_ong:
+            if p.cantidad_aportada is None:
+                session.delete(p)
         session.commit()
         return {"mensaje": "Has rechazado la invitación al consorcio."}
 
@@ -279,67 +351,48 @@ async def responder_invitacion(
         raise HTTPException(status_code=422, detail="Debes indicar una cantidad mayor a 0.")
 
     emergencia = session.get(Emergencia, lote.emergenciaId)
-
     if not es_lote_vigente(lote, emergencia):
         raise HTTPException(status_code=400, detail="La convocatoria del lote ha expirado.")
 
-    #  Verificar si ya participa en otra oferta para este lote ---
-    stmt_ofertas_lote = select(Oferta).where(
-        Oferta.lote_id == oferta.lote_id,
-        Oferta.valida == True,
-        Oferta.descartada_en.is_(None)
-    )
-    ofertas_en_lote = session.exec(stmt_ofertas_lote).all()
-    ofertas_ids = [o.id for o in ofertas_en_lote]
-
-    if ofertas_ids:
-        # 1. ¿Es líder de otra oferta en este lote?
-        lider_en_otra = any(o.ong_lider_id == ong_id_actual and o.id != oferta_id for o in ofertas_en_lote)
-        
-        # 2. ¿Ya tiene una participación CONFIRMADA en otra oferta de este lote?
-        stmt_otra_part = select(ParticipanteOferta).where(
-            ParticipanteOferta.oferta_id.in_(ofertas_ids),
-            ParticipanteOferta.oferta_id != oferta_id,
-            ParticipanteOferta.ong_id == ong_id_actual,
-            ParticipanteOferta.cantidad_aportada.is_not(None)
+    # Verificar si esta ONG (por ong_cuit) ya participa de forma confirmada en otra oferta del lote
+    if _ong_tiene_participacion_confirmada_en_lote(session, oferta.lote_id, ong_cuit_actual, excluir_oferta_id=oferta_id):
+        for p in participaciones_ong:
+            if p.cantidad_aportada is None:
+                session.delete(p)
+        session.commit()
+        raise HTTPException(
+            status_code=400,
+            detail="Tu ONG ya tiene una oferta activa o participa de forma confirmada en este lote. Esta invitación ha sido descartada."
         )
-        otra_participacion_confirmada = session.exec(stmt_otra_part).first()
 
-        if lider_en_otra or otra_participacion_confirmada:
-            # --- LIMPIEZA AUTOMÁTICA ---
-            # Como ya está participando en otro lado, borramos esta invitación basura para que desaparezca de su vista
-            session.delete(participacion)
-            session.commit()
-            # ---------------------------
-            
-            raise HTTPException(
-                status_code=400,
-                detail="Ya tenés una oferta activa o participas de forma confirmada en otro consorcio para este lote. Esta invitación ha sido descartada."
-            )
-    # ------------------------------------------------------------------------------
-
-    # Calcular cuánto lleva sumado ESTA oferta en consorcio en total
+    # Calcular cuánto llevan sumado OTRAS ONGs (distinto ong_cuit) en esta oferta
     stmt_parts = select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta_id)
     todos_participantes = session.exec(stmt_parts).all()
-    
-    suma_actual_oferta = sum(p.cantidad_aportada for p in todos_participantes if p.cantidad_aportada is not None and p.ong_id != ong_id_actual)
-    
-    total_propuesto = suma_actual_oferta + data.cantidad_aportada
+
+    suma_otras_ongs = sum(
+        p.cantidad_aportada
+        for p in todos_participantes
+        if p.cantidad_aportada is not None and p.ong_cuit != ong_cuit_actual
+    )
+
+    total_propuesto = suma_otras_ongs + data.cantidad_aportada
     if total_propuesto > lote.cantidad:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"El total de esta oferta ({total_propuesto}) supera el máximo del lote ({lote.cantidad})."
         )
 
-    if participacion.cantidad_aportada is None:
-        participacion.ong_cuit = await obtener_cuit_aporte(bonita, ong_id_actual)
-    elif not participacion.ong_cuit:
-        raise HTTPException(409, "Debe revisarse la ONG de origen del aporte antes de modificarlo.")
-        
+    # Confirmar la participación actual y eliminar las demás invitaciones pendientes de la misma ONG en esta oferta
+    participacion.ong_id = ong_id_actual
+    participacion.ong_cuit = ong_cuit_actual
     participacion.cantidad_aportada = data.cantidad_aportada
     session.add(participacion)
-    session.commit()
 
+    for p in participaciones_ong:
+        if p.id != participacion.id and p.cantidad_aportada is None:
+            session.delete(p)
+
+    session.commit()
     return {"mensaje": "Invitación aceptada y aporte registrado con éxito."}
 
 
@@ -348,21 +401,25 @@ async def responder_invitacion(
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
 )
-def get_mis_ofertas_consorcio(
+async def get_mis_ofertas_consorcio(
     current_user: dict = Depends(get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    bonita: BonitaService = Depends(get_bonita_validacion_service),
 ):
     ong_id_actual = int(current_user['user_id'])
+    ong_cuit_actual = await _obtener_cuit_seguro(bonita, ong_id_actual)
+    ids_misma_ong = await _obtener_ids_misma_ong(bonita, ong_cuit_actual, ong_id_actual)
     ahora = datetime.now(timezone.utc)
 
-    # 1. Consultar participaciones actuales de la ONG (solo lectura, sin escrituras en BDD)
-    stmt_participaciones = select(ParticipanteOferta).where(ParticipanteOferta.ong_id == ong_id_actual)
+    stmt_participaciones = select(ParticipanteOferta).where(
+        (ParticipanteOferta.ong_cuit == ong_cuit_actual) | (ParticipanteOferta.ong_id.in_(ids_misma_ong))
+    )
     participaciones = session.exec(stmt_participaciones).all()
     ofertas_ids = [p.oferta_id for p in participaciones]
 
     stmt_ofertas = select(Oferta).where(
         Oferta.descartada_en.is_(None),
-        (Oferta.ong_lider_id == ong_id_actual) | (Oferta.id.in_(ofertas_ids if ofertas_ids else [0]))
+        (Oferta.ong_lider_id.in_(ids_misma_ong)) | (Oferta.id.in_(ofertas_ids if ofertas_ids else [0]))
     )
     ofertas = session.exec(stmt_ofertas).all()
 
@@ -370,8 +427,7 @@ def get_mis_ofertas_consorcio(
     for oferta in ofertas:
         lote = session.get(Lote, oferta.lote_id)
         emergencia = session.get(Emergencia, lote.emergenciaId) if lote else None
-        
-        # Validar vigencia del lote
+
         vigente = False
         if lote and lote.fechaLimiteConvocatoria:
             fecha_limite = lote.fechaLimiteConvocatoria
@@ -382,33 +438,64 @@ def get_mis_ofertas_consorcio(
         stmt_parts = select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta.id)
         todos_participantes = session.exec(stmt_parts).all()
 
-        es_lider = (oferta.ong_lider_id == ong_id_actual)
-        mi_participacion = next((p for p in todos_participantes if p.ong_id == ong_id_actual), None)
-        
-        # Red de seguridad visual: si venció hace segundos y Bonita aún no corrió el conector, igual no la mostramos
-        if not es_lider and mi_participacion and mi_participacion.cantidad_aportada is None and not vigente:
+        # Agrupar participantes por ong_cuit (para mostrar una entrada por ONG)
+        participantes_por_ong: dict[str, dict] = {}
+        for p in todos_participantes:
+            clave = p.ong_cuit or f"uid-{p.ong_id}"
+            if clave not in participantes_por_ong:
+                participantes_por_ong[clave] = {
+                    "ong_id": p.ong_id,
+                    "ong_cuit": p.ong_cuit,
+                    "cantidad_aportada": p.cantidad_aportada,
+                }
+            else:
+                # Si ya existía una pendiente y ahora hay una confirmada, priorizamos la confirmada
+                if participantes_por_ong[clave]["cantidad_aportada"] is None and p.cantidad_aportada is not None:
+                    participantes_por_ong[clave]["cantidad_aportada"] = p.cantidad_aportada
+                    participantes_por_ong[clave]["ong_id"] = p.ong_id
+
+        es_lider = oferta.ong_lider_id in ids_misma_ong
+        mi_part_confirmada = next(
+            (p for p in todos_participantes if (p.ong_cuit == ong_cuit_actual or p.ong_id in ids_misma_ong) and p.cantidad_aportada is not None),
+            None
+        )
+        mi_part_pendiente = next(
+            (p for p in todos_participantes if (p.ong_cuit == ong_cuit_actual or p.ong_id in ids_misma_ong) and p.cantidad_aportada is None),
+            None
+        )
+
+        # Ocultar invitaciones pendientes vencidas
+        if not es_lider and mi_part_confirmada is None and mi_part_pendiente is not None and not vigente:
             continue
 
-        es_invitacion_pendiente = (not es_lider and mi_participacion and mi_participacion.cantidad_aportada is None)
+        es_invitacion_pendiente = (not es_lider and mi_part_confirmada is None and mi_part_pendiente is not None)
 
         if not es_invitacion_pendiente:
-            participantes_confirmados = [p for p in todos_participantes if p.cantidad_aportada is not None]
-            if len(participantes_confirmados) < 2:
+            confirmados_unicos = [v for v in participantes_por_ong.values() if v["cantidad_aportada"] is not None]
+            if len(confirmados_unicos) < 2:
                 continue
 
-        estado_invitacion = "lider" if es_lider else ("pendiente" if mi_participacion and mi_participacion.cantidad_aportada is None else "aceptada")
+        if es_lider:
+            estado_invitacion = "lider"
+        elif mi_part_confirmada is not None:
+            estado_invitacion = "aceptada"
+        else:
+            estado_invitacion = "pendiente"
+
+        mi_aporte = (
+            mi_part_confirmada.cantidad_aportada
+            if mi_part_confirmada is not None
+            else (next((p.cantidad_aportada for p in todos_participantes if p.ong_id == oferta.ong_lider_id and p.cantidad_aportada is not None), None) if es_lider else None)
+        )
 
         resultado.append({
             "oferta_id": oferta.id,
             "es_lider": es_lider,
             "estado_invitacion": estado_invitacion,
-            "mi_aporte": mi_participacion.cantidad_aportada if mi_participacion else None,
+            "mi_aporte": mi_aporte,
             "lote": lote,
             "emergencia": emergencia,
-            "participantes": [
-                {"ong_id": p.ong_id, "cantidad_aportada": p.cantidad_aportada} 
-                for p in todos_participantes
-            ]
+            "participantes": list(participantes_por_ong.values()),
         })
 
     return resultado
@@ -419,24 +506,25 @@ def get_mis_ofertas_consorcio(
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
 )
-def get_mis_ofertas_compat(
+async def get_mis_ofertas_compat(
     current_user: dict = Depends(get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    bonita: BonitaService = Depends(get_bonita_validacion_service),
 ):
-    """Endpoint de compatibilidad para el frontend que consulta /misofertas"""
+    """Devuelve las ofertas confirmadas de la ONG (por ong_cuit) para cualquier representante de esa ONG."""
     ong_id_actual = int(current_user['user_id'])
-    
-    # 1. Traer solo las participaciones confirmadas (donde cantidad_aportada NO sea None)
+    ong_cuit_actual = await _obtener_cuit_seguro(bonita, ong_id_actual)
+    ids_misma_ong = await _obtener_ids_misma_ong(bonita, ong_cuit_actual, ong_id_actual)
+
     stmt_participaciones = select(ParticipanteOferta).where(
-        ParticipanteOferta.ong_id == ong_id_actual,
+        (ParticipanteOferta.ong_cuit == ong_cuit_actual) | (ParticipanteOferta.ong_id.in_(ids_misma_ong)),
         ParticipanteOferta.cantidad_aportada != None
     )
     participaciones = session.exec(stmt_participaciones).all()
     ofertas_ids = [p.oferta_id for p in participaciones]
 
-    # 2. Traer las ofertas donde el usuario sea líder o tenga una participación confirmada
     stmt_ofertas = select(Oferta).where(
-        (Oferta.ong_lider_id == ong_id_actual) | (Oferta.id.in_(ofertas_ids if ofertas_ids else [0]))
+        (Oferta.ong_lider_id.in_(ids_misma_ong)) | (Oferta.id.in_(ofertas_ids if ofertas_ids else [0]))
     )
     ofertas = session.exec(stmt_ofertas).all()
 
@@ -445,13 +533,15 @@ def get_mis_ofertas_compat(
     for oferta in ofertas:
         lote = session.get(Lote, oferta.lote_id)
         emergencia = session.get(Emergencia, lote.emergenciaId) if lote else None
-        
+
         stmt_parts = select(ParticipanteOferta).where(ParticipanteOferta.oferta_id == oferta.id)
         todos_participantes = session.exec(stmt_parts).all()
-        mi_participacion = next((p for p in todos_participantes if p.ong_id == ong_id_actual), None)
 
-        # 3. Ignorar invitaciones pendientes de respuesta
-        if not mi_participacion or mi_participacion.cantidad_aportada is None:
+        mi_participacion = next(
+            (p for p in todos_participantes if (p.ong_cuit == ong_cuit_actual or p.ong_id in ids_misma_ong) and p.cantidad_aportada is not None),
+            None
+        )
+        if not mi_participacion:
             continue
 
         if lote and lote.fechaLimiteConvocatoria:
@@ -471,6 +561,7 @@ def get_mis_ofertas_compat(
             "id_lote": oferta.lote_id,
             "cant_recurso": mi_participacion.cantidad_aportada,
             "id_ong": oferta.ong_lider_id,
+            "ong_cuit": mi_participacion.ong_cuit or ong_cuit_actual,
             "lote_tipo": lote.tipoRecurso if lote else "",
             "lote_cantidad_total": lote.cantidad if lote else 0,
             "lote_cantidad_cubierta": lote.cantidadCubierta or 0,
@@ -491,33 +582,21 @@ def get_mis_ofertas_compat(
 )
 async def listar_ongs_desde_bonita(
     current_user: dict = Depends(get_current_user),
-    bonita: BonitaService = Depends(get_bonita_service)
+    bonita: BonitaService = Depends(get_bonita_validacion_service)
 ):
     ong_id_actual = int(current_user['user_id'])
     try:
-        # Usamos el método del servicio BonitaService para obtener los usuarios con el rol "representante_ong"
-        usuarios = await bonita.obtener_usuarios_por_rol(REPRESENTANTE_ONG)
-       
-        resultado = []
-
-        for u in usuarios:
-
-            uid = int(u.get("id", 0))
-
-            # Filtrar para no mostrar a la ONG actual
-
-            if uid != ong_id_actual:
-                firstname = u.get('firstname', '') or ''
-                lastname = u.get('lastname', '') or ''
-                nombre_completo = f"{firstname} {lastname}".strip()
-                nombre = nombre_completo if nombre_completo else u.get('userName', f"ONG #{uid}")
-                resultado.append({
-                    "id": uid,
-                    "nombre": nombre
-                })
-
-        return resultado
-
+        mi_cuit = await _obtener_cuit_seguro(bonita, ong_id_actual)
+        ongs = await bonita.obtener_ongs_agrupadas_por_cuit(REPRESENTANTE_ONG)
+        return [
+            {
+                "id": ong["id"],
+                "ong_cuit": ong["ong_cuit"],
+                "nombre": ong["nombre"],
+            }
+            for ong in ongs
+            if not (mi_cuit and ong.get("ong_cuit") == mi_cuit) and int(ong["id"]) != ong_id_actual
+        ]
     except Exception as e:
         traceback.print_exc()
         print("Error obteniendo usuarios de Bonita:", e)
@@ -528,11 +607,12 @@ async def listar_ongs_desde_bonita(
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_roles(REPRESENTANTE_ONG))]
 )
-def editar_aporte_oferta(
+async def editar_aporte_oferta(
     oferta_id: int,
     data: OfertaUpdate,
     current_user: dict = Depends(get_current_user),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
+    bonita: BonitaService = Depends(get_bonita_validacion_service),
 ):
     ong_id_actual = int(current_user['user_id'])
 
@@ -555,41 +635,40 @@ def editar_aporte_oferta(
     if not es_lote_vigente(lote, emergencia):
         raise HTTPException(status_code=400, detail="La convocatoria de este lote ha expirado.")
 
-    # Buscar la participación de la ONG actual en esta oferta
+    ong_cuit_actual = await _obtener_cuit_seguro(bonita, ong_id_actual)
+    ids_misma_ong = await _obtener_ids_misma_ong(bonita, ong_cuit_actual, ong_id_actual)
+
     stmt = select(ParticipanteOferta).where(
         ParticipanteOferta.oferta_id == oferta_id,
-        ParticipanteOferta.ong_id == ong_id_actual
+        ((ParticipanteOferta.ong_cuit == ong_cuit_actual) | (ParticipanteOferta.ong_id.in_(ids_misma_ong))),
+        ParticipanteOferta.cantidad_aportada.is_not(None)
     )
     participacion = session.exec(stmt).first()
     if not participacion:
-        raise HTTPException(status_code=403, detail="No formas parte de esta oferta en consorcio.")
+        raise HTTPException(status_code=403, detail="Tu ONG no forma parte confirmada de esta oferta.")
 
-    # 1. Sumar lo aportado por los DEMÁS miembros de la oferta (excluyendo al usuario actual)
+    # Sumar lo aportado por las DEMÁS ONGs (distinto ong_cuit)
     stmt_otros = select(ParticipanteOferta).where(
         ParticipanteOferta.oferta_id == oferta_id,
-        ParticipanteOferta.ong_id != ong_id_actual
+        ParticipanteOferta.ong_cuit != ong_cuit_actual,
+        ParticipanteOferta.cantidad_aportada.is_not(None)
     )
     otros_participantes = session.exec(stmt_otros).all()
     aporte_otros = sum(p.cantidad_aportada for p in otros_participantes if p.cantidad_aportada is not None)
 
-    # 2. Verificar que el nuevo aporte + lo aportado por los demás no supere el total del lote
     if (aporte_otros + data.cant_recurso) > lote.cantidad:
         max_permitido = lote.cantidad - aporte_otros
         raise HTTPException(
             status_code=400,
-            detail=f"La nueva cantidad supera el límite del lote. Los demás miembros aportan {aporte_otros}. Tu máximo posible es {max_permitido}."
+            detail=f"La nueva cantidad supera el límite del lote. Las demás ONGs aportan {aporte_otros}. El máximo posible es {max_permitido}."
         )
 
-    if not participacion.ong_cuit:
-        raise HTTPException(409, "Debe revisarse la ONG de origen del aporte antes de modificarlo.")
-
-    # 3. Guardar el nuevo aporte
+    participacion.ong_cuit = participacion.ong_cuit or ong_cuit_actual
     participacion.cantidad_aportada = data.cant_recurso
     session.add(participacion)
     session.commit()
 
     return {"mensaje": "Aporte actualizado correctamente en el consorcio."}
-
 @router.patch(
     "/{oferta_id}/invalida",
     status_code=status.HTTP_200_OK,
