@@ -25,6 +25,7 @@ def require_roles(*roles: str):
     allowed = set(roles)
 
     async def checker(current_user=Depends(get_current_user)):
+        print("ROLES:", get_user_roles(current_user), "| permitido:", allowed, "| user:", current_user)
         if not get_user_roles(current_user) & allowed:
             raise HTTPException(
                 status_code=403,

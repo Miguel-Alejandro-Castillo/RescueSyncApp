@@ -14,9 +14,19 @@ from models.oferta import Oferta
 from models.participante_oferta import ParticipanteOferta
 from services.bonita_service import BonitaService
 
+import asyncio
+import logging
+
 router = APIRouter(
     prefix="/monitoreo",
     tags=["monitoreo"]
+)
+
+logger = logging.getLogger(__name__)
+
+TAREAS_CIERRE = (
+    "Monitorear la ejecucion",
+    "Ejecutar y finalizar actividades de ayuda",
 )
 
 class EventoRequest(BaseModel):
@@ -38,6 +48,30 @@ def get_ongs_de_emergencia(session: Session, emergencia_id: int):
         finalizada = participante.tareas_finalizadas
         ongs[participante.ong_id] = ongs.get(participante.ong_id, True) and finalizada
     return ongs
+
+async def completar_tareas_cierre(bonita: BonitaService, case_id: str, intentos: int = 5, espera: float = 1.0):
+    """Completa 'Monitorear la ejecucion' y 'Ejecutar y finalizar actividades de ayuda'."""
+    pendientes = set(TAREAS_CIERRE)
+
+    for _ in range(intentos):
+        tareas = await bonita.obtener_tareas_humanas_por_caso(case_id)
+        for tarea in tareas:
+            nombre = " ".join(tarea["name"].split())
+            if nombre in pendientes:
+                await bonita.completar_tarea_humana(tarea["id"])
+                pendientes.discard(nombre)
+
+        if not pendientes:
+            return
+        await asyncio.sleep(espera)
+
+    if len(pendientes) == len(TAREAS_CIERRE):
+        raise Exception(
+            "No se encontraron las tareas de cierre del caso en Bonita: "
+            + ", ".join(sorted(pendientes))
+        )
+    logger.warning("Caso %s: quedaron tareas sin completar: %s", case_id, sorted(pendientes))
+
 
 @router.get("", dependencies=[Depends(require_roles(CENTRO_COORDINADOR))])
 def get_monitoreo(session: Session = Depends(get_session)):
@@ -227,10 +261,7 @@ async def finalizar_monitoreo(
         session.add(emergencia)
 
         if emergencia.bonitaCaseId:
-            tareas = await bonita.obtener_tareas_humanas_por_caso(emergencia.bonitaCaseId)
-            tarea = next((t for t in tareas if t["name"].strip() == "Monitorear la ejecucion"), None)
-            if tarea:
-                await bonita.completar_tarea_humana(tarea["id"])
+            await completar_tareas_cierre(bonita, emergencia.bonitaCaseId)
 
         session.commit()
     except Exception as e:

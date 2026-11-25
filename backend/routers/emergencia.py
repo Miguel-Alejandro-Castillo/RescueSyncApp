@@ -7,9 +7,8 @@ from routers.monitoreo import get_participantes_adjudicados
 from fastapi import Depends, HTTPException, Response
 from dependencies.jwt_auth import get_current_user
 from dependencies.bonita import get_bonita_service
-from dependencies.rbac import (
-    require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES, USUARIO_BONITA
-)
+from dependencies.rbac import require_roles, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, REPRESENTANTE_ONG, AUDITORES, USUARIO_BONITA
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 from database import get_session
@@ -28,7 +27,7 @@ router = APIRouter(
     prefix="/emergencias",
     tags=["emergencias"]
 )
-@router.get("", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, *AUDITORES))])
+@router.get("", dependencies=[Depends(require_roles(USUARIO_BONITA, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, *AUDITORES))])
 def read_emergencias(
     estado: str | None = None,
     nivelGravedad: str | None = None,
@@ -62,7 +61,7 @@ def read_emergencias(
 
     return session.exec(query.order_by(Emergencia.fechaCreacion.desc(), Emergencia.id.desc())).all()
 
-@router.get("/{emergencia_id}", dependencies=[Depends(require_roles(OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, *AUDITORES))])
+@router.get("/{emergencia_id:int}", dependencies=[Depends(require_roles(USUARIO_BONITA, OPERADOR_MUNICIPAL, CENTRO_COORDINADOR, *AUDITORES))])
 def read_emergencia(
     emergencia_id: int,
     session: Session = Depends(get_session)
@@ -180,7 +179,7 @@ class NotificarTimeoutRequest(BaseModel):
 @router.post("/notificar_timeout", dependencies=[Depends(require_roles(USUARIO_BONITA))], status_code=204)
 async def notificar_por_timeout(
     request: NotificarTimeoutRequest,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ):
     # buscar emergencia por case_id en Bonita
     emergencia = session.exec(select(Emergencia).where(Emergencia.bonitaCaseId == request.case_id)).first()
@@ -213,7 +212,7 @@ async def notificar_por_timeout(
 @router.get("/ofertas_finalizadas_emergencia", status_code=200, dependencies=[Depends(require_roles(USUARIO_BONITA))])
 async def obtener_ofertas_finalizadas_emergencia(
     case_id: str,
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ):
     # 1. Buscar emergencia por case_id
     emergencia = session.exec(
