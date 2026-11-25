@@ -484,10 +484,12 @@ class BonitaService:
     async def obtener_ongs_agrupadas_por_cuit(self, role_name: str) -> list[dict]:
         """
         Obtiene usuarios con el rol indicado y los agrupa por cuitONG.
-        Cada elemento representa una ONG única con sus user_ids asociados.
+        Cada elemento representa una ONG única con sus user_ids asociados,
+        resolviendo el nombre real desde Bonita o desde la extensión sistemaNacional.
         """
         usuarios = await self.obtener_usuarios_por_rol(role_name)
         agrupadas: dict[str, dict] = {}
+        nombres_nacional_por_cuit: dict[str, str | None] = {}
 
         for u in usuarios:
             uid = int(u.get("id", 0))
@@ -500,9 +502,35 @@ class BonitaService:
             lastname = (u.get("lastname") or "").strip()
             nombre_usuario = f"{firstname} {lastname}".strip() or u.get("userName") or f"ONG #{uid}"
 
+            nombre_desde_nacional = None
+            if cuit and not info["nombre_ong"]:
+                if cuit not in nombres_nacional_por_cuit:
+                    try:
+                        ong_ext = await self.get_ong_by_cuit(cuit)
+                        if isinstance(ong_ext, dict):
+                            nombres_nacional_por_cuit[cuit] = (
+                                (
+                                    ong_ext.get("razonSocial")
+                                    or ong_ext.get("nombre")
+                                    or ong_ext.get("razon_social")
+                                    or ""
+                                ).strip()
+                                or None
+                            )
+                        else:
+                            nombres_nacional_por_cuit[cuit] = None
+                    except Exception:
+                        nombres_nacional_por_cuit[cuit] = None
+
+                nombre_desde_nacional = nombres_nacional_por_cuit[cuit]
+
             # Clave de agrupación: el CUIT si está configurado; si no, fallback por usuario
             clave = cuit if cuit else f"sin-cuit-{uid}"
-            nombre_ong = info["nombre_ong"] or (f"ONG CUIT {cuit}" if cuit else nombre_usuario)
+            nombre_ong = (
+                info["nombre_ong"]
+                or nombre_desde_nacional
+                or (f"ONG CUIT {cuit}" if cuit else nombre_usuario)
+            )
 
             if clave not in agrupadas:
                 agrupadas[clave] = {
