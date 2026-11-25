@@ -12,6 +12,7 @@ class BonitaService:
     IDENTITY_API = "/API/identity"
     SYSTEM_API = "/API/system"
     CUSTOM_USER_INFO_API = "/API/customuserinfo"
+    EXTENSION_SISTEMA_NACIONAL_API = "/API/extension/sistemaNacional"
 
     def __init__(self):
         base_url = os.getenv("BONITA_ENGINE_URL")
@@ -443,6 +444,7 @@ class BonitaService:
             if len(values) < 100:
                 return None
             page += 1
+
     async def obtener_info_ong_usuario(self, user_id: int) -> dict:
         """
         Devuelve {'cuit': str | None, 'nombre_ong': str | None} a partir de
@@ -515,6 +517,39 @@ class BonitaService:
                 agrupadas[clave]["representantes"].append(nombre_usuario)
 
         return list(agrupadas.values())
+    # Consulta ONGs mediante la extensión REST 'sistemaNacional' en Bonita Engine
+    async def get_ongs(self, cuit: str | None = None) -> dict:
+        """
+        Consulta las ONGs en el Sistema Nacional a través de la extensión REST de Bonita:
+        GET /API/extension/sistemaNacional/ongs?cuit=<cuit>
+        Retorna un Listado de ONGS
+        """
+        params = {}
+        if cuit:
+            params["cuit"] = str(cuit).strip()
+
+        response = await self.http_client.get(
+            f"{self.EXTENSION_SISTEMA_NACIONAL_API}/ongs",
+            headers=self._auth_headers(),
+            params=params or None,
+        )
+        return response.json()
+
+    # Obtiene una sola ONG por su CUIT invocando get_ongs
+    async def get_ong_by_cuit(self, cuit: str) -> dict | None:
+        """
+        Consulta y retorna una única ONG a partir de su CUIT.
+        Devuelve el objeto de la ONG directamente (o None si no existe o no se encuentra).
+        """
+        if not cuit or not str(cuit).strip():
+            return None
+
+        resultado = await self.get_ongs(cuit=cuit)
+        ongs = resultado.get("data") if isinstance(resultado, dict) else None
+        if ongs and isinstance(ongs, list) and len(ongs) > 0:
+            return ongs[0]
+
+        return None
 
 class BonitaValidacionService(BonitaService):
     """Autentica al consultar identidades; permite guardar y reintentar fallas."""
