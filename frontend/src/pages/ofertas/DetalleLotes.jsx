@@ -183,9 +183,16 @@ export default function DetalleLotes() {
         throw new Error(data.detail || 'Error al procesar la oferta en consorcio');
       }
 
-      const mensajeExitoFinal = hacerConsorcio
+      const esConsorcioReal = idsInvitados.length > 0;
+      const mensajeExitoFinal =
+        data?.mensaje ||
+       (esConsorcioReal
         ? '¡Oferta en consorcio creada con éxito!'
-        : '¡Oferta creada con éxito!';
+       : '¡Oferta creada con éxito!');
+
+      navigate('/ofertas', {
+       state: { mensajeExito: mensajeExitoFinal }
+       });
 
       navigate('/ofertas', {
         state: { mensajeExito: mensajeExitoFinal }
