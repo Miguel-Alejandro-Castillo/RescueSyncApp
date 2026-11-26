@@ -119,6 +119,7 @@ services:
     volumes:
       - ./backend:/app
     environment:
+      RESCUESYNC_API_URL: "http://localhost:3000/api/rescue"
       PORT: 3000
       HOST: 0.0.0.0
       DATABASE_URL: postgresql://bonita:bpm@bonita-db:5432/rescuesync

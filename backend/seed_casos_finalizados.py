@@ -20,6 +20,7 @@ import argparse
 import asyncio
 import base64
 import json
+import os
 import random
 import sys
 import time
@@ -28,8 +29,8 @@ import httpx
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-API = "http://localhost:3000/api/rescue"
-BONITA = "http://localhost:8080/bonita"
+API = os.getenv("RESCUESYNC_API_URL", "http://localhost:3000/api/rescue")
+BONITA = os.getenv("BONITA_ENGINE_URL", "http://localhost:8080/bonita")
 PASSWORD = "bpm"
 MUNICIPAL, COORDINADOR = "william.jobs", "michael.morrison"
 BONITA_USER = ("bonita.bpm", "bpm")
