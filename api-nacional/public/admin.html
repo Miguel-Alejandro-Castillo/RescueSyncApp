@@ -332,23 +332,23 @@
           <form id="ongForm" novalidate>
             <div class="field">
               <label for="razonSocial">Razón Social *</label>
-              <input id="razonSocial" type="text" placeholder="Ej: Fundación Rescate Solidario" required />
+              <input id="razonSocial" type="text" maxlength="120" placeholder="Ej: Fundación Rescate Solidario" required />
             </div>
 
             <div class="row">
               <div class="field">
                 <label for="sigla">Sigla *</label>
-                <input id="sigla" type="text" placeholder="Ej: FRS" required />
+                <input id="sigla" type="text" maxlength="30" placeholder="Ej: FRS" required />
               </div>
               <div class="field">
                 <label for="cuit">CUIT *</label>
-                <input id="cuit" type="text" placeholder="Ej: 30-71234567-8" required />
+                <input id="cuit" type="text" maxlength="13" placeholder="Ej: 30-71234567-8" required />
               </div>
             </div>
 
             <div class="field">
               <label for="descripcion">Descripción</label>
-              <textarea id="descripcion" placeholder="Opcional..."></textarea>
+              <textarea id="descripcion" maxlength="500" placeholder="Opcional..."></textarea>
             </div>
 
             <div class="divider">
@@ -391,7 +391,7 @@
             </div>
             <form id="addStockForm" class="stock-row" novalidate>
               <select id="detailRecurso" required></select>
-              <input id="detailCantidad" type="number" min="1" step="1" placeholder="Cant." required />
+              <input id="detailCantidad" type="number" min="1" max="1000000" step="1" placeholder="Cant." required />
               <button id="btnAddStock" class="btn btn-primary" type="submit">Agregar</button>
             </form>
           </div>
@@ -403,6 +403,8 @@
   <script>
     const API = '/api/v1';
     const TOKEN_KEY = 'api_nacional_jwt';
+    const MAX_STOCK = 1000000;
+    const CUIT_REGEX = /^\d{2}-\d{8}-\d$/;
     const $ = (id) => document.getElementById(id);
 
     const state = {
@@ -470,7 +472,7 @@
       row.className = 'stock-row';
       row.innerHTML = `
         <select class="r-select" required>${resourceOptions()}</select>
-        <input class="r-qty" type="number" min="1" step="1" placeholder="Cant." required />
+        <input class="r-qty" type="number" min="1" max="${MAX_STOCK}" step="1" placeholder="Cant." required />
         <button type="button" class="btn btn-remove">Quitar</button>
       `;
       row.querySelector('button').addEventListener('click', () => {
@@ -659,14 +661,26 @@
         $('cuit').focus();
         return;
       }
-
-      // Validar CUIT / sigla duplicados contra el catálogo cargado
-      if (state.ongs.some((o) => o.cuit.toLowerCase() === cuit.toLowerCase())) {
-        showAlert($('globalAlert'), `Ya existe una ONG registrada con el CUIT ${cuit}.`, false);
+      if (!CUIT_REGEX.test(cuit)) {
+        showAlert($('globalAlert'), 'El CUIT debe tener el formato XX-XXXXXXXX-X (solo números y guiones, ej: 30-71234567-8).', false);
+        $('cuit').focus();
         return;
       }
-      if (state.ongs.some((o) => o.sigla.toLowerCase() === sigla.toLowerCase())) {
+
+      // Validar razón social, sigla y CUIT únicos contra el catálogo cargado
+      if (state.ongs.some((o) => o.razonSocial.trim().toLowerCase() === razonSocial.toLowerCase())) {
+        showAlert($('globalAlert'), `Ya existe una ONG registrada con la razón social "${razonSocial}".`, false);
+        $('razonSocial').focus();
+        return;
+      }
+      if (state.ongs.some((o) => o.cuit.trim().toLowerCase() === cuit.toLowerCase())) {
+        showAlert($('globalAlert'), `Ya existe una ONG registrada con el CUIT ${cuit}.`, false);
+        $('cuit').focus();
+        return;
+      }
+      if (state.ongs.some((o) => o.sigla.trim().toLowerCase() === sigla.toLowerCase())) {
         showAlert($('globalAlert'), `Ya existe una ONG registrada con la sigla "${sigla}".`, false);
+        $('sigla').focus();
         return;
       }
 
@@ -674,9 +688,14 @@
       const seen = new Set();
       for (const row of $('stockRows').querySelectorAll('.stock-row')) {
         const recursoId = Number(row.querySelector('.r-select').value);
-        const cantidadTotal = Number(row.querySelector('.r-qty').value);
-        if (!recursoId || !Number.isInteger(cantidadTotal) || cantidadTotal <= 0) {
+        const rawQty = row.querySelector('.r-qty').value.trim();
+        const cantidadTotal = Number(rawQty);
+        if (!recursoId || !rawQty || !Number.isInteger(cantidadTotal) || cantidadTotal <= 0) {
           showAlert($('globalAlert'), 'Revisá los recursos y cantidades (deben ser enteros mayores a 0).', false);
+          return;
+        }
+        if (cantidadTotal > MAX_STOCK) {
+          showAlert($('globalAlert'), `La cantidad máxima permitida por recurso es ${MAX_STOCK.toLocaleString('es-AR')}.`, false);
           return;
         }
         if (seen.has(recursoId)) {
@@ -727,9 +746,14 @@
       $('detailAlert').classList.add('hidden');
 
       const recursoId = Number($('detailRecurso').value);
-      const cantidadTotal = Number($('detailCantidad').value);
-      if (!recursoId || !Number.isInteger(cantidadTotal) || cantidadTotal <= 0) {
+      const rawQty = $('detailCantidad').value.trim();
+      const cantidadTotal = Number(rawQty);
+      if (!recursoId || !rawQty || !Number.isInteger(cantidadTotal) || cantidadTotal <= 0) {
         showAlert($('detailAlert'), 'Elegí un recurso y una cantidad entera mayor a 0.', false);
+        return;
+      }
+      if (cantidadTotal > MAX_STOCK) {
+        showAlert($('detailAlert'), `La cantidad máxima permitida por recurso es ${MAX_STOCK.toLocaleString('es-AR')}.`, false);
         return;
       }
 
