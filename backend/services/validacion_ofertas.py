@@ -127,7 +127,124 @@ def resultado_guardado(session, emergencia_id):
     )
     return dict(cobertura_suficiente=validacion_completa and all(l.cantidadCubierta >= l.cantidad for l in lotes))
 
+def obtener_reservas_adjudicadas(session, emergencia_id):
+    """Calcula las reservas adjudicadas para una emergencia."""
+    lotes = session.exec(select(Lote).where(Lote.emergenciaId == emergencia_id)).all()
+    lote_ids = [lote.id for lote in lotes if lote.id is not None]
+    respuesta_vacia = {"emergencia_id": emergencia_id, "data": [], "ofertas": []}
+    if not lote_ids:
+        return respuesta_vacia
 
+    ofertas = session.exec(select(Oferta).where(
+        Oferta.lote_id.in_(lote_ids),
+        Oferta.resultado_validacion.is_not(None),
+        Oferta.descartada_en.is_(None),
+    ).order_by(Oferta.lote_id, Oferta.id)).all()
+    if not ofertas:
+        return respuesta_vacia
+
+    cuits_por_participante = {
+        (oferta_id, participante_id): cuit
+        for oferta_id, participante_id, cuit in session.exec(
+            select(ParticipanteOferta.oferta_id, ParticipanteOferta.id, ParticipanteOferta.ong_cuit)
+            .where(ParticipanteOferta.oferta_id.in_([oferta.id for oferta in ofertas]))
+        ).all()
+    }
+
+    detalles = session.exec(
+        select(AdjudicacionDetalle, ParticipanteOferta)
+        .join(
+            ParticipanteOferta,
+            AdjudicacionDetalle.participante_oferta_id == ParticipanteOferta.id,
+        )
+        .join(
+            Adjudicacion,
+            AdjudicacionDetalle.adjudicacion_id == Adjudicacion.id,
+        )
+        .join(Lote, Adjudicacion.lote_id == Lote.id)
+        .where(Lote.emergenciaId == emergencia_id)
+    ).all()
+    adjudicado_por_participante = {}
+    for detalle, participante in detalles:
+        adjudicado_por_participante[participante.id] = (
+            adjudicado_por_participante.get(participante.id, 0)
+            + detalle.cantidad_adjudicada
+        )
+
+    lotes_por_id = {lote.id: lote for lote in lotes}
+    data_por_recurso = {}
+    ofertas_resultado = []
+
+    for oferta in ofertas:
+        lote = lotes_por_id[oferta.lote_id]
+        resultado = oferta.resultado_validacion or {}
+        participantes_adjudicados = []
+
+        for participante in resultado.get("participantes", []):
+            participante_id = participante.get("participante_id")
+            cantidad_reservada = participante.get("cantidad_verificada", 0)
+            if (
+                not isinstance(participante_id, int)
+                or not isinstance(cantidad_reservada, int)
+            ):
+                raise ValueError(f"Resultado inválido para la oferta {oferta.id}")
+
+            cantidad_adjudicada = adjudicado_por_participante.get(participante_id, 0)
+            if cantidad_adjudicada > cantidad_reservada:
+                raise ValueError(
+                    f"La cantidad adjudicada excede la reservada para el participante "
+                    f"{participante_id}"
+                )
+            if not cantidad_adjudicada:
+                continue
+
+            participante_db = session.get(ParticipanteOferta, participante_id)
+            if not participante_db:
+                raise ValueError(f"No existe el participante {participante_id}")
+
+            cuit = participante_db.ong_cuit
+            if not isinstance(cuit, str) or not cuit.strip():
+                cuit = cuits_por_participante.get((oferta.id, participante_id))
+            if not isinstance(cuit, str) or not cuit.strip():
+                raise ValueError(
+                    f"El participante {participante_id} no tiene CUIT para adjudicar"
+                )
+            cuit = cuit.strip()
+
+            participantes_adjudicados.append({
+                **participante,
+                "cuit": cuit,
+                "cantidad_reservada": cantidad_reservada,
+                "cantidad_adjudicada": cantidad_adjudicada,
+                "cantidad_a_liberar": cantidad_adjudicada,
+            })
+            clave = (cuit, lote.descripcion)
+            data_por_recurso[clave] = (
+                data_por_recurso.get(clave, 0) + cantidad_adjudicada
+            )
+
+        if participantes_adjudicados:
+            ofertas_resultado.append({
+                "oferta_id": oferta.id,
+                "lote_id": lote.id,
+                "descripcion": lote.descripcion,
+                "participantes": participantes_adjudicados,
+            })
+
+    data = [
+        {
+            "cuit": cuit,
+            "descripcion": descripcion,
+            "cantidad_a_liberar": cantidad,
+        }
+        for (cuit, descripcion), cantidad in sorted(data_por_recurso.items())
+    ]
+    return {
+        "emergencia_id": emergencia_id,
+        "data": data,
+        "ofertas": ofertas_resultado,
+    }
+    
 def obtener_reservas_no_adjudicadas(session, emergencia_id):
     """Calcula el remanente reservado después de las adjudicaciones."""
     lotes = session.exec(select(Lote).where(Lote.emergenciaId == emergencia_id)).all()

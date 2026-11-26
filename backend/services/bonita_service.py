@@ -517,6 +517,7 @@ class BonitaService:
                 agrupadas[clave]["representantes"].append(nombre_usuario)
 
         return list(agrupadas.values())
+
     # Consulta ONGs mediante la extensión REST 'sistemaNacional' en Bonita Engine
     async def get_ongs(self, cuit: str | None = None) -> dict:
         """
