@@ -268,7 +268,7 @@ def actualizar_estado_emergencia(
         raise HTTPException(status_code=404, detail="Emergencia no encontrada")
     
     # Actualizar el estado
-    emergencia.estado = "finalizado"
+    emergencia.estado = EmergenciaEstado.MONITOREO_FINALIZADO
     
     session.add(emergencia)
     session.commit()
