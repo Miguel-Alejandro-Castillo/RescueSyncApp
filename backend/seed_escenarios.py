@@ -6,7 +6,8 @@ quedan consistentes. Complementa a seed_casos_finalizados.py (que lleva casos ha
 Escenarios (fases):
   lotes        6 emergencias esperando "Generar lotes" (4 criticas)
   adjudicacion 2 casos con cobertura total -> lote EN_ADJUDICACION (uno con consorcio)
-  evaluar      4 casos con cobertura insuficiente -> esperando "Evaluar acciones a tomar"
+  evaluar      10 casos con cobertura insuficiente u ofertas invalidas -> esperando
+               "Evaluar acciones a tomar" (aparecen en "Emergencias a validar")
   ejecucion    2 casos adjudicados con varias ONGs -> Monitorear / Ejecutar y finalizar
   abiertas     3 emergencias con convocatoria abierta, sin ofertas ("Cargar ofertas")
 
@@ -72,11 +73,25 @@ CASOS = [
     dict(fase="evaluar", gravedad="critico", zona="Isla Grande", tipo="Insumos", recurso="Agua",
          cantidad=100, lider=("lalo.salamanca", 40), invitados=[]),                      # Caritas
     dict(fase="evaluar", gravedad="critico", zona="Paso del Rio", tipo="Personal", recurso="Bomberos",
-         cantidad=120, lider=("mario.schrader", 60), invitados=[]),                      # Cruzada
+         cantidad=120, lider=("marie.schrader", 60), invitados=[]),                      # Cruzada
     dict(fase="evaluar", gravedad="alto", zona="Cerro Alto", tipo="Materiales", recurso="Arena",
          cantidad=150, lider=("hector.salamanca", 100), invitados=[]),                   # Cultura de Trabajo
     dict(fase="evaluar", gravedad="medio", zona="La Cañada", tipo="Insumos", recurso="Medicamentos",
          cantidad=80, lider=("saul.goodman", 30), invitados=[]),                         # Fund. Si
+    # --- evaluar: 6 casos con oferta INVALIDA, para "Emergencias a validar"
+    #     (la ONG ofrece mas de lo que tiene en stock o un recurso que no tiene) ---
+    dict(fase="evaluar", gravedad="critico", zona="Rio Seco", tipo="Personal", recurso="Medicos",
+         cantidad=100, lider=("walter.white", 90), invitados=[]),                        # Cruz Roja: stock 80 < 90
+    dict(fase="evaluar", gravedad="critico", zona="Cañadon Sur", tipo="Materiales", recurso="Tierra",
+         cantidad=200, lider=("skylar.white", 150), invitados=[]),                       # Cruzada: stock 110 < 150
+    dict(fase="evaluar", gravedad="alto", zona="Barrio Obrero", tipo="Materiales", recurso="Ladrillos",
+         cantidad=150, lider=("don.eladio", 130), invitados=[]),                         # Huesped: stock 110 < 130
+    dict(fase="evaluar", gravedad="critico", zona="Loma Verde", tipo="Insumos", recurso="Raciones de comida",
+         cantidad=60, lider=("gustavo.fring", 60), invitados=[]),                        # Huesped: stock 50 < 60
+    dict(fase="evaluar", gravedad="alto", zona="Isla Sur", tipo="Personal", recurso="Bomberos",
+         cantidad=80, lider=("juan.bolsa", 80), invitados=[]),                           # Cult. de Trabajo: no tiene Bomberos
+    dict(fase="evaluar", gravedad="alto", zona="Pampa Seca", tipo="Insumos", recurso="Medicamentos",
+         cantidad=80, lider=("marco.salamanca", 70), invitados=[]),                      # Potenciar: stock 50 < 70
     # --- ejecucion: varias ONGs, cobertura total, adjudicado ---
     dict(fase="ejecucion", gravedad="alto", zona="Villa Esperanza", tipo="Transporte", recurso="Combustible",
          cantidad=300, lider=("hector.salamanca", 120),

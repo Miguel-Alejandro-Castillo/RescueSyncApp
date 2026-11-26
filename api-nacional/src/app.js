@@ -1,11 +1,17 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import apiRouter from './routes/index.routes.js';
 import systemRouter from './routes/system.routes.js';
 import notFound from './middlewares/not-found.middleware.js';
 import errorHandler from './middlewares/error-handler.middleware.js';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const publicDir = path.resolve(__dirname, '../public');
 
 // -------------------------
 // Configuración de Express
@@ -25,6 +31,12 @@ app.use(
     }
   })
 );
+
+// Panel web de administración de ONGs y stock (API Nacional)
+app.use('/admin', express.static(publicDir));
+app.get('/admin', (_req, res) => {
+  res.sendFile(path.join(publicDir, 'admin.html'));
+});
 
 // Swagger queda público; el resto de las rutas requiere un JWT válido.
 // El login es la única ruta pública dentro de la API. 

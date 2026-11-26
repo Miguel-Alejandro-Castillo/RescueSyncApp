@@ -7,28 +7,25 @@ import CuentaRegresiva from '../../components/CuentaRegresiva';
 import ValidatedForm, { FieldError } from '../../components/ValidatedForm';
 import { LOTE_ESTADOS } from '../../constants/lote';
 
-const ONG_NOMBRES_POR_CUIT = {
-  "30-54603392-5": "Cruz Roja Argentina",
-  "30-51731290-4": "Cáritas Argentina",
-  "30-71250682-9": "Fundación Sí",
-  "30-63749647-2": "Fundación Huésped",
-  "30-58650783-0": "Fundación Cruzada Patagónica",
-  "30-71203700-4": "Fundación Potenciar Solidario",
-  "30-71600757-6": "Fundación Cultura de Trabajo",
-  "30-70759612-7": "Fundación Banco de Alimentos",
-};
+
 
 const obtenerNombreOng = (ong) => {
+  const nombreBackend = (
+    ong?.nombre ||
+    ong?.razonSocial ||
+    ong?.razon_social ||
+    ''
+  ).trim();
+
+  if (nombreBackend && !nombreBackend.startsWith('ONG CUIT ')) {
+    return nombreBackend;
+  }
+
   const cuit = (ong?.ong_cuit || '').trim();
-  if (cuit && ONG_NOMBRES_POR_CUIT[cuit]) {
-    return ONG_NOMBRES_POR_CUIT[cuit];
-  }
-  if (ong?.nombre && !ong.nombre.startsWith('ONG CUIT ')) {
-    return ong.nombre;
-  }
   if (cuit) {
     return `ONG CUIT ${cuit}`;
   }
+
   return `ONG #${ong?.id ?? ''}`;
 };
 
@@ -186,9 +183,16 @@ export default function DetalleLotes() {
         throw new Error(data.detail || 'Error al procesar la oferta en consorcio');
       }
 
-      const mensajeExitoFinal = hacerConsorcio
+      const esConsorcioReal = idsInvitados.length > 0;
+      const mensajeExitoFinal =
+        data?.mensaje ||
+       (esConsorcioReal
         ? '¡Oferta en consorcio creada con éxito!'
-        : '¡Oferta creada con éxito!';
+       : '¡Oferta creada con éxito!');
+
+      navigate('/ofertas', {
+       state: { mensajeExito: mensajeExitoFinal }
+       });
 
       navigate('/ofertas', {
         state: { mensajeExito: mensajeExitoFinal }
@@ -242,7 +246,7 @@ export default function DetalleLotes() {
                     <h3 style={{ margin: '0 0 0.5rem 0' }}>{lote.tipoRecurso}</h3>
                     <p>{lote.descripcion}</p>
                     <p style={{ margin: 0, color: 'var(--muted)' }}>
-                      Cubierto: <strong>{cantCubierta}</strong> de {lote.cantidad} (Faltan: <strong style={{ color: 'var(--danger)' }}>{faltante}</strong>)
+                      Se necesitan: <strong>{lote.cantidad}</strong>
                     </p>
                   </div>
 

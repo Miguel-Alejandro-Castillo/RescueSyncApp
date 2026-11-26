@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sistema Nacional - Registrar ONG</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface-2: #162033;
+      --input-bg: #0f172a;
+      --border: #334155;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --accent-text: #082f49;
+      --ok-bg: rgba(34, 197, 94, 0.10);
+      --ok-border: rgba(34, 197, 94, 0.30);
+      --ok-text: #bbf7d0;
+      --err-bg: rgba(245, 158, 11, 0.10);
+      --err-border: rgba(245, 158, 11, 0.35);
+      --err-text: #fde68a;
+      --radius: 10px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    header {
+      background: var(--surface-2);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.08rem;
+      font-weight: 700;
+      color: #f8fafc;
+    }
+
+    header span {
+      display: block;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    .container {
+      max-width: 1120px;
+      margin: 24px auto;
+      padding: 0 20px 44px;
+    }
+
+    .login-wrap {
+      max-width: 400px;
+      margin: 60px auto;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 20px;
+      align-items: start;
+    }
+
+    @media (max-width: 880px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+    }
+
+    .card h2 {
+      margin: 0 0 4px;
+      font-size: 1.02rem;
+      color: #f8fafc;
+    }
+
+    .subtitle {
+      margin: 0 0 16px;
+      font-size: 0.84rem;
+      color: var(--muted);
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    @media (max-width: 520px) {
+      .row { grid-template-columns: 1fr; }
+    }
+
+    .field { margin-bottom: 13px; }
+
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 5px;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 8px 11px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      color: var(--text);
+      background: var(--input-bg);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+    }
+
+    input::placeholder, textarea::placeholder { color: #64748b; }
+
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14);
+    }
+
+    textarea { resize: vertical; min-height: 60px; }
+
+    .divider {
+      margin: 16px 0 10px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .divider h3 {
+      margin: 0;
+      font-size: 0.9rem;
+      color: #cbd5e1;
+    }
+
+    .stock-row {
+      display: grid;
+      grid-template-columns: 1fr 105px auto;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+
+    .btn {
+      padding: 8px 14px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      border-radius: 7px;
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--accent-text);
+    }
+
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+
+    .btn-ghost {
+      background: var(--surface-2);
+      color: var(--text);
+      border-color: var(--border);
+      padding: 6px 11px;
+      font-size: 0.8rem;
+    }
+
+    .btn-ghost:hover:not(:disabled) { background: #273549; }
+
+    .btn-remove {
+      background: transparent;
+      color: #fca5a5;
+      border: 1px solid #7f1d1d;
+      padding: 7px 10px;
+      font-size: 0.78rem;
+    }
+
+    .btn-remove:hover { background: rgba(153, 27, 27, 0.25); }
+
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .alert {
+      padding: 10px 13px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 14px;
+      border: 1px solid transparent;
+    }
+
+    .alert-ok { background: var(--ok-bg); border-color: var(--ok-border); color: var(--ok-text); }
+    .alert-err { background: var(--err-bg); border-color: var(--err-border); color: var(--err-text); }
+
+    .ong-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-height: 310px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+
+    .ong-item {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+
+    .ong-item:hover { border-color: #64748b; }
+    .ong-item.active { border-color: var(--accent); background: rgba(56, 189, 248, 0.08); }
+
+    .ong-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ong-name { font-weight: 600; font-size: 0.9rem; color: #f8fafc; }
+    .ong-meta { font-size: 0.79rem; color: var(--muted); margin-top: 2px; }
+
+    .badge {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(34, 197, 94, 0.15);
+      color: #86efac;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+      margin-top: 8px;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 7px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    .hint {
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin: 4px 0 8px;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Registrar ONG</h1>
+      <span>Sistema Nacional de Gestión de Recursos y Riesgos</span>
+    </div>
+    <button id="btnLogout" class="btn btn-ghost hidden" type="button">Cerrar sesión</button>
+  </header>
+
+  <main class="container">
+    <!-- Login -->
+    <section id="loginCard" class="login-wrap card">
+      <h2>Iniciar sesión</h2>
+      <div id="loginAlert" class="alert alert-err hidden"></div>
+      <form id="loginForm" novalidate>
+        <div class="field">
+          <label for="username">Usuario</label>
+          <input id="username" type="text" value="admin" required />
+        </div>
+        <div class="field">
+          <label for="password">Contraseña</label>
+          <input id="password" type="password" value="admin123" required />
+        </div>
+        <button id="btnLogin" class="btn btn-primary" type="submit" style="width: 100%;">Ingresar</button>
+      </form>
+    </section>
+
+    <!-- Panel principal -->
+    <section id="appSection" class="hidden">
+      <div id="globalAlert" class="alert hidden"></div>
+
+      <div class="grid">
+        <!-- Izquierda: Alta de ONG + Stock inicial -->
+        <div class="card">
+          <h2>Nueva ONG</h2>
+          <p class="subtitle">Registrá una ONG y cargá su stock inicial.</p>
+
+          <form id="ongForm" novalidate>
+            <div class="field">
+              <label for="razonSocial">Razón Social *</label>
+              <input id="razonSocial" type="text" placeholder="Ej: Fundación Rescate Solidario" required />
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <label for="sigla">Sigla *</label>
+                <input id="sigla" type="text" placeholder="Ej: FRS" required />
+              </div>
+              <div class="field">
+                <label for="cuit">CUIT *</label>
+                <input id="cuit" type="text" placeholder="Ej: 30-71234567-8" required />
+              </div>
+            </div>
+
+            <div class="field">
+              <label for="descripcion">Descripción</label>
+              <textarea id="descripcion" placeholder="Opcional..."></textarea>
+            </div>
+
+            <div class="divider">
+              <h3>Stock inicial</h3>
+              <button id="btnAddRow" class="btn btn-ghost" type="button">+ Agregar recurso</button>
+            </div>
+
+            <div id="stockRows"></div>
+            <p id="emptyStock" class="hint">Sin recursos agregados.</p>
+
+            <div class="actions">
+              <button id="btnClear" class="btn btn-ghost" type="button">Limpiar</button>
+              <button id="btnSubmit" class="btn btn-primary" type="submit">Crear ONG</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Derecha: Listado de ONGs + Stock de la ONG seleccionada -->
+        <div style="display: flex; flex-direction: column; gap: 18px;">
+          <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px;">
+              <h2 style="margin: 0;">ONGs (<span id="ongCount">0</span>)</h2>
+              <button id="btnRefresh" class="btn btn-ghost" type="button">Actualizar</button>
+            </div>
+            <input id="searchOng" type="text" placeholder="Filtrar por nombre, sigla o CUIT..." />
+            <div id="ongList" class="ong-list"></div>
+          </div>
+
+          <div id="detailCard" class="card hidden">
+            <div class="ong-item-top" style="margin-bottom: 4px;">
+              <h2 id="detailTitle" style="margin: 0;">Stock</h2>
+              <span id="detailEstado" class="badge">HABILITADA</span>
+            </div>
+            <p id="detailMeta" class="subtitle" style="margin-bottom: 10px;"></p>
+            <div id="detailAlert" class="alert hidden"></div>
+            <div id="detailTable"></div>
+
+            <div class="divider">
+              <h3>Agregar recurso</h3>
+            </div>
+            <form id="addStockForm" class="stock-row" novalidate>
+              <select id="detailRecurso" required></select>
+              <input id="detailCantidad" type="number" min="1" step="1" placeholder="Cant." required />
+              <button id="btnAddStock" class="btn btn-primary" type="submit">Agregar</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const API = '/api/v1';
+    const TOKEN_KEY = 'api_nacional_jwt';
+    const $ = (id) => document.getElementById(id);
+
+    const state = {
+      token: sessionStorage.getItem(TOKEN_KEY) || '',
+      categorias: [],
+      recursos: [],
+      ongs: [],
+      selectedOngId: null,
+      selectedOngRecursosIds: new Set(),
+    };
+
+    function escapeHtml(s) {
+      return String(s ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function showAlert(el, msg, ok = true) {
+      el.textContent = msg;
+      el.className = `alert ${ok ? 'alert-ok' : 'alert-err'}`;
+      el.classList.remove('hidden');
+    }
+
+    async function api(path, opts = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+      if (state.token) headers.Authorization = `Bearer ${state.token}`;
+      const res = await fetch(`${API}${path}`, { ...opts, headers });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 401 && path !== '/auth/login') {
+        logout('Sesión vencida. Volvé a ingresar.');
+        throw new Error('Sesión vencida');
+      }
+      if (!res.ok) {
+        throw new Error(body?.error?.message || body?.message || `Error HTTP ${res.status}`);
+      }
+      return body.data;
+    }
+
+    function resourceOptions(excludeIds = null) {
+      const catById = new Map(state.categorias.map((c) => [c.id, c.nombre]));
+      const groups = new Map();
+      for (const r of state.recursos) {
+        if (excludeIds && excludeIds.has(r.id)) continue;
+        const cat = catById.get(r.categoriaId) || 'Otros';
+        if (!groups.has(cat)) groups.set(cat, []);
+        groups.get(cat).push(r);
+      }
+      let html = '<option value="">Recurso...</option>';
+      for (const [cat, list] of groups.entries()) {
+        html += `<optgroup label="${escapeHtml(cat)}">`;
+        for (const r of list) {
+          html += `<option value="${r.id}">${escapeHtml(r.nombre)} (${escapeHtml(r.codigo)})</option>`;
+        }
+        html += '</optgroup>';
+      }
+      return html;
+    }
+
+    function toggleEmptyHint() {
+      $('emptyStock').classList.toggle('hidden', $('stockRows').children.length > 0);
+    }
+
+    function addStockRow() {
+      const row = document.createElement('div');
+      row.className = 'stock-row';
+      row.innerHTML = `
+        <select class="r-select" required>${resourceOptions()}</select>
+        <input class="r-qty" type="number" min="1" step="1" placeholder="Cant." required />
+        <button type="button" class="btn btn-remove">Quitar</button>
+      `;
+      row.querySelector('button').addEventListener('click', () => {
+        row.remove();
+        toggleEmptyHint();
+      });
+      $('stockRows').appendChild(row);
+      toggleEmptyHint();
+    }
+
+    function renderOngList() {
+      const q = $('searchOng').value.trim().toLowerCase();
+      const filtered = state.ongs.filter((o) =>
+        o.razonSocial.toLowerCase().includes(q) ||
+        o.sigla.toLowerCase().includes(q) ||
+        o.cuit.toLowerCase().includes(q)
+      );
+
+      $('ongCount').textContent = String(state.ongs.length);
+      if (!filtered.length) {
+        $('ongList').innerHTML = '<p class="hint">No se encontraron ONGs.</p>';
+        return;
+      }
+
+      $('ongList').innerHTML = filtered.map((o) => `
+        <div class="ong-item ${o.id === state.selectedOngId ? 'active' : ''}" data-id="${o.id}">
+          <div class="ong-item-top">
+            <span class="ong-name">${escapeHtml(o.razonSocial)}</span>
+            <span class="badge">${escapeHtml(o.estado)}</span>
+          </div>
+          <div class="ong-meta">${escapeHtml(o.sigla)} · CUIT ${escapeHtml(o.cuit)}</div>
+        </div>
+      `).join('');
+
+      $('ongList').querySelectorAll('.ong-item').forEach((el) => {
+        el.addEventListener('click', () => selectOng(Number(el.dataset.id)));
+      });
+    }
+
+    async function selectOng(ongId) {
+      state.selectedOngId = ongId;
+      renderOngList();
+      $('detailAlert').classList.add('hidden');
+      $('detailCard').classList.remove('hidden');
+      $('detailTable').innerHTML = '<p class="hint">Cargando...</p>';
+
+      try {
+        const data = await api(`/ongs/${ongId}/recursos`);
+        state.selectedOngRecursosIds = new Set(data.recursos.map((r) => r.id));
+        $('detailTitle').textContent = data.razonSocial;
+        $('detailMeta').textContent = `CUIT ${data.cuit} · ID #${data.id}`;
+        $('detailEstado').textContent = data.estado;
+        $('detailRecurso').innerHTML = resourceOptions(state.selectedOngRecursosIds);
+
+        if (!data.recursos.length) {
+          $('detailTable').innerHTML = '<p class="hint">Esta ONG todavía no tiene stock cargado.</p>';
+          return;
+        }
+
+        $('detailTable').innerHTML = `
+          <table>
+            <thead>
+              <tr>
+                <th>Recurso</th>
+                <th class="num">Total</th>
+                <th class="num">Reserv.</th>
+                <th class="num">Disp.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.recursos.map((r) => `
+                <tr>
+                  <td>${escapeHtml(r.nombre)}</td>
+                  <td class="num">${r.cantidadTotal}</td>
+                  <td class="num">${r.cantidadReservada}</td>
+                  <td class="num"><strong>${r.cantidadDisponible}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `;
+      } catch (err) {
+        showAlert($('detailAlert'), err.message, false);
+        $('detailTable').innerHTML = '';
+      }
+    }
+
+    async function loadAll() {
+      const [categorias, recursos, ongs] = await Promise.all([
+        api('/categorias'),
+        api('/recursos'),
+        api('/ongs'),
+      ]);
+      state.categorias = categorias || [];
+      state.recursos = recursos || [];
+      state.ongs = ongs || [];
+      renderOngList();
+      if (state.selectedOngId && state.ongs.some((o) => o.id === state.selectedOngId)) {
+        await selectOng(state.selectedOngId);
+      }
+    }
+
+    async function enterApp() {
+      $('loginCard').classList.add('hidden');
+      $('appSection').classList.remove('hidden');
+      $('btnLogout').classList.remove('hidden');
+      $('globalAlert').classList.add('hidden');
+      try {
+        await loadAll();
+      } catch (err) {
+        if (state.token) showAlert($('globalAlert'), err.message, false);
+      }
+    }
+
+    function logout(msg = '') {
+      state.token = '';
+      state.selectedOngId = null;
+      sessionStorage.removeItem(TOKEN_KEY);
+      $('appSection').classList.add('hidden');
+      $('btnLogout').classList.add('hidden');
+      $('detailCard').classList.add('hidden');
+      $('loginCard').classList.remove('hidden');
+      if (msg) showAlert($('loginAlert'), msg, false);
+      else $('loginAlert').classList.add('hidden');
+    }
+
+    $('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('loginAlert').classList.add('hidden');
+      const username = $('username').value.trim();
+      const password = $('password').value;
+      if (!username || !password) {
+        showAlert($('loginAlert'), 'Completá usuario y contraseña.', false);
+        (!username ? $('username') : $('password')).focus();
+        return;
+      }
+      $('btnLogin').disabled = true;
+      try {
+        const data = await api('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ username, password }),
+        });
+        state.token = data.access_token;
+        sessionStorage.setItem(TOKEN_KEY, state.token);
+        await enterApp();
+      } catch (err) {
+        showAlert($('loginAlert'), err.message, false);
+      } finally {
+        $('btnLogin').disabled = false;
+      }
+    });
+
+    $('btnLogout').addEventListener('click', () => logout());
+    $('btnAddRow').addEventListener('click', addStockRow);
+    $('searchOng').addEventListener('input', renderOngList);
+    $('btnRefresh').addEventListener('click', () => loadAll());
+
+    $('btnClear').addEventListener('click', () => {
+      $('ongForm').reset();
+      $('stockRows').innerHTML = '';
+      toggleEmptyHint();
+      $('globalAlert').classList.add('hidden');
+    });
+
+    $('ongForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('globalAlert').classList.add('hidden');
+
+      const razonSocial = $('razonSocial').value.trim();
+      const sigla = $('sigla').value.trim();
+      const cuit = $('cuit').value.trim();
+      const descripcion = $('descripcion').value.trim();
+
+      if (!razonSocial) {
+        showAlert($('globalAlert'), 'Ingresá la razón social de la ONG.', false);
+        $('razonSocial').focus();
+        return;
+      }
+      if (!sigla) {
+        showAlert($('globalAlert'), 'Ingresá la sigla de la ONG.', false);
+        $('sigla').focus();
+        return;
+      }
+      if (!cuit) {
+        showAlert($('globalAlert'), 'Ingresá el CUIT de la ONG.', false);
+        $('cuit').focus();
+        return;
+      }
+
+      // Validar CUIT / sigla duplicados contra el catálogo cargado
+      if (state.ongs.some((o) => o.cuit.toLowerCase() === cuit.toLowerCase())) {
+        showAlert($('globalAlert'), `Ya existe una ONG registrada con el CUIT ${cuit}.`, false);
+        return;
+      }
+      if (state.ongs.some((o) => o.sigla.toLowerCase() === sigla.toLowerCase())) {
+        showAlert($('globalAlert'), `Ya existe una ONG registrada con la sigla "${sigla}".`, false);
+        return;
+      }
+
+      const items = [];
+      const seen = new Set();
+      for (const row of $('stockRows').querySelectorAll('.stock-row')) {
+        const recursoId = Number(row.querySelector('.r-select').value);
+        const cantidadTotal = Number(row.querySelector('.r-qty').value);
+        if (!recursoId || !Number.isInteger(cantidadTotal) || cantidadTotal <= 0) {
+          showAlert($('globalAlert'), 'Revisá los recursos y cantidades (deben ser enteros mayores a 0).', false);
+          return;
+        }
+        if (seen.has(recursoId)) {
+          showAlert($('globalAlert'), 'No repitas el mismo recurso en el stock inicial.', false);
+          return;
+        }
+        seen.add(recursoId);
+        items.push({ recursoId, cantidadTotal });
+      }
+
+      $('btnSubmit').disabled = true;
+      try {
+        const ong = await api('/ongs', {
+          method: 'POST',
+          body: JSON.stringify({
+            razonSocial,
+            sigla,
+            cuit,
+            descripcion: descripcion || undefined,
+          }),
+        });
+
+        for (const item of items) {
+          await api(`/ongs/${ong.id}/recursos`, {
+            method: 'PUT',
+            body: JSON.stringify(item),
+          });
+        }
+
+        $('ongForm').reset();
+        $('stockRows').innerHTML = '';
+        toggleEmptyHint();
+        state.selectedOngId = ong.id;
+        await loadAll();
+
+        const extra = items.length ? ` con ${items.length} recurso(s)` : '';
+        showAlert($('globalAlert'), `ONG "${ong.razonSocial}" creada (ID #${ong.id}, CUIT ${ong.cuit})${extra}.`, true);
+      } catch (err) {
+        showAlert($('globalAlert'), err.message, false);
+      } finally {
+        $('btnSubmit').disabled = false;
+      }
+    });
+
+    $('addStockForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!state.selectedOngId) return;
+      $('detailAlert').classList.add('hidden');
+
+      const recursoId = Number($('detailRecurso').value);
+      const cantidadTotal = Number($('detailCantidad').value);
+      if (!recursoId || !Number.isInteger(cantidadTotal) || cantidadTotal <= 0) {
+        showAlert($('detailAlert'), 'Elegí un recurso y una cantidad entera mayor a 0.', false);
+        return;
+      }
+
+      $('btnAddStock').disabled = true;
+      try {
+        await api(`/ongs/${state.selectedOngId}/recursos`, {
+          method: 'PUT',
+          body: JSON.stringify({ recursoId, cantidadTotal }),
+        });
+        $('detailCantidad').value = '';
+        await selectOng(state.selectedOngId);
+        showAlert($('detailAlert'), 'Recurso agregado al stock.', true);
+      } catch (err) {
+        showAlert($('detailAlert'), err.message, false);
+      } finally {
+        $('btnAddStock').disabled = false;
+      }
+    });
+
+    if (state.token) enterApp();
+  </script>
+</body>
+</html>
